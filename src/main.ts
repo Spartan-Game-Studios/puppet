@@ -48,6 +48,7 @@ import {
 import { VCAM_RESOLUTIONS, type VcamResolution } from './vcam/frame';
 import { VirtualCamOutput } from './vcam/output';
 import { loadSettings, saveSettings, type Settings } from './app/settings';
+import { bindEnvironmentUi } from './app/environmentUi';
 import type { PhysicsMode } from './physics/stableSprings';
 
 const params = new URLSearchParams(location.search);
@@ -254,7 +255,11 @@ async function applyBackground(): Promise<void> {
       bgUrl = null;
     }
   }
-  viewer.setBackground(b.kind, b.color, b.kind === 'image' ? bgUrl : null);
+  if (b.kind === 'environment') envUi.setActive(true);
+  else {
+    envUi.setActive(false);
+    viewer.setBackground(b.kind, b.color, b.kind === 'image' ? bgUrl : null);
+  }
   // Cameras have no alpha: CLEAR is sent composited over the chosen colour.
   vcam.setBackground(b.color);
   segSet('bg-kind', b.kind);
@@ -434,6 +439,18 @@ $<HTMLInputElement>('bg-color').addEventListener('input', (e) => {
   applyBackground();
 });
 $('btn-bg-image').addEventListener('click', () => pickBackgroundImage());
+// 05 ENVIRONMENT (src/app/environmentUi.ts)
+const envUi = bindEnvironmentUi({
+  viewer,
+  settings,
+  persist,
+  setStatus,
+  setBackgroundKind: (k) => {
+    settings.background.kind = k;
+    persist();
+    applyBackground();
+  },
+});
 segBind('framing', () => currentFraming, (v) => {
   currentFraming = v as Framing;
   viewer.frame(currentFraming);
@@ -827,6 +844,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'f') setTab('face');
   else if (k === 'p') setTab('physics');
   else if (k === 'r') avatar?.physics.reset();
+  else if (k === 'e') envUi.toggle();
   else if (k === '1') setMode('face');
   else if (k === '2') setMode('upper');
   else if (k === '3') setMode('hands');
@@ -843,7 +861,7 @@ await onNativeDrop(
   async (paths) => {
     const p = paths.find((x) => /\.vrm$/i.test(x));
     if (p) await loadModel(await readPath(p), baseName(p), p);
-    else setStatus('DROP A .VRM FILE', true);
+    else if (!(await envUi.dropPaths(paths))) setStatus('DROP A .VRM (OR A .GLB / .HDR ENVIRONMENT)', true);
   },
   (on) => drop.classList.toggle('on', on),
 );
@@ -858,8 +876,10 @@ if (!isTauri) {
   window.addEventListener('drop', async (e) => {
     e.preventDefault();
     drop.classList.remove('on');
-    const f = Array.from(e.dataTransfer?.files ?? []).find((x) => /\.vrm$/i.test(x.name));
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    const f = files.find((x) => /\.vrm$/i.test(x.name));
     if (f) await loadModel(await f.arrayBuffer(), f.name, null);
+    else await envUi.dropFiles(files);
   });
 }
 
@@ -995,6 +1015,7 @@ Object.assign(window, {
     record,
     calibrate,
     vcam,
+    env: envUi,
     frame: (f: Framing) => {
       currentFraming = f;
       segSet('framing', f);

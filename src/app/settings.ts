@@ -4,10 +4,11 @@ import { DEFAULT_PHYSICS, type PhysicsOverrides, type PhysicsSettings } from '..
 import { EMPTY_CALIBRATION, type Calibration } from '../tracking/faceProcessor';
 import type { BodyMode } from '../tracking/protocol';
 import type { VcamResolution } from '../vcam/frame';
+import { defaultEnvironmentSettings, sanitizeEnvironment, type EnvironmentSettings } from '../scene/environment/look';
 import { loadSettingsRaw, saveSettingsRaw } from './platform';
 
 export type Resolution = '640x480' | '1280x720' | '1920x1080';
-export type BackgroundKind = 'color' | 'transparent' | 'image';
+export type BackgroundKind = 'color' | 'transparent' | 'image' | 'environment';
 
 export interface Settings {
   version: 1;
@@ -31,6 +32,8 @@ export interface Settings {
   physics: PhysicsSettings;
   /** Per-model physics overrides, keyed by the model file's SHA-256. */
   physicsOverrides: Record<string, PhysicsOverrides>;
+  /** 3D environment (background kind 'environment'): scene, quality, per-scene look. */
+  environment: EnvironmentSettings;
   ui: { tab: 'face' | 'physics'; debug: boolean };
 }
 
@@ -55,6 +58,7 @@ export function defaultSettings(): Settings {
     vcam: { enabled: false, resolution: '1280x720', device: null },
     physics: { ...DEFAULT_PHYSICS },
     physicsOverrides: {},
+    environment: defaultEnvironmentSettings(),
     ui: { tab: 'face', debug: true },
   };
 }
@@ -77,7 +81,9 @@ export async function loadSettings(): Promise<Settings> {
   try {
     const raw = await loadSettingsRaw();
     if (!raw) return d;
-    return merge(d, JSON.parse(raw));
+    const s = merge(d, JSON.parse(raw));
+    sanitizeEnvironment(s.environment);
+    return s;
   } catch (e) {
     console.warn('[settings] unreadable, using defaults', e);
     return d;

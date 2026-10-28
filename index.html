@@ -72,6 +72,7 @@
             <button data-value="color">COLOUR</button>
             <button data-value="transparent">CLEAR</button>
             <button data-value="image">IMAGE</button>
+            <button data-value="environment" title="3D environment (section 05)">3D<kbd>E</kbd></button>
           </div>
           <div class="row swatches" id="swatches">
             <button data-color="#00ff00" style="background:#00ff00" title="Chroma green"></button>
@@ -97,8 +98,59 @@
           <div class="row"><span class="lbl">TX</span><span id="vmc-stats" class="val">OFF</span></div>
         </section>
 
+        <section class="block env" id="env-block">
+          <h2><span class="idx">05</span>ENVIRONMENT</h2>
+          <label class="row"><span class="lbl">SCENE</span>
+            <select id="env-id">
+              <option value="studio">STUDIO CYCLORAMA</option>
+              <option value="room">COSY ROOM</option>
+              <option value="moor">MOOR AT DUSK</option>
+              <option value="forest">NIGHT CLEARING</option>
+              <option value="neon">NEON GRID</option>
+              <option value="hall">CONCRETE HALL</option>
+              <option value="custom">CUSTOM (GLB + HDR)</option>
+            </select>
+          </label>
+          <div class="row"><span class="lbl">QUALITY</span>
+            <div class="seg" id="env-quality" role="radiogroup">
+              <button data-value="low">LOW</button>
+              <button data-value="high">HIGH</button>
+            </div>
+          </div>
+          <div class="env-custom" id="env-custom">
+            <div class="row btns">
+              <button id="btn-env-scene" class="btn" title="Load a .glb / .gltf scene (or drop one on the window)">SCENE</button>
+              <button id="btn-env-sky" class="btn" title="Load an equirectangular .hdr / .exr sky (lights the scene)">SKY</button>
+              <button id="btn-env-sky-clear" class="btn ghost" title="Remove the custom sky">NO SKY</button>
+            </div>
+            <div class="row"><span class="lbl">SCENE FILE</span><span id="env-scene-name" class="val">NONE</span></div>
+            <div class="row"><span class="lbl">SKY FILE</span><span id="env-sky-name" class="val">NONE</span></div>
+            <label class="slider"><span class="lbl">SCALE</span><input type="range" id="env-scale" min="-2" max="2" step="0.01" /><output id="env-scale-out"></output></label>
+            <label class="slider"><span class="lbl">POS X</span><input type="range" id="env-x" min="-10" max="10" step="0.05" /><output id="env-x-out"></output></label>
+            <label class="slider"><span class="lbl">POS Y</span><input type="range" id="env-y" min="-10" max="10" step="0.05" /><output id="env-y-out"></output></label>
+            <label class="slider"><span class="lbl">POS Z</span><input type="range" id="env-z" min="-10" max="10" step="0.05" /><output id="env-z-out"></output></label>
+            <label class="slider"><span class="lbl">ROTATE °</span><input type="range" id="env-rot" min="-180" max="180" step="1" /><output id="env-rot-out"></output></label>
+          </div>
+          <h3>LIGHT</h3>
+          <div class="seg" id="env-style" role="radiogroup">
+            <button data-value="scene" title="The scene's own lighting">SCENE</button>
+            <button data-value="key" title="Strong key, soft fill">KEY</button>
+            <button data-value="rim" title="Back-lit rim, low key">RIM</button>
+            <button data-value="soft" title="Even ambient light">SOFT</button>
+          </div>
+          <label class="slider"><span class="lbl">INTENSITY</span><input type="range" id="env-intensity" min="0.25" max="2" step="0.01" /><output id="env-intensity-out"></output></label>
+          <label class="slider"><span class="lbl">TEMP K</span><input type="range" id="env-temp" min="2000" max="12000" step="100" /><output id="env-temp-out"></output></label>
+          <h3>ATMOSPHERE</h3>
+          <label class="slider"><span class="lbl">FOG</span><input type="range" id="env-fog" min="0" max="1" step="0.01" /><output id="env-fog-out"></output></label>
+          <label class="check"><input type="checkbox" id="env-shadow" /><span>GROUND SHADOW</span></label>
+          <label class="slider"><span class="lbl">FLOOR M</span><input type="range" id="env-floor" min="-1" max="1" step="0.01" /><output id="env-floor-out"></output></label>
+          <h3>CAMERA</h3>
+          <label class="check"><input type="checkbox" id="env-sway" /><span>IDLE SWAY</span></label>
+          <label class="check"><input type="checkbox" id="env-dof" /><span>DEPTH OF FIELD (HIGH ONLY)</span></label>
+          <div class="row btns"><button id="btn-env-reset" class="btn ghost" title="Reset this scene's look and placement">RESET THIS SCENE</button></div>
+        </section>
         <section class="block">
-          <h2><span class="idx">05</span>VIRTUAL CAM</h2>
+          <h2><span class="idx">06</span>VIRTUAL CAM</h2>
           <label class="check"><input type="checkbox" id="vcam-enabled" /><span>SEND TO VIRTUAL CAMERA</span><kbd>W</kbd></label>
           <label class="row"><span class="lbl">RES</span>
             <select id="vcam-res">

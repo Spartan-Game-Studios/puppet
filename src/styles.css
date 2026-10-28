@@ -227,4 +227,9 @@ body.capture .bar, body.capture .panel, body.capture .grid-overlay, body.capture
 body.capture .capture-hint.show { display: block; }
 body.no-debug .bar.bottom > span:not(:last-child) { visibility: hidden; }
 
+/* ---- 05 environment ---- */
+.env-custom { display: none; flex-direction: column; gap: 8px; }
+.env.custom .env-custom { display: flex; }
+.env.off h2 { background: var(--mute); }
+
 .status-err { color: var(--accent) !important; }
