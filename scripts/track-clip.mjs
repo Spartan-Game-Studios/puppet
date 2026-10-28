@@ -10,7 +10,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BASE, launch, requireEnv, serveLocal } from './lib/browser.mjs';
-import { bodyReport } from './lib/bodyMetrics.mjs';
+import { bodyReport, faceStabilityReport, handSearchReport } from './lib/bodyMetrics.mjs';
 
 const model = requireEnv('PUPPET_MODEL');
 const dir = process.argv[2] ?? requireEnv('PUPPET_CLIP_DIR');
@@ -29,8 +29,10 @@ async function open(browser, query) {
 
 const browser = await launch();
 
-// ---- pass 1: record
-const page = await open(browser, 'loop=0&record=1&mirror=0&mode=hands');
+// ---- pass 1: record (PUPPET_MIRROR=1: mirrored, as in normal use; the arm and
+// finger metrics assume unmirrored, hand detection and gestures don't).
+const mirror = process.env.PUPPET_MIRROR === '1' ? 1 : 0;
+const page = await open(browser, `loop=0&record=1&mirror=${mirror}&mode=hands`);
 const calibrate = process.env.PUPPET_CALIBRATE !== '0';
 await page.evaluate(async (cal) => {
   const v = window.__puppet.source.video;
@@ -70,7 +72,7 @@ await page.close();
 
 const tr = (vt) => truth.frames[Math.min(truth.frames.length - 1, Math.max(0, Math.round(vt * truth.fps)))];
 const rows = rec.filter((r) => r.vt != null && r.face);
-const faceRec = rec.filter((r) => !r.body);
+const faceRec = rec.filter((r) => !r.body && !r.handsFrame);
 const avg = (k) => {
   const xs = fpsSamples.slice(2).map((x) => x[k]).filter((x) => x != null);
   return xs.length ? Math.round((10 * xs.reduce((a, b) => a + b, 0)) / xs.length) / 10 : null;
@@ -129,6 +131,9 @@ const report = {
   },
 };
 if (truth.frames.some((f) => f.rig)) report.body = bodyReport(rec, truth);
+report.mirror = !!mirror;
+report.handSearch = handSearchReport(rec, truth);
+report.faceStability = faceStabilityReport(rec, truth);
 console.log(JSON.stringify(report, null, 2));
 await writeFile(join(dir, 'track-report.json'), JSON.stringify({ report, rec }, null, 1));
 

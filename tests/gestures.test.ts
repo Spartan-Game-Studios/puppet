@@ -168,11 +168,11 @@ describe('GestureTracker events', () => {
     expect(events).toHaveLength(2);
   });
 
-  it('falls back to the selfie-convention handedness label', () => {
+  it('falls back to the handedness label, which names the hand\'s own side on an unmirrored frame', () => {
     const tr = new GestureTracker();
     for (let t = 0; t <= 400; t += 33) tr.update([{ worldLandmarks: hand(SPECS.fist), handedness: 'Left' }], t);
-    expect(tr.current.right).toBe('fist');
-    expect(tr.current.left).toBe('none');
+    expect(tr.current.left).toBe('fist');
+    expect(tr.current.right).toBe('none');
   });
 });
 

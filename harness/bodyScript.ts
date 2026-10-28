@@ -163,9 +163,83 @@ function lerpHand(a: HandKey, b: HandKey, t: number): HandKey {
   };
 }
 
-/** The interpolated body pose at time t (t >= BODY_START). */
-export function bodyAt(t: number): BodyKey {
-  const ks = BODY_KEYS;
+/**
+ * The "webcam" script (?script=webcam): what a real desk webcam sees and the
+ * rendered default clip never had. Hands at and in front of the face (the
+ * user-reported failure), both hands up for a whole gesture run, hands low at
+ * the bottom edge, close to the camera, in front of the torso and close
+ * together. No face section: it starts on the body at WEBCAM_START. Rendered
+ * with the closer desk camera (?cam=desk), where the elbows are often out of
+ * frame and the pose's wrists are weak.
+ */
+export const WEBCAM_START = 0.6;
+// Her left hand flat on her left cheek, fingers up, palm to the face.
+const F_CHEEK = hand({ wrist: [-0.2, 0.1, 0.32], pole: [0.4, -1, -0.2], fingers: [-0.1, 1, 0.05], thumbDir: [0, 0, 1], curl: [0.1, 0.1, 0.15, 0.15] });
+// Her left hand over her mouth and nose, back of the hand to the camera.
+const F_COVER = hand({ wrist: [-0.32, 0.18, 0.5], pole: [0.4, -1, -0.2], fingers: [-0.7, 0.7, -0.05], thumbDir: [0.7, 0.7, 0], curl: [0.2, 0.2, 0.25, 0.25] });
+// Chin resting on her left fist, knuckles up.
+const F_CHIN = hand({ wrist: [-0.3, 0.1, 0.5], pole: [0.3, -1, 0], fingers: [-0.25, 0.75, 0.3], thumbDir: [-0.2, 0, 1], curl: [1, 1, 1, 1], fold: 1 });
+// Open palm to the camera in front of her face.
+const F_FRONT = hand({ wrist: [-0.22, 0.2, 0.7], pole: [0.5, -1, -0.2], fingers: [-0.05, 1, 0.1], thumbDir: [-1, 0, 0], curl: [0, 0, 0, 0], spread: 0.4 });
+// Open palm beside her head, at the ear, a little out to the side (a wave).
+const F_BESIDE = hand({ wrist: [0.08, 0.22, 0.3], pole: [0.6, -1, -0.2], fingers: [0.05, 1, 0.05], thumbDir: [-1, 0, 0], curl: [0, 0, 0, 0], spread: 0.4 });
+// Hands low, just above the desk (near the bottom edge of a desk camera).
+const W_LOW = hand({ wrist: [-0.05, 0.0, 0.5], pole: [0.4, -1, -0.4], fingers: [-0.1, -0.1, 1], thumbDir: [-1, 0.2, 0], curl: [0.4, 0.4, 0.45, 0.45] });
+// Reaching toward the camera, open palm to it (a big hand).
+const W_CLOSE = hand({ wrist: [-0.22, 0.12, 0.82], pole: [0.4, -1, -0.2], fingers: [0, 1, 0.25], thumbDir: [-1, 0, 0], curl: [0, 0, 0, 0], spread: 0.4 });
+// In front of the torso, palms in, a hand's width apart.
+const W_TORSO = hand({ wrist: [-0.18, -0.05, 0.5], pole: [0.4, -1, -0.3], fingers: [-0.45, 0.25, 0.75], thumbDir: [0, 1, 0], curl: [0.3, 0.3, 0.35, 0.35] });
+// Nearly touching: fingertips together in front of the chest (wrists not crossed).
+const W_TOGETHER = hand({ wrist: [-0.27, -0.1, 0.55], pole: [0.4, -1, -0.3], fingers: [-0.8, 0.5, 0.2], thumbDir: [0, 1, 0], curl: [0.1, 0.1, 0.15, 0.15] });
+
+function buildWebcamKeys(): BodyKey[] {
+  const keys: BodyKey[] = [];
+  let t = WEBCAM_START;
+  const k = (dt: number, left: HandKey, right: HandKey, segment: string, g: BodyKey['gesture'] = { left: 'none', right: 'none' }) => {
+    t += dt;
+    keys.push({ t, left, right, segment, gesture: g, torso: ZERO });
+  };
+  // Each pose: 0.6 s in, held 1.8 s.
+  const hold = (left: HandKey, right: HandKey, segment: string, g?: BodyKey['gesture']) => {
+    k(0.6, left, right, segment, g);
+    k(1.8, left, right, segment, g);
+  };
+  k(0, REST, REST, 'rest');
+  k(0.4, REST, REST, 'rest');
+  // Hands at the face, one side then the other, then both.
+  hold(REST, F_CHEEK, 'faceCheek');
+  hold(F_CHEEK, REST, 'faceCheek');
+  hold(F_CHEEK, F_CHEEK, 'faceBoth');
+  hold(REST, F_COVER, 'faceCover');
+  hold(F_COVER, REST, 'faceCover');
+  hold(F_CHIN, REST, 'faceChin');
+  hold(REST, F_CHIN, 'faceChin');
+  hold(F_FRONT, REST, 'faceFront', { left: 'open', right: 'none' });
+  hold(REST, F_FRONT, 'faceFront', { left: 'none', right: 'open' });
+  hold(F_BESIDE, F_BESIDE, 'faceBeside', { left: 'open', right: 'open' });
+  hold(F_CHIN, F_CHEEK, 'faceBoth');
+  // Both hands up through a whole gesture run (each hand its own order).
+  const SLOT = 1.2;
+  for (let i = 0; i < SEQUENCE.length; i++) {
+    const gl = SEQUENCE[i];
+    const gr = SEQUENCE[(i + 3) % SEQUENCE.length];
+    k(i === 0 ? 0.6 : 0.3, hand(GESTURES[gl]), hand(GESTURES[gr]), 'bothUp', { left: gl, right: gr });
+    k(SLOT - 0.3, hand(GESTURES[gl]), hand(GESTURES[gr]), 'bothUp', { left: gl, right: gr });
+  }
+  hold(W_LOW, W_LOW, 'low');
+  hold(REST, W_CLOSE, 'close', { left: 'none', right: 'open' });
+  hold(W_TORSO, W_TORSO, 'torso');
+  hold(W_TOGETHER, W_TOGETHER, 'together');
+  k(0.8, REST, REST, 'rest');
+  k(0.6, REST, REST, 'rest');
+  return keys;
+}
+
+export const WEBCAM_KEYS = buildWebcamKeys();
+export const WEBCAM_END = WEBCAM_KEYS[WEBCAM_KEYS.length - 1].t;
+
+/** The interpolated body pose at time t (t >= the first key). */
+export function bodyAt(t: number, ks: BodyKey[] = BODY_KEYS): BodyKey {
   if (t <= ks[0].t) return { ...ks[0], t };
   for (let i = 0; i < ks.length - 1; i++) {
     const a = ks[i];

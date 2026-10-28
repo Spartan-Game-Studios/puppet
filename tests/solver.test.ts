@@ -143,6 +143,17 @@ describe('BodySolver', () => {
     expect(a.left!.landmarks[0].x).toBe(0.85);
     expect(a.right!.landmarks[0].x).toBe(0.15);
   });
+
+  it('maps user sides to avatar sides: as is unmirrored, swapped mirrored', () => {
+    const h = (userSide: 'left' | 'right') => ({ landmarks: [], worldLandmarks: [], handedness: 'Left', score: 0.9, userSide });
+    const plain = new BodySolver(rest, { mirror: false, hands: true }).assignHands({ hands: [h('left')] });
+    expect(Object.keys(plain)).toEqual(['left']);
+    const mirrored = new BodySolver(rest, { mirror: true, hands: true }).assignHands({ hands: [h('left')] });
+    expect(Object.keys(mirrored)).toEqual(['right']);
+    // No side and no pose: the label names the hand's own side.
+    const byLabel = new BodySolver(rest, { mirror: false, hands: true }).assignHands({ hands: [{ ...h('left'), userSide: undefined, handedness: 'Right' }] });
+    expect(Object.keys(byLabel)).toEqual(['right']);
+  });
 });
 
 /** Image landmarks for a world pose seen by a camera 2 m away, 640x480 (x right, y down). */
@@ -309,6 +320,31 @@ describe('BodySolver: occlusion and false wrists', () => {
     expect(sol!.armWeight.right).toBe(1);
     const lower = sol!.bones.get('rightLowerArm')!;
     expect(angleOf(lower)).toBeLessThan(0.35);
+  });
+
+  describe('the false-wrist gate only fires where the hand search looked and found nothing', () => {
+    const world = pose({
+      0: [0, -0.7, -0.1], 11: [0.2, -0.5, 0], 12: [-0.2, -0.5, 0], 13: [0.22, -0.2, 0], 14: [-0.25, -0.25, 0],
+      15: [0.23, 0.05, 0], 16: [-0.05, -0.6, -0.1], 23: [0.1, 0, 0], 24: [-0.1, 0, 0],
+    });
+    const img = imageOf(world);
+    const forearm = (handStatus: Record<string, string>, mirror = false) => {
+      const s = new BodySolver(rest, { mirror, hands: true });
+      let sol;
+      for (let t = 0; t < 1; t += 1 / 30) sol = s.solve({ poseWorld: world, poseImage: img, aspect: 4 / 3, t, hands: [], handStatus }, [['spine', 1]]);
+      return angleOf(sol!.bones.get(`${mirror ? 'left' : 'right'}LowerArm`)!);
+    };
+    it('searched there, nothing found (miss, other hand, duplicate): not followed', () => {
+      for (const st of ['miss', 'other-hand', 'duplicate']) expect(forearm({ left: 'tracked', right: st })).toBeLessThan(0.35);
+    });
+    it('not searched there (skip, no-roi): followed, a real hand at the face is never suppressed unseen', () => {
+      for (const st of ['skip', 'no-roi']) expect(forearm({ left: 'tracked', right: st })).toBeGreaterThan(1.0);
+    });
+    it('reads the status of the USER side, also when mirrored', () => {
+      // Mirrored: the user's right arm drives the avatar's left.
+      expect(forearm({ left: 'tracked', right: 'miss' }, true)).toBeLessThan(0.35);
+      expect(forearm({ left: 'miss', right: 'skip' }, true)).toBeGreaterThan(1.0);
+    });
   });
 });
 

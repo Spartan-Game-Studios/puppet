@@ -200,7 +200,7 @@ export interface GestureHandInput {
   worldLandmarks: P3[];
   /** The user's anatomical side, if known. */
   userSide?: HandSide;
-  /** MediaPipe handedness label (selfie convention), used when userSide is missing. */
+  /** MediaPipe handedness label, used when userSide is missing ('Left' = the user's left on an unmirrored frame). */
   handedness?: string;
 }
 
@@ -235,8 +235,8 @@ export class GestureTracker {
     const got = new Set<HandSide>();
     for (const h of hands) {
       if (!h.worldLandmarks || h.worldLandmarks.length < 21) continue;
-      // MediaPipe labels handedness as if the image were mirrored (selfie view).
-      const side: HandSide = h.userSide ?? (h.handedness === 'Left' ? 'right' : 'left');
+      // Without a side, the label names the hand's own side on our unmirrored frames (measured; see handAssign.ts).
+      const side: HandSide = h.userSide ?? (h.handedness === 'Right' ? 'right' : 'left');
       if (got.has(side)) continue;
       got.add(side);
       if (t - this.seen[side] > this.lostMs) this.smooth[side].reset();

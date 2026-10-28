@@ -58,6 +58,8 @@ export class Tracker {
     where: 'none',
   };
   onResult: (r: TrackerResult) => void = () => {};
+  /** Every result of the hand search, once (debug statistics). */
+  onHands: (r: TrackerResult) => void = () => {};
   onStatus: (s: string) => void = () => {};
 
   private lanes: Record<Pipeline, Lane> = {
@@ -139,6 +141,7 @@ export class Tracker {
       m.videoTime = lane.sentVideoTime;
       this.account(lane, m);
       if (pipeline === 'hands') {
+        this.onHands(m);
         const b = this.merge.onHands(m);
         if (b) this.onResult(b);
         return;
@@ -242,6 +245,7 @@ export class Tracker {
         const r = detect(this.main, p, v, t, this.opts.mode, this.opts.wantFaceLandmarks);
         const res: TrackerResult = { type: 'result', ...r, videoTime: this.lanes[p].sentVideoTime };
         this.account(this.lanes[p], res);
+        if (p === 'body' && res.handStatus) this.onHands(res);
         this.onResult(res);
       }
     }

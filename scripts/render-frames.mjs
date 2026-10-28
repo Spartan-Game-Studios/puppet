@@ -11,7 +11,7 @@ const browser = await launch();
 const page = await browser.newPage({ viewport: { width: 700, height: 520 } });
 page.on('console', (m) => m.type() === 'error' && console.log('[page]', m.text()));
 await serveLocal(page, { '/__local/model.vrm': model });
-await page.goto(`${BASE}/harness/?test=render&clean=${process.env.PUPPET_CLEAN ?? '0'}`);
+await page.goto(`${BASE}/harness/?test=render&clean=${process.env.PUPPET_CLEAN ?? '0'}&script=${process.env.PUPPET_SCRIPT ?? 'default'}&cam=${process.env.PUPPET_CAM ?? 'default'}`);
 await page.waitForFunction(() => document.title === 'ready' || document.title === 'error', null, { timeout: 180000 });
 for (const t of times) {
   const i = Math.round(Number(t) * 30);
