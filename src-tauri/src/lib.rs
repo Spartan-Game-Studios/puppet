@@ -1,7 +1,8 @@
 //! Puppet: Tauri shell. The app itself (rendering, tracking, solving) is the
 //! web frontend; Rust provides file access, settings persistence, the VMC
-//! sender and camera permission handling.
+//! sender, the virtual camera output and camera permission handling.
 
+mod vcam;
 mod vmc;
 
 use std::path::PathBuf;
@@ -12,6 +13,13 @@ use tauri::{AppHandle, Manager, State};
 #[derive(Default)]
 struct VmcState(Mutex<vmc::Sender>);
 
+/// Virtual camera: the frame path takes `cam` briefly per frame; status and
+/// setup go through `handle` so a slow device probe never stalls frames.
+struct VcamState {
+    cam: Mutex<vcam::VirtualCam>,
+    handle: vcam::VcamHandle,
+}
+
 /// Read a file the user picked (model, background image) as raw bytes.
 #[tauri::command]
 fn read_file(path: String) -> Result<tauri::ipc::Response, String> {
@@ -21,7 +29,11 @@ fn read_file(path: String) -> Result<tauri::ipc::Response, String> {
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    // PUPPET_SETTINGS_DIR: keep test runs away from the user's own settings.
+    let dir = match std::env::var_os("PUPPET_SETTINGS_DIR") {
+        Some(d) => PathBuf::from(d),
+        None => app.path().app_config_dir().map_err(|e| e.to_string())?,
+    };
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join("settings.json"))
 }
@@ -79,6 +91,49 @@ fn vmc_stats(state: State<VmcState>) -> Result<vmc::Stats, String> {
     Ok(state.0.lock().map_err(|e| e.to_string())?.stats.clone())
 }
 
+#[tauri::command(async)]
+fn vcam_status(state: State<'_, VcamState>) -> Result<vcam::SinkStatus, String> {
+    Ok(state.handle.status())
+}
+
+#[tauri::command]
+fn vcam_stats(state: State<'_, VcamState>) -> vcam::VcamStats {
+    state.handle.stats()
+}
+
+/// Install / activate / register the OS camera (may show an OS prompt).
+#[tauri::command(async)]
+fn vcam_setup(state: State<'_, VcamState>) -> Result<(), String> {
+    state.handle.setup()
+}
+
+#[tauri::command(async)]
+fn vcam_select_device(state: State<'_, VcamState>, device: Option<String>) -> Result<(), String> {
+    state.handle.select_device(device);
+    Ok(())
+}
+
+#[tauri::command(async)]
+fn vcam_start(state: State<'_, VcamState>, width: u32, height: u32, fps: u32) -> Result<(), String> {
+    state.cam.lock().map_err(|e| e.to_string())?.start(vcam::StreamConfig { width, height, fps })
+}
+
+#[tauri::command(async)]
+fn vcam_stop(state: State<'_, VcamState>) -> Result<(), String> {
+    state.cam.lock().map_err(|e| e.to_string())?.stop();
+    Ok(())
+}
+
+/// One frame as a raw binary body (no JSON): see `vcam::parse_frame`. Runs off
+/// the main thread; returns as soon as the frame is queued (or dropped).
+#[tauri::command(async)]
+fn vcam_frame(state: State<'_, VcamState>, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
+        return Err("vcam_frame expects a binary body".into());
+    };
+    state.cam.lock().map_err(|e| e.to_string())?.push(body)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -102,7 +157,23 @@ pub fn run() {
                     }
                 });
             }
-            let _ = app;
+            let cam = vcam::VirtualCam::new(vcam::default_sink(app.path().resource_dir().ok()));
+            let handle = cam.handle();
+            // PUPPET_VCAM_SELFTEST=status|setup: print the sink status (after
+            // running setup, i.e. the macOS activation request) for 15 s.
+            if let Ok(mode) = std::env::var("PUPPET_VCAM_SELFTEST") {
+                let h = handle.clone();
+                std::thread::spawn(move || {
+                    if mode == "setup" {
+                        println!("[puppet] vcam selftest: setup -> {:?}", h.setup());
+                    }
+                    for _ in 0..15 {
+                        println!("[puppet] vcam selftest: {}", serde_json::to_string(&h.status()).unwrap_or_default());
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+                    }
+                });
+            }
+            app.manage(VcamState { cam: Mutex::new(cam), handle });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -114,7 +185,14 @@ pub fn run() {
             debug_log,
             vmc_configure,
             vmc_send,
-            vmc_stats
+            vmc_stats,
+            vcam_status,
+            vcam_stats,
+            vcam_setup,
+            vcam_select_device,
+            vcam_start,
+            vcam_stop,
+            vcam_frame
         ])
         .run(tauri::generate_context!())
         .expect("error while running Puppet");
