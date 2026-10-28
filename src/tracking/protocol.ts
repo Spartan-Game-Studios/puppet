@@ -58,7 +58,8 @@ export interface HandResult {
 /**
  * What the hand search did for one user side on a frame (debug readout):
  * skip = not looked for (weak pose wrist, looked only now and then),
- * no-roi = nowhere to look (no usable pose wrist), miss = looked, found nothing,
+ * no-roi = nowhere to look (no usable pose wrist), miss = looked (the
+ * full-frame search counts as looking everywhere), found nothing,
  * other-hand = found a hand that belonged to the other side, duplicate = the
  * other side's crop found the same hand, tracked = found again from its own
  * last landmarks, found = (re)found from a search.

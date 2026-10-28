@@ -264,10 +264,12 @@ export class HandCropTracker {
     }
 
     // 3. Still missing: the crop at the pose wrist (a lost tracked hand gets one try there too).
+    // Not looking there after the full-frame search looked everywhere is still a miss.
+    const notHere = (side: Side): HandStatus => (tracking[side] || fullRan ? 'miss' : 'no-roi');
     for (const side of missing()) {
       const st = this.state[side];
       if (!pi) {
-        st.status = tracking[side] ? 'miss' : 'no-roi';
+        st.status = notHere(side);
         continue;
       }
       const vis = pi[side === 'left' ? 15 : 16]?.visibility ?? 1;
@@ -279,13 +281,13 @@ export class HandCropTracker {
       // every frame.
       const every = vis >= 0.5 && st.misses < 10 ? 1 : fullRan ? (vis < 0.5 ? 6 : 3) : vis < 0.5 ? 4 : 1;
       if (!tracking[side] && st.misses % every !== 0) {
-        st.status = 'skip';
+        st.status = fullRan ? 'miss' : 'skip';
         continue;
       }
       // Alternate a normal and a wide crop between attempts.
       const roi = roiFromPose(pi, side, width, height, Math.floor(st.misses / every) % 2 === 0 ? 1 : 1.5);
       if (!roi) {
-        st.status = tracking[side] ? 'miss' : 'no-roi';
+        st.status = notHere(side);
         continue;
       }
       ran = true;
