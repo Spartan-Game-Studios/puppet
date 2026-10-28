@@ -58,6 +58,10 @@ jobs:
             args: ''
             rust_targets: ''
     runs-on: ${{ matrix.platform }}
+    env:
+      # Optional macOS signing (see docs/virtual-camera.md). Without these
+      # secrets the build is unsigned and the camera extension is ad-hoc signed.
+      HAS_APPLE_SIGNING: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.PUPPET_APP_PROFILE != '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Linux deps
@@ -78,10 +82,58 @@ jobs:
           workspaces: src-tauri
           key: ${{ matrix.name }}
       - run: pnpm install --frozen-lockfile
+      - name: macOS signing setup (only when the secrets exist)
+        if: runner.os == 'macOS' && env.HAS_APPLE_SIGNING == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PUPPET_APP_PROFILE_B64: ${{ secrets.PUPPET_APP_PROFILE }}
+          PUPPET_CAMEXT_PROFILE_B64: ${{ secrets.PUPPET_CAMEXT_PROFILE }}
+        run: |
+          # The camera extension is signed in beforeBundleCommand, before Tauri
+          # imports the certificate itself, so put it in a keychain now.
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          KCPW="$(openssl rand -hex 16)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KCPW" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KCPW" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KCPW" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          echo "$PUPPET_APP_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/app.provisionprofile"
+          if [ -n "$PUPPET_CAMEXT_PROFILE_B64" ]; then
+            echo "$PUPPET_CAMEXT_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/camext.provisionprofile"
+            echo "PUPPET_CAMEXT_PROFILE=$RUNNER_TEMP/camext.provisionprofile" >> "$GITHUB_ENV"
+          fi
+          PUPPET_APP_PROFILE="$RUNNER_TEMP/app.provisionprofile" bash src-tauri/macos/prepare-signing.sh
+          echo "SIGNED_CONFIG=--config src-tauri/macos/build/tauri.signed.conf.json" >> "$GITHUB_ENV"
       - name: Build (no release)
         uses: tauri-apps/tauri-action@v0
+        env:
+          # Empty unless the signing secrets are configured.
+          APPLE_SIGNING_IDENTITY: ${{ env.HAS_APPLE_SIGNING == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_TEAM_ID: ${{ env.HAS_APPLE_SIGNING == 'true' && secrets.APPLE_TEAM_ID || '' }}
+          APPLE_ID: ${{ env.HAS_APPLE_SIGNING == 'true' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ env.HAS_APPLE_SIGNING == 'true' && secrets.APPLE_PASSWORD || '' }}
         with:
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} ${{ env.SIGNED_CONFIG }}
+      - name: Check the virtual camera is in the bundle
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            APP=$(ls -d src-tauri/target/*/release/bundle/macos/Puppet.app)
+            EXT="$APP/Contents/Library/SystemExtensions/com.spartangamestudios.puppet.camera.systemextension"
+            test -x "$EXT/Contents/MacOS/com.spartangamestudios.puppet.camera"
+            lipo -info "$EXT/Contents/MacOS/com.spartangamestudios.puppet.camera"
+            plutil -p "$EXT/Contents/Info.plist" | grep -E 'CMIOExtensionMachServiceName|CFBundlePackageType'
+            codesign --verify --strict --verbose=1 "$EXT"
+          elif [ "$RUNNER_OS" = Windows ]; then
+            test -f src-tauri/vendor/softcam/softcam.dll
+            test -f src-tauri/target/release/softcam.dll
+            ls -l src-tauri/target/release/softcam.dll
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: puppet-${{ matrix.name }}
