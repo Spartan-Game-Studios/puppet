@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Downloaded / copied at build time (scripts/fetch-models.mjs)
+public/mediapipe/
+
+# Test footage and results rendered locally (may derive from personal models)
+test-assets/
+harness/out/
+
+# Never commit avatar files: test models are personal-use content.
+*.vrm
+*.VRM
