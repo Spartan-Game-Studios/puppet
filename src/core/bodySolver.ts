@@ -47,7 +47,18 @@ export interface BodyInput {
   t?: number;
   /** Image width / height; with `poseImage`, enables depth-from-bone-length. */
   aspect?: number;
+  /**
+   * What the hand search did for each USER side on its latest frame
+   * (TrackerResult.handStatus). With it, the false-wrist gate (a wrist at the
+   * face with no hand) only fires where the search really looked and found
+   * no hand of that side; without it (old recordings, tests) it fires on any
+   * missing hand, as before.
+   */
+  handStatus?: Partial<Record<Side, string>>;
 }
+
+/** Hand search results that mean "looked there, no hand of this side". */
+const SEARCHED_EMPTY = new Set(['miss', 'other-hand', 'duplicate']);
 
 export type Side = 'left' | 'right';
 
@@ -346,6 +357,8 @@ interface SideState {
   humerusTwist: number | null;
   handActive: boolean;
   handSeen: number;
+  /** When the hand search last looked for this hand and found none of it. */
+  searchedEmptyT: number;
   handFrames: number;
   handWeight: number;
   fingers: OneEuroVector;
@@ -364,6 +377,7 @@ const newSide = (): SideState => ({
   humerusTwist: null,
   handActive: false,
   handSeen: -Infinity,
+  searchedEmptyT: -Infinity,
   handFrames: 0,
   handWeight: 0,
   fingers: new OneEuroVector(FINGER_VALUES),
@@ -527,8 +541,14 @@ export class BodySolver {
         // out of view gets placed at the chin. In hands mode, a wrist up by the
         // face with no hand found at it for a while is not trusted enough to
         // start following (a forearm already followed keeps going through
-        // short hand misses).
-        if (temporal && this.opts.hands && t - st.handSeen > 0.4 && img && this.nearFace(img, idx(side, 'Wrist'), aspect || 4 / 3)) {
+        // short hand misses). Only where the hand search really looked and
+        // came back empty: a real hand at the face that the search hasn't
+        // looked for (or has found) is never suppressed.
+        const status = input.handStatus?.[mirror ? (side === 'left' ? 'right' : 'left') : side];
+        if (status && SEARCHED_EMPTY.has(status)) st.searchedEmptyT = t;
+        // (The search looks only now and then at a weak wrist, so "recently".)
+        const searchedEmpty = input.handStatus ? t - st.searchedEmptyT < 0.5 : true;
+        if (temporal && this.opts.hands && searchedEmpty && t - st.handSeen > 0.4 && img && this.nearFace(img, idx(side, 'Wrist'), aspect || 4 / 3)) {
           foreConf *= 0.6;
         }
         res.armConfidence[side] = foreConf;
@@ -650,8 +670,8 @@ export class BodySolver {
         const dr = Math.hypot(w.x - pi[POSE.rightWrist].x, w.y - pi[POSE.rightWrist].y);
         user = dl <= dr ? 'left' : 'right';
       } else {
-        // MediaPipe labels handedness as if the image were mirrored (selfie view).
-        user = h.handedness === 'Left' ? 'right' : 'left';
+        // The label names the hand's own side on our unmirrored frames (measured; see handAssign.ts).
+        user = h.handedness === 'Right' ? 'right' : 'left';
       }
       const avatarSide: Side = mirror ? (user === 'left' ? 'right' : 'left') : user;
       if (!out[avatarSide] || out[avatarSide]!.score < h.score) out[avatarSide] = h;

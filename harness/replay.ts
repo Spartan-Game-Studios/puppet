@@ -59,7 +59,7 @@ async function main() {
       const apply = (r: TrackerResult) => {
         if (r.pose) {
           const pose = (r.handsUpdate && poseFilter.last) || poseFilter.filter(r.pose, r.t / 1000);
-          avatar.setBody({ poseWorld: pose.world, poseImage: pose.image, hands: r.hands ?? [], aspect: r.width / r.height });
+          avatar.setBody({ poseWorld: pose.world, poseImage: pose.image, hands: r.hands ?? [], aspect: r.width / r.height, handStatus: r.handStatus });
         }
         gestures.update(r.hands ?? [], r.t);
         if (!r.handsUpdate) {

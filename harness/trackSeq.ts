@@ -4,7 +4,7 @@
  * A fast, deterministic way to measure hand detection without playing video.
  * Driven by scripts/track-seq.mjs: window.__seq.run(from, to, step).
  */
-import { createLandmarkers, detect } from '../src/tracking/landmarkers';
+import { createLandmarkers, detect, HandCropTracker } from '../src/tracking/landmarkers';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { roiFromPose } from '../src/tracking/handRoi';
 
@@ -12,6 +12,11 @@ async function main() {
   const p = new URLSearchParams(location.search);
   const poseModel = (p.get('pose') as 'lite' | 'full') ?? 'lite';
   const set = await createLandmarkers(['body', 'hands'], '/mediapipe/wasm', '/mediapipe/models', 'GPU', poseModel);
+  // ?full=off|search&fullEvery=n: hand search variants.
+  set.handTracker = new HandCropTracker(set.hands!, set.handsFull ?? null);
+  if (p.get('full')) set.handTracker.opts.full = p.get('full') as 'off' | 'search' | 'primary';
+  if (p.get('fullEvery')) set.handTracker.opts.fullEvery = Number(p.get('fullEvery'));
+  if (p.get('fullIdleEvery')) set.handTracker.opts.fullIdleEvery = Number(p.get('fullIdleEvery'));
   let dbgT = 1e7;
   (window as unknown as { __seq: unknown }).__seq = {
     async run(from: number, to: number, step = 1) {
@@ -32,6 +37,8 @@ async function main() {
           hands: (r.hands ?? []).map((h) => ({ side: h.userSide, label: h.handedness, score: h.score, wrist: [h.landmarks[0].x, h.landmarks[0].y], world: h.worldLandmarks.map((l) => [l.x, l.y, l.z]) })),
           handsRan: r.handsRan,
           status: set.handTracker ? [set.handTracker.state.left.status, set.handTracker.state.right.status] : null,
+          trust: set.handTracker?.labelTrust.value,
+          dis: set.handTracker?.disagree,
           ms: r.timings,
         });
       }

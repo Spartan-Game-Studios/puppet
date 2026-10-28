@@ -100,10 +100,5 @@ export function wristDistance(hand: Landmark[], pose: Landmark[] | undefined, si
   return Math.hypot((h0.x - pw.x) * width, (h0.y - pw.y) * height) / size;
 }
 
-/** Whether two hands (normalized landmarks) are the same detection. */
-export function sameHand(a: Landmark[], b: Landmark[], width: number, height: number): boolean {
-  const size = Math.max(1e-6, Math.hypot((a[9].x - a[0].x) * width, (a[9].y - a[0].y) * height));
-  let d = 0;
-  for (const i of [0, 5, 9, 13, 17]) d += Math.hypot((a[i].x - b[i].x) * width, (a[i].y - b[i].y) * height);
-  return d / 5 < 0.35 * size;
-}
+/** Whether two hands are the same detection (moved to handAssign.ts with the rest of the side logic). */
+export { sameHand } from './handAssign';

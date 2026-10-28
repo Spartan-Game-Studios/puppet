@@ -29,6 +29,7 @@ import type { BodyMode, TrackerResult } from './tracking/protocol';
 import { listCameras, VideoSource } from './tracking/source';
 import { Tracker } from './tracking/tracker';
 import { HandStats } from './tracking/handStats';
+import { faceCovered } from './tracking/faceOcclusion';
 import { GestureTracker } from './core/gestures';
 import { toUnity, unityBoneName, vmcBlendName, type VmcFrame } from './vmc/vmcFrame';
 import {
@@ -159,21 +160,29 @@ const record: unknown[] | null = params.get('record') === '1' ? [] : null;
 
 let lastFace: TrackerResult | null = null;
 let lastBody: TrackerResult | null = null;
+let faceHeldSince: number | null = null;
+let faceHeld = false;
 tracker.onHands = (r) => {
   handStats.push(r);
-  if (record) record.push({ handsFrame: true, vt: r.videoTime, hands: (r.hands ?? []).map((h) => h.userSide ?? h.handedness), status: r.handStatus, ms: r.timings.hands });
+  if (record) record.push({ handsFrame: true, vt: r.videoTime, hands: (r.hands ?? []).map((h) => h.userSide ?? h.handedness), wrists: (r.hands ?? []).map((h) => [h.landmarks[0].x, h.landmarks[0].y]), status: r.handStatus, ms: r.timings.hands });
 };
 tracker.onResult = (r) => {
   const t = r.t / 1000;
   if (r.pipeline === 'face') {
     lastFace = r;
-    if (r.face) avatar?.setFace(face.process(r.face, t));
+    // A hand over the face: FaceLandmarker still returns a face, but its head
+    // pose and mouth go wrong, so hold the last good face (for up to 3 s).
+    const covered =
+      settings.mode === 'hands' && !!r.face && faceCovered((lastBody?.hands ?? []).map((h) => h.landmarks), lastBody?.pose?.image, r.width / r.height);
+    faceHeldSince = covered ? (faceHeldSince ?? t) : null;
+    faceHeld = covered && t - faceHeldSince! < 3;
+    if (r.face && !faceHeld) avatar?.setFace(face.process(r.face, t));
   } else {
     lastBody = r;
     if (avatar && settings.mode !== 'face' && r.pose) {
       // A hands update re-sends a pose that is already filtered.
       const pose = (r.handsUpdate && poseFilter.last) || poseFilter.filter(r.pose, t);
-      avatar.setBody({ poseWorld: pose.world, poseImage: pose.image, hands: settings.mode === 'hands' ? (r.hands ?? []) : [], aspect: r.width / r.height });
+      avatar.setBody({ poseWorld: pose.world, poseImage: pose.image, hands: settings.mode === 'hands' ? (r.hands ?? []) : [], aspect: r.width / r.height, handStatus: settings.mode === 'hands' ? r.handStatus : undefined });
     }
     gestures.update(settings.mode === 'hands' ? (r.hands ?? []) : [], r.t);
     // One row per pose (a hands update shows up in the next row's rig).
@@ -200,6 +209,7 @@ tracker.onResult = (r) => {
     record.push({
       vt: r.videoTime,
       face: !!r.face,
+      faceHeld,
       pose: !!lastBody?.pose,
       hands: lastBody?.hands?.length ?? 0,
       handsRan: !!lastBody?.handsRan,

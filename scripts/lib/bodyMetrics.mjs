@@ -231,9 +231,24 @@ export function handSearchReport(rec, truth) {
   const segs = {};
   const add = (k, r) => {
     const t = r.truth;
-    const s = (segs[k] ??= { frames: 0, inView: { left: 0, right: 0, both: 0 }, found: { left: 0, right: 0, both: 0 }, status: { left: {}, right: {} } });
+    const s = (segs[k] ??= { frames: 0, wrong: 0, inView: { left: 0, right: 0, both: 0 }, found: { left: 0, right: 0, both: 0 }, status: { left: {}, right: {} } });
     s.frames++;
-    const f = { left: r.hands.includes('left'), right: r.hands.includes('right') };
+    // Found = reported for that side AND (when the truth has hand positions)
+    // sitting on that hand: nearer its true wrist than the other's, within 2 hand sizes.
+    const onHand = (side) => {
+      const k = r.hands.indexOf(side);
+      if (k < 0) return false;
+      const p = t.handPos;
+      const w = r.wrists?.[k];
+      if (!p || !w) return true;
+      const o = side === 'left' ? 'right' : 'left';
+      const d = (q) => Math.hypot(((w[0] - q.wrist[0]) * 4) / 3, w[1] - q.wrist[1]);
+      const size = Math.hypot(((p[side].mcp[0] - p[side].wrist[0]) * 4) / 3, p[side].mcp[1] - p[side].wrist[1]);
+      const ok = d(p[side]) <= d(p[o]) && d(p[side]) < 2 * size;
+      if (!ok) s.wrong++;
+      return ok;
+    };
+    const f = { left: onHand('left'), right: onHand('right') };
     for (const side of SIDES) {
       if (t.handInFrame?.[side]) {
         s.inView[side]++;
@@ -257,6 +272,7 @@ export function handSearchReport(rec, truth) {
   for (const [k, s] of Object.entries(segs)) {
     perSegment[k] = {
       frames: s.frames,
+      wrongSide: s.wrong,
       foundPct: { left: pct(s.found.left, s.inView.left), right: pct(s.found.right, s.inView.right), any: pct(s.found.left + s.found.right, s.inView.left + s.inView.right), both: pct(s.found.both, s.inView.both) },
       inView: s.inView,
       status: s.status,
@@ -292,7 +308,7 @@ export function faceStabilityReport(rec, truth) {
         mouthJump = Math.max(mouthJump, Math.abs((rs[i].values?.jawOpen ?? 0) - (rs[i - 1].values?.jawOpen ?? 0)));
       }
     }
-    out[seg] = { n: rs.length, faceFoundPct: r1((100 * rs.filter((r) => r.face).length) / Math.max(1, rs.length)), headErrRmsDeg: r1(Math.sqrt(ss / Math.max(1, rs.length))), maxHeadJumpDeg: r1(jump), maxJawJump: Math.round(mouthJump * 100) / 100 };
+    out[seg] = { n: rs.length, faceFoundPct: r1((100 * rs.filter((r) => r.face).length) / Math.max(1, rs.length)), heldPct: r1((100 * rs.filter((r) => r.faceHeld).length) / Math.max(1, rs.length)), headErrRmsDeg: r1(Math.sqrt(ss / Math.max(1, rs.length))), maxHeadJumpDeg: r1(jump), maxJawJump: Math.round(mouthJump * 100) / 100 };
   }
   return out;
 }
