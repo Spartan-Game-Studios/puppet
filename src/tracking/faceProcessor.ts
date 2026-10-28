@@ -56,6 +56,16 @@ export class FaceProcessor {
   private lastRaw: Blendshapes = {};
   private smoothing = 0.5;
   state: FaceState | null = null;
+  /**
+   * Until the user calibrates, take the first steady second of face as
+   * neutral (not saved). An uncalibrated start otherwise carries every
+   * resting offset MediaPipe reads on this face (a few degrees of head pitch,
+   * half-closed eyes, a "pucker" from dark lips) straight onto the avatar.
+   */
+  autoCalibrate = true;
+  /** True once an automatic neutral is in use (cleared by a manual calibrate). */
+  autoCalibrated = false;
+  private steady: Array<{ t: number; q: Quaternion; pos: Vector3; bs: Blendshapes }> = [];
 
   constructor() {
     for (const n of ARKIT_NAMES) this.filters.set(n, new OneEuroFilter());
@@ -78,6 +88,7 @@ export class FaceProcessor {
 
   /** Capture the current face as neutral. */
   captureNeutral(): boolean {
+    this.autoCalibrated = false;
     if (!this.lastRawHead) return false;
     const baseline: Record<string, number> = {};
     for (const n of ARKIT_NAMES) {
@@ -98,6 +109,46 @@ export class FaceProcessor {
 
   clearCalibration(): void {
     this.calibration = structuredClone(EMPTY_CALIBRATION);
+    this.autoCalibrated = false;
+    this.steady = [];
+  }
+
+  /** Auto neutral: average a steady, eyes-open, mouth-closed second of raw frames. */
+  private autoNeutral(t: number, q: Quaternion, pos: Vector3, bs: Blendshapes): void {
+    if (!this.autoCalibrate || this.autoCalibrated || this.calibration.head) return;
+    this.steady.push({ t, q: q.clone(), pos: pos.clone(), bs });
+    while (this.steady.length && this.steady[0].t < t - 1.0) this.steady.shift();
+    const w = this.steady;
+    if (w.length < 8 || t - w[0].t < 0.9) return;
+    const ref = w[w.length - 1].q;
+    if (w.some((f) => f.q.angleTo(ref) > 0.05)) return;
+    for (const n of ARKIT_NAMES) {
+      let lo = 1, hi = 0;
+      for (const f of w) {
+        const v = f.bs[n] ?? 0;
+        lo = Math.min(lo, v);
+        hi = Math.max(hi, v);
+      }
+      if (hi - lo > 0.12) return;
+    }
+    const peak = (n: string) => Math.max(...w.map((f) => f.bs[n] ?? 0));
+    if (peak('jawOpen') > 0.25 || peak('eyeBlinkLeft') > 0.6 || peak('eyeBlinkRight') > 0.6) return;
+    const baseline: Record<string, number> = {};
+    for (const n of ARKIT_NAMES) {
+      const v = w.reduce((s, f) => s + (f.bs[n] ?? 0), 0) / w.length;
+      // Wider than a manual capture: a resting value this high is a misread, not an expression.
+      if (v > 0.02 && v < 0.95) baseline[n] = v;
+    }
+    const avgPos = w.reduce((s, f) => s.add(f.pos), new Vector3()).multiplyScalar(1 / w.length);
+    const gz = w.map((f) => gazeFromBlendshapes(f.bs));
+    this.calibration = {
+      baseline,
+      head: [ref.x, ref.y, ref.z, ref.w],
+      headPos: [avgPos.x, avgPos.y, avgPos.z],
+      gaze: { yaw: gz.reduce((s, g) => s + g.yaw, 0) / gz.length, pitch: gz.reduce((s, g) => s + g.pitch, 0) / gz.length },
+    };
+    this.autoCalibrated = true;
+    this.steady = [];
   }
 
   /** Process one tracking result. Times in seconds. */
@@ -118,6 +169,7 @@ export class FaceProcessor {
       const pose = headPoseFromMatrix(face.matrix, this.mirror);
       this.lastRawHead = pose.rotation.clone();
       this.lastRawPos = pose.position.clone();
+      this.autoNeutral(t, pose.rotation, pose.position, bs);
       let q = pose.rotation;
       const c = this.calibration.head;
       if (c) q = q.multiply(new Quaternion(c[0], c[1], c[2], c[3]).invert());
