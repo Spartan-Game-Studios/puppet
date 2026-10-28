@@ -26,6 +26,11 @@ if (clip) {
 }
 await page.goto(`${BASE}/?${qs}`);
 await page.waitForTimeout(wait);
+// PUPPET_KEYS="p 2": press keys (shortcuts) before the shot.
+for (const k of (process.env.PUPPET_KEYS ?? '').split(' ').filter(Boolean)) {
+  await page.keyboard.press(k);
+  await page.waitForTimeout(300);
+}
 const info = await page.evaluate(() => {
   const p = window.__puppet;
   return {
