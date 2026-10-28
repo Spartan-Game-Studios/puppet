@@ -314,7 +314,36 @@ gestures.current.right; // the right hand's gesture now
 off();                  // unsubscribe
 ```
 
-An event fires on every change, including back to `none` (a gesture let go, or the hand lost for 300 ms). A gesture is reported after it has won for 150 ms and dropped after it has scored under 0.3 for 200 ms. Gestures need HANDS mode.
+An event fires on every change, including back to `none` (a gesture let go, or the hand lost for 300 ms). A gesture is reported after it has won for 150 ms and dropped after it has scored under 0.3 for 200 ms. Gestures need HANDS mode. The 08 HOTKEYS gesture triggers (e.g. thumbs up → an emote) are fed from these events through `trackerGestureSource` (`src/input/gestures.ts`), with the names `fist`, `open_palm`, `point`, `peace`, `thumbs_up`, `ok` and `horns`, per user hand.
+
+## Tracking quality
+
+Measured with `scripts/track-clip.mjs` on the rendered test clip (49 s, 640×480, played unmirrored in HANDS mode, headless Chrome on an M3 Pro), before → after the tracking-quality work, on three models. Errors are mean angles against the posed model's own bones; a hand counts as found only while it is in view. Repeated runs vary by a few points.
+
+| metric | realistic VRM 0.x | anime VRM 0.x | VRM 1.0, caped |
+|---|---|---|---|
+| hand found, all frames with a hand in view (%) | 61.9 → 86.2 | 33.4 → 65 | 9.9 → 57.2 |
+| hand found, gestures section (%) | 99.7 → 98.6 | 36 → 84.2 | 10.1 → 77.4 |
+| hand found, crossed arms (%) | 7.3 → 51.4 | 11 → 45.1 | 0 → 16 |
+| gesture accuracy (%) | 0 → 98 | 0 → 83.1 | 0 → 86.1 |
+| finger joint error (°) | 17.4 → 15.1 | 22.7 → 20.2 | 26.8 → 18.8 |
+| upper arm direction error (°) | 15.4 → 18.6 | 18 → 19.1 | 20.9 → 22.3 |
+| forearm direction error (°) | 39.6 → 36.3 | 36.2 → 30.3 | 45.8 → 41.4 |
+| forearm error, lean and twist (°) | 55 → 55.7 | 54.4 → 42.7 | 67.8 → 54.4 |
+| forearm error, arm leaving frame (°) | 55.1 → 48.3 | 67.6 → 57.5 | 110.8 → 91.5 |
+| forearm error, 90° abduction (°) | 43 → 35.8 | 59.2 → 46.9 | 61 → 53.5 |
+| elbow bend error (°) | 21.2 → 19.5 | 22 → 18.2 | 25.3 → 23.8 |
+| jitter at rest, arms (°, RMS 2nd diff) | 0.69 → 1.34 | 1.41 → 2.06 | 2.7 → 1.65 |
+| jitter at rest, fingers (°) | 1.63 → 1.16 | 4.16 → 1.83 | 1.35 → 1.17 |
+| end-to-end lag (ms) | 100 → 140 | 140 → 160 | 200 → 320 |
+| body fps | 24.3 → 30.6 | 25.6 → 30.6 | 30.5 → 30.5 |
+| face fps | 30.6 → 30.4 | 30.5 → 30.5 | 30.5 → 30.5 |
+| hands fps (own worker after) | (in body) → 28.9 | (in body) → 25.4 | (in body) → 25.9 |
+
+- Gestures: on the realistic model every gesture was recognised (the misses are thumbs up read as a fist for 2 frames and 10 frames of `none` read as a fist). On the other two, most misses are the hand not being found at all, which reads as `none`.
+- Arm jitter at rest went up on two models: arm depth now comes from the 2D image points, which carry their own noise.
+- The arm-leaving-the-frame and T-pose segments are hard on the rendered footage: MediaPipe's pose model loses or misplaces an arm stretched out of view, and on the caped model it places the elbow inside the cape.
+- Rendered footage is not a webcam: anime hands, gloves and capes are harder for MediaPipe than real hands. Real webcam footage was not available.
 
 ## Known limitations
 
