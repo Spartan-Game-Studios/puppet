@@ -1,8 +1,10 @@
 /** three.js stage: renderer, camera, lights, background. */
 import {
   AmbientLight,
+  Camera,
   Color,
   DirectionalLight,
+  Group,
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
@@ -22,6 +24,10 @@ export class Viewer {
   readonly camera = new PerspectiveCamera(28, 1, 0.05, 50);
   readonly controls: OrbitControls;
   avatar: Avatar | null = null;
+  /** The flat-background lights; an environment hides them and brings its own. */
+  readonly defaultLights = new Group();
+  /** When set, called instead of renderer.render (3D environments: post-processing, camera sway). */
+  renderHook: ((renderer: WebGLRenderer, scene: Scene, camera: Camera) => void) | null = null;
   private bgTexture: Texture | null = null;
   private host: HTMLElement;
 
@@ -37,7 +43,8 @@ export class Viewer {
     key.position.set(0.6, 1.6, 2.2);
     const fill = new DirectionalLight(0xffffff, Math.PI * 0.35);
     fill.position.set(-1.2, 1.0, 1.0);
-    this.scene.add(key, fill, new AmbientLight(0xffffff, 0.6));
+    this.defaultLights.add(key, fill, new AmbientLight(0xffffff, 0.6));
+    this.scene.add(this.defaultLights);
 
     this.camera.position.set(0, 1.4, 1.6);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -110,6 +117,7 @@ export class Viewer {
 
   render(): void {
     this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    if (this.renderHook) this.renderHook(this.renderer, this.scene, this.camera);
+    else this.renderer.render(this.scene, this.camera);
   }
 }

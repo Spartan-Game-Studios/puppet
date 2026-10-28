@@ -7,7 +7,7 @@ is under a permissive licence; transitive notes are at the end.
 
 | Component | Version | Licence | Notes |
 |---|---|---|---|
-| [three.js](https://github.com/mrdoob/three.js) | 0.186.1 | MIT | rendering; also `GLTFLoader`, `OrbitControls` from `three/examples/jsm` |
+| [three.js](https://github.com/mrdoob/three.js) | 0.186.1 | MIT | rendering; also from `three/examples/jsm`: `GLTFLoader`, `OrbitControls`, and for 3D environments `HDRLoader`, `EXRLoader` (with its bundled `fflate`, MIT), `LightProbeGenerator`, `BufferGeometryUtils`, `FullScreenQuad` (`postprocessing/Pass.js`) |
 | [@pixiv/three-vrm](https://github.com/pixiv/three-vrm) (+ `three-vrm-core`, `-springbone`, `-materials-mtoon`, `-materials-v0compat`, `-materials-hdr-emissive-multiplier`, `-node-constraint`, `types-*`) | 3.5.5 | MIT | VRM 0.x / 1.0 loading, humanoid, expressions, lookAt, spring bones |
 | [@mediapipe/tasks-vision](https://www.npmjs.com/package/@mediapipe/tasks-vision) | 1.1.0 | Apache-2.0 | Face / Pose / Hand landmarkers, WASM runtime (copied from the package at build time) |
 | MediaPipe models: `face_landmarker.task`, `pose_landmarker_lite.task`, `pose_landmarker_full.task`, `hand_landmarker.task` | float16 v1 | Apache-2.0 | downloaded at build time from `storage.googleapis.com/mediapipe-models/`, SHA-256 pinned in `scripts/fetch-models.mjs`; not stored in git |
@@ -59,10 +59,16 @@ MPL-2.0 is file-level copyleft. Using these crates unmodified (their source is o
 | @types/three | MIT |
 | Playwright | Apache-2.0 |
 
+## Environment assets
+
+The built-in 3D environments ship **no asset files**. Every scene, texture and sky is generated at runtime from code in `src/scene/environment/` (geometry, GLSL shaders, value noise painted into canvas textures). Custom `.glb`/`.gltf`/`.hdr`/`.exr` files are the user's own and are never bundled.
+
 ## Algorithms
 
 - One-euro filter: Géry Casiez, Nicolas Roussel, Daniel Vogel, "1€ Filter: A Simple Speed-based Low-pass Filter for Noisy Input in Interactive Systems", CHI 2012. Implemented from the paper.
 - VMC protocol: <https://protocol.vmc.info/> (message layout only).
+- Colour temperature: blackbody sRGB values at 1000 K steps, approximated from Mitchell Charity's blackbody colour data ("What color is a blackbody?", vendian.org), interpolated and luminance-normalised in `src/scene/environment/look.ts`.
+- Value noise and the mulberry32 PRNG in `src/scene/environment/parts.ts` are standard public-domain techniques, written from scratch.
 
 ## Apache-2.0 notice (MediaPipe)
 

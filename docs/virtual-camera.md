@@ -1,6 +1,6 @@
 # Virtual camera
 
-Puppet can show up as a webcam called **Puppet Virtual Camera**, so Zoom, Meet, Discord, FaceTime, OBS and other apps can use the avatar directly. Turn it on in the **05 VIRTUAL CAM** panel or press `W`.
+Puppet can show up as a webcam called **Puppet Virtual Camera**, so Zoom, Meet, Discord, FaceTime, OBS and other apps can use the avatar directly. Turn it on in the **06 VIRTUAL CAM** panel or press `W`.
 
 | OS | How | One-time setup by the user | Status |
 |---|---|---|---|
@@ -54,7 +54,7 @@ If all three frame buffers are still in flight when the next frame is due, that 
 ### What the user does (signed build)
 
 1. Move **Puppet.app** to **/Applications** and open it from there. macOS installs system extensions only from apps in /Applications.
-2. In **05 VIRTUAL CAM**, click **INSTALL CAMERA**.
+2. In **06 VIRTUAL CAM**, click **INSTALL CAMERA**.
 3. macOS asks for approval:
    - macOS 15 and later: **System Settings → General → Login Items & Extensions → Camera Extensions**, switch **Puppet** on.
    - macOS 13–14: **System Settings → Privacy & Security**, under "System software from application Puppet was blocked", click **Allow**.
@@ -108,7 +108,7 @@ Then copy `src-tauri/target/release/bundle/macos/Puppet.app` to /Applications an
 
 ## Windows
 
-1. In **05 VIRTUAL CAM**, click **REGISTER CAMERA** and accept the Windows admin prompt. This runs `regsvr32` on the `softcam.dll` that ships next to `puppet.exe` (once per install location).
+1. In **06 VIRTUAL CAM**, click **REGISTER CAMERA** and accept the Windows admin prompt. This runs `regsvr32` on the `softcam.dll` that ships next to `puppet.exe` (once per install location).
 2. Tick **SEND TO VIRTUAL CAMERA** (`W`) and pick **Puppet Virtual Camera** in your video app.
 
 To remove it before uninstalling Puppet, run in an admin terminal: `regsvr32 /u "<Puppet install folder>\softcam.dll"`.

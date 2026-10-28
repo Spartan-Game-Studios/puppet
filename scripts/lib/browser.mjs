@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 
 export const BASE = process.env.PUPPET_URL ?? 'http://localhost:5173';
 
-export async function launch({ headless = true } = {}) {
+export async function launch({ headless = true, extraArgs = [] } = {}) {
   return chromium.launch({
     channel: process.env.PUPPET_CHROME_CHANNEL ?? 'chrome',
     headless,
@@ -18,6 +18,7 @@ export async function launch({ headless = true } = {}) {
       '--enable-unsafe-swiftshader',
       '--use-fake-ui-for-media-stream',
       '--autoplay-policy=no-user-gesture-required',
+      ...extraArgs,
     ],
   });
 }
