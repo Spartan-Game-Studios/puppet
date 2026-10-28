@@ -16,7 +16,7 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
 - **Upper body and hands.** PoseLandmarker world landmarks drive the spine, chest, shoulders and arms. HandLandmarker drives all finger bones. Choose FACE (`1`), +BODY (`2`) or +HANDS (`3`). Legs stay in an idle stance.
   - The solver is Puppet's own: direction vectors against the model's measured rest directions, with an elbow-hinge-aware upper-arm twist and part of the wrist twist moved into the forearm. Hands are found by cropping around each pose wrist, so small webcam hands are still seen. Untracked arms ease back to an idle pose.
 - **VMC protocol output** over OSC/UDP from the Rust side (`rosc`). Messages: `/VMC/Ext/OK`, `/VMC/Ext/T`, `/VMC/Ext/Root/Pos`, `/VMC/Ext/Bone/Pos` (all humanoid bones, Unity coordinates), `/VMC/Ext/Blend/Val` and `/VMC/Ext/Blend/Apply`. Host and port are configurable (default `127.0.0.1:39539`). Bundles are split under 1200 bytes so they also cross a real network.
-- **Virtual camera output.** Puppet shows up as a webcam, **Puppet Virtual Camera**, in Zoom, Meet, Discord, FaceTime and OBS (**05 VIRTUAL CAM**, `W`). It sends the capture view at 1280×720 or 1920×1080, 30 fps. Cameras have no alpha, so the CLEAR background is sent as the chosen colour (green by default). See [Virtual camera](#virtual-camera).
+- **Virtual camera output.** Puppet shows up as a webcam, **Puppet Virtual Camera**, in Zoom, Meet, Discord, FaceTime and OBS (**06 VIRTUAL CAM**, `W`). It sends the capture view at 1280×720 or 1920×1080, 30 fps. Cameras have no alpha, so the CLEAR background is sent as the chosen colour (green by default); a 3D environment is sent as rendered, except depth of field, which is display-only. See [Virtual camera](#virtual-camera).
   - macOS 12.3+: a CoreMediaIO Camera Extension inside Puppet.app (needs a Developer ID–signed build; see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)).
   - Windows 10/11: a DirectShow camera built from [softcam](https://github.com/tshino/softcam) (MIT); one admin prompt to register it.
   - Linux: a v4l2loopback device you create with `modprobe`.
@@ -32,14 +32,39 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
   - Open a VRM from a file dialog (`O`) or by dropping it on the window; the last model reopens at launch.
   - Pick the camera, resolution and tracking rate.
   - Toggle the tracking preview inset (`T`) with the landmark overlay.
-  - Background: solid colour (chroma key presets), transparent, or an image.
+  - Background: solid colour (chroma key presets), transparent, an image, or a lit **3D environment** (`E`, see below).
   - **Capture view** (`H`, `Esc` to leave) hides all UI for clean OBS capture.
   - A debug bar (`D`) shows render fps and frame time, face/body tracking fps, latency and inference time.
   - Settings persist to `settings.json` in the app config dir.
 
 ### Keys
 
-`O` open · `H` capture view · `Esc` leave capture view · `C` calibrate neutral · `M` mirror · `T` preview · `V` VMC on/off · `W` virtual camera on/off · `1` `2` `3` tracking mode · `8` `9` `0` physics off/stiff/normal · `R` settle physics · `F` `P` face/physics tab · `D` debug bar
+`O` open · `E` 3D environment on/off · `H` capture view · `Esc` leave capture view · `C` calibrate neutral · `M` mirror · `T` preview · `V` VMC on/off · `W` virtual camera on/off · `1` `2` `3` tracking mode · `8` `9` `0` physics off/stiff/normal · `R` settle physics · `F` `P` face/physics tab · `D` debug bar
+
+### 3D environments
+
+![The six built-in environments](docs/environments.jpg)
+
+Background **3D** (`E`) stands the avatar in a lit scene; **05 ENVIRONMENT** picks the scene and the look. All six built-in scenes are procedural (three.js geometry, shaders and canvas textures generated at runtime), so they add no asset files to the app.
+
+| scene | what it is |
+|---|---|
+| STUDIO CYCLORAMA | seamless photo-studio cove, soft key/fill/rim, two softboxes framing the shot |
+| COSY ROOM | wallpapered corner with a bookshelf, a window at dusk, a rug and a floor lamp that really lights the avatar |
+| MOOR AT DUSK | rolling heather, a ring of standing stones, low sun, fog and drifting mist |
+| NIGHT CLEARING | conifer ring under a starry sky, moonlight and GPU-animated fireflies |
+| NEON GRID | scrolling synthwave grid, striped sun, glowing ridges |
+| CONCRETE HALL | board-formed concrete, columns, light slots, a slot window and an orange rule |
+| CUSTOM | your own `.glb`/`.gltf` (a `.gltf` may reference sibling `.bin`/texture files) and an equirectangular `.hdr`/`.exr` sky; drop the files on the window or use SCENE / SKY |
+
+- **Placement (custom):** SCALE (log slider, 0.01–100×), POS X/Y/Z and ROTATE. A loaded scene is centred under the avatar with its lowest point on the floor. **FLOOR M** (every scene) moves the scene up or down so it meets the avatar's feet.
+- **Light:** SCENE uses the scene's own key/fill/rim/ambient rig; KEY, RIM and SOFT restyle it. INTENSITY and TEMP K (white balance; 6500 is neutral) apply on top. The rig is held inside an exposure window measured on an MToon model (MToon wraps light far round the face, so even a back light lights it), so the face neither clips nor goes black at any setting. A custom HDR sky lights PBR materials through image-based lighting and MToon through a spherical-harmonics light probe, normalised to the rig's ambient level.
+- **Atmosphere:** FOG (0.5 is the scene's default), GROUND SHADOW under the avatar.
+- **Camera:** BUST/UPPER/FULL framing works as before; IDLE SWAY adds a slow ±1 cm drift; DEPTH OF FIELD (off by default, HIGH only) keeps the avatar sharp and blurs what lies behind it, reusing the colour pass's depth (no second scene render). It holds 60 fps at 1080p on an M3 Pro but costs MediaPipe about a quarter of its throughput, which is why it is off by default.
+- **Quality:** LOW gives a soft blob shadow and no post-processing. HIGH adds a real, directional shadow map and allows depth of field. The avatar's shadow is cast by a dozen invisible capsules that follow its bones, not by its own meshes: re-skinning a detailed avatar (300k triangles) into a shadow map cost MediaPipe about 30% of its throughput, the capsules, refreshed at 20 Hz, cost nothing measurable. Glows (sun, fireflies, neon, lamps) are additive geometry rather than a bloom pass: a full-resolution HDR composer cost about 4 ms a frame at 1080p and halved MediaPipe's GPU throughput, so depth of field is the only post effect.
+- Look settings are saved per scene (per file for custom scenes), placement per custom scene file, all in `settings.json`. The desktop app reopens the last custom scene and sky.
+
+`node scripts/env-bench.mjs` measures each scene at LOW and HIGH against the flat background (see [Testing without a camera](#testing-without-a-camera)).
 
 ## Install, run, build
 
@@ -68,7 +93,7 @@ Puppet ships no avatar. Use your own `.vrm` (VRM 0.x or 1.0), for example one ex
 ## Virtual camera
 
 1. Pick a background in **03 BACKGROUND** (CLEAR is sent as the chosen colour).
-2. In **05 VIRTUAL CAM**, do the one-time setup the panel asks for:
+2. In **06 VIRTUAL CAM**, do the one-time setup the panel asks for:
    - **macOS:** Puppet must be in /Applications. Click **INSTALL CAMERA**, then approve it in System Settings → General → Login Items & Extensions → Camera Extensions (macOS 13–14: Privacy & Security → Allow). This needs a signed build; unsigned builds say so and point to the OBS route.
    - **Windows:** click **REGISTER CAMERA** and accept the admin prompt.
    - **Linux:** create a loopback device once (the panel shows this command, click to copy):
@@ -138,6 +163,7 @@ The scripts in `scripts/` drive headless Chrome through Playwright, using your i
 - `PUPPET_MODEL=avatar.vrm node scripts/physics-test.mjs` runs the physics stability test below.
 - `PUPPET_MODEL=avatar.vrm node scripts/screenshot.mjs ui.png` screenshots the UI.
 - `PUPPET_MODEL=avatar.vrm node scripts/vcam-test.mjs out/` checks the virtual camera frame source in headless Chrome (size, BGRA order, background composite, 30 fps), and `scripts/vcam-desktop-test.mjs` runs a built desktop app with the file sink and measures CPU with the output on and off.
+- `PUPPET_MODEL=avatar.vrm PUPPET_CLIP=clip.webm node scripts/env-bench.mjs out/` benchmarks the 3D environments in capture view at 1920×1080: render fps, frame time, tracking fps and inference time, and the avatar's face brightness, for every scene at LOW and HIGH against the flat background. It saves a screenshot of each scene. `PUPPET_UNCAPPED=1` removes vsync to show headroom.
 
 Footage rendered from a model inherits that model's licence. Keep it out of the repo unless the model is redistributable.
 

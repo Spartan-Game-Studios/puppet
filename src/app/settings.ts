@@ -27,7 +27,7 @@ export interface Settings {
   calibration: Calibration;
   background: { kind: BackgroundKind; color: string; imagePath: string | null };
   vmc: { enabled: boolean; host: string; port: number };
-  /** Virtual camera output (05 VIRTUAL CAM). `device`: Linux /dev/videoN, null = first found. */
+  /** Virtual camera output (06 VIRTUAL CAM). `device`: Linux /dev/videoN, null = first found. */
   vcam: { enabled: boolean; resolution: VcamResolution; device: string | null };
   physics: PhysicsSettings;
   /** Per-model physics overrides, keyed by the model file's SHA-256. */
