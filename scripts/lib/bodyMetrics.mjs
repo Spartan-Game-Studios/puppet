@@ -217,3 +217,82 @@ export function bodyReport(rec, truth, { gestureGraceMs = 250 } = {}) {
     peakArmSpeedDegPerSec: { outOfFrame: peakSpeed('outOfFrame'), cross: peakSpeed('cross'), nearFace: peakSpeed('nearFace') },
   };
 }
+
+/**
+ * Hand search report from the per-hands-frame rows (`handsFrame` in the
+ * ?record=1 log): per segment, how often each hand in view was found, how
+ * often BOTH were found when both were in view, what the search did (status
+ * counts per side), and the hands worker's time per frame.
+ */
+export function handSearchReport(rec, truth) {
+  const fps = truth.fps;
+  const tr = (vt) => truth.frames[Math.min(truth.frames.length - 1, Math.max(0, Math.round(vt * fps)))];
+  const rows = rec.filter((r) => r.handsFrame && r.vt != null).map((r) => ({ ...r, truth: tr(r.vt) }));
+  const segs = {};
+  const add = (k, r) => {
+    const t = r.truth;
+    const s = (segs[k] ??= { frames: 0, inView: { left: 0, right: 0, both: 0 }, found: { left: 0, right: 0, both: 0 }, status: { left: {}, right: {} } });
+    s.frames++;
+    const f = { left: r.hands.includes('left'), right: r.hands.includes('right') };
+    for (const side of SIDES) {
+      if (t.handInFrame?.[side]) {
+        s.inView[side]++;
+        if (f[side]) s.found[side]++;
+      }
+      const st = r.status?.[side];
+      if (st) s.status[side][st] = (s.status[side][st] ?? 0) + 1;
+    }
+    if (t.handInFrame?.left && t.handInFrame?.right) {
+      s.inView.both++;
+      if (f.left && f.right) s.found.both++;
+    }
+  };
+  for (const r of rows) {
+    add(r.truth.segment, r);
+    if (/^face|nearFace/.test(r.truth.segment)) add('FACE', r);
+    add('ALL', r);
+  }
+  const pct = (a, b) => (b ? r1((100 * a) / b) : null);
+  const perSegment = {};
+  for (const [k, s] of Object.entries(segs)) {
+    perSegment[k] = {
+      frames: s.frames,
+      foundPct: { left: pct(s.found.left, s.inView.left), right: pct(s.found.right, s.inView.right), any: pct(s.found.left + s.found.right, s.inView.left + s.inView.right), both: pct(s.found.both, s.inView.both) },
+      inView: s.inView,
+      status: s.status,
+    };
+  }
+  const ms = rows.map((r) => r.ms).filter((x) => x != null).sort((a, b) => a - b);
+  return { frames: rows.length, perSegment, handsMs: { mean: r1(mean(ms)), p95: r1(ms[Math.floor(0.95 * (ms.length - 1))]) } };
+}
+
+/**
+ * Face stability while hands are at the face: head angle error against the
+ * truth (deg, RMS) and the largest frame-to-frame head jump, per segment,
+ * from the face rows of the ?record=1 log (head = [yaw, pitch, roll], rad).
+ */
+export function faceStabilityReport(rec, truth) {
+  const fps = truth.fps;
+  const tr = (vt) => truth.frames[Math.min(truth.frames.length - 1, Math.max(0, Math.round(vt * fps)))];
+  const rows = rec.filter((r) => !r.body && !r.handsFrame && r.vt != null && r.head).map((r) => ({ ...r, truth: tr(r.vt) }));
+  const out = {};
+  const segs = [...new Set(rows.map((r) => r.truth.segment))];
+  for (const seg of segs) {
+    const rs = rows.filter((r) => r.truth.segment === seg);
+    let ss = 0;
+    let jump = 0;
+    let mouthJump = 0;
+    for (let i = 0; i < rs.length; i++) {
+      const h = rs[i].head.map(deg);
+      const th = rs[i].truth.head;
+      ss += (h[0] - th.yaw) ** 2 + (h[1] - th.pitch) ** 2 + (h[2] - th.roll) ** 2;
+      if (i > 0 && rs[i].vt - rs[i - 1].vt < 0.1) {
+        const p = rs[i - 1].head.map(deg);
+        jump = Math.max(jump, Math.hypot(h[0] - p[0], h[1] - p[1], h[2] - p[2]));
+        mouthJump = Math.max(mouthJump, Math.abs((rs[i].values?.jawOpen ?? 0) - (rs[i - 1].values?.jawOpen ?? 0)));
+      }
+    }
+    out[seg] = { n: rs.length, faceFoundPct: r1((100 * rs.filter((r) => r.face).length) / Math.max(1, rs.length)), headErrRmsDeg: r1(Math.sqrt(ss / Math.max(1, rs.length))), maxHeadJumpDeg: r1(jump), maxJawJump: Math.round(mouthJump * 100) / 100 };
+  }
+  return out;
+}

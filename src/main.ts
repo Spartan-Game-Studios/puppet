@@ -28,6 +28,7 @@ import { drawPreview } from './tracking/overlay';
 import type { BodyMode, TrackerResult } from './tracking/protocol';
 import { listCameras, VideoSource } from './tracking/source';
 import { Tracker } from './tracking/tracker';
+import { HandStats } from './tracking/handStats';
 import { GestureTracker } from './core/gestures';
 import { toUnity, unityBoneName, vmcBlendName, type VmcFrame } from './vmc/vmcFrame';
 import {
@@ -126,6 +127,8 @@ const tracker = new Tracker({
 });
 /** Hand gestures (hands mode): `gestures.on(e => ...)` fires on every change. */
 const gestures = new GestureTracker();
+/** Per-side hand search status and found % over the last 3 s (debug overlay, ?debuglog=1). */
+const handStats = new HandStats(3000);
 gestures.mirror = settings.mirror;
 let avatar: Avatar | null = null;
 let modelHash: string | null = null;
@@ -156,6 +159,10 @@ const record: unknown[] | null = params.get('record') === '1' ? [] : null;
 
 let lastFace: TrackerResult | null = null;
 let lastBody: TrackerResult | null = null;
+tracker.onHands = (r) => {
+  handStats.push(r);
+  if (record) record.push({ handsFrame: true, vt: r.videoTime, hands: (r.hands ?? []).map((h) => h.userSide ?? h.handedness), status: r.handStatus, ms: r.timings.hands });
+};
 tracker.onResult = (r) => {
   const t = r.t / 1000;
   if (r.pipeline === 'face') {
@@ -1054,6 +1061,7 @@ function tick(now: number): void {
     $('d-infer').textContent = `${s.face.infer.toFixed(1)}/${s.body.pose.toFixed(1)}/${s.body.hands.toFixed(1)} MS`;
     $('d-gesture').textContent =
       settings.mode === 'hands' ? `L ${gestures.current.left.toUpperCase()} R ${gestures.current.right.toUpperCase()}` : '-';
+    $('d-hands').textContent = settings.mode === 'hands' ? handStats.summary() : '-';
     $('d-where').textContent = `${s.where.toUpperCase()} ${s.delegate}`;
     $('d-phys').textContent = avatar
       ? `${settings.physics.mode.toUpperCase()} ${avatar.physics.lastSteps} STEP/F`
@@ -1098,7 +1106,7 @@ if (params.get('debuglog') === '1') {
   setInterval(() => {
     const s = tracker.stats;
     debugLog(
-      `render ${renderTimes.length}fps frame ${frameMs.toFixed(1)}ms | ${vcamLogLine()} | face ${s.face.fps}fps lat ${s.face.latency.toFixed(0)}ms inf ${s.face.infer.toFixed(1)}ms | body ${s.body.fps}fps lat ${s.body.latency.toFixed(0)}ms pose ${s.body.pose.toFixed(1)} hands ${s.body.hands.toFixed(1)}ms | ${s.where} ${s.delegate} | ${$('status').textContent} | ${$('sync-mode').textContent} | vmc ${$('vmc-stats').textContent} | ${bgLoop?.active ? 'bg' : 'fg'} ${document.visibilityState}`,
+      `render ${renderTimes.length}fps frame ${frameMs.toFixed(1)}ms | ${vcamLogLine()} | face ${s.face.fps}fps lat ${s.face.latency.toFixed(0)}ms inf ${s.face.infer.toFixed(1)}ms | body ${s.body.fps}fps lat ${s.body.latency.toFixed(0)}ms pose ${s.body.pose.toFixed(1)} hands ${s.body.hands.toFixed(1)}ms | hands3s ${handStats.summary()} [${handStats.countsLine()}] | ${s.where} ${s.delegate} | ${$('status').textContent} | ${$('sync-mode').textContent} | vmc ${$('vmc-stats').textContent} | ${bgLoop?.active ? 'bg' : 'fg'} ${document.visibilityState}`,
     );
   }, 2000);
 }
@@ -1163,6 +1171,7 @@ Object.assign(window, {
     viewer,
     tracker,
     gestures,
+    handStats,
     face,
     source,
     get avatar() {

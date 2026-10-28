@@ -26,10 +26,16 @@ import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from '@pix
 import { basisRotation, twistAbout, qpow, type RestDirs } from '../src/core/bodySolver';
 import { probeRig, type RigProbe } from '../src/core/rigProbe';
 import { measureRestDirs, solverWorldRotation, widenSkinIndices } from '../src/scene/avatar';
-import { BODY_END, BODY_START, bodyAt, type BodyKey, type HandKey, type V3 } from './bodyScript';
+import { BODY_END, BODY_KEYS, BODY_START, WEBCAM_END, WEBCAM_KEYS, WEBCAM_START, bodyAt, type BodyKey, type HandKey, type V3 } from './bodyScript';
 
 export const FPS = 30;
 export const DURATION = BODY_END;
+
+/** ?script=webcam: the webcam-realism body script (bodyScript.ts), no face section. */
+const SCRIPT = new URLSearchParams(typeof location === 'undefined' ? '' : location.search).get('script') === 'webcam' ? 'webcam' : 'default';
+const KEYS = SCRIPT === 'webcam' ? WEBCAM_KEYS : BODY_KEYS;
+const START = SCRIPT === 'webcam' ? WEBCAM_START : BODY_START;
+const END = SCRIPT === 'webcam' ? WEBCAM_END : BODY_END;
 
 /** Smooth bump: 0 outside [a, b], 1 in the middle. */
 function bump(t: number, a: number, b: number, ramp = 0.25): number {
@@ -56,10 +62,16 @@ export interface Truth {
   rig?: RigProbe;
   /** Whether each hand (wrist and fingertips) is inside the camera image. */
   handInFrame?: { left: boolean; right: boolean };
+  /** Each hand's wrist and middle knuckle in the image (normalized, y down), for checking which hand was found where. */
+  handPos?: { left: { wrist: [number, number]; mcp: [number, number] }; right: { wrist: [number, number]; mcp: [number, number] } };
 }
 
 /** The scripted performance. */
 export function truthAt(t: number): Truth {
+  if (SCRIPT === 'webcam') {
+    const b = bodyAt(Math.max(t, START), KEYS);
+    return { t, expr: {}, head: { yaw: 0, pitch: 0, roll: 0 }, arms: { left: 0, right: 0 }, segment: b.segment, torso: b.torso, gesture: b.gesture };
+  }
   const expr: Record<string, number> = {};
   const add = (k: string, v: number) => (expr[k] = Math.max(expr[k] ?? 0, v));
   // 1.0-2.6 s: jaw open (talking "aa").
@@ -352,9 +364,12 @@ async function main() {
 
   // Webcam-like framing: ~55° vertical field of view, at eye level, 0.8 m away.
   const head = vrm.humanoid.getRawBoneNode('head')!.getWorldPosition(new Vector3());
-  const camera = new PerspectiveCamera(55, W / H, 0.05, 20);
-  camera.position.set(0, head.y + 0.02, 0.8);
-  camera.lookAt(0, head.y - 0.16, 0);
+  // ?cam=desk: a laptop / monitor-top webcam, closer and a little above the
+  // eyes, so the frame ends around the chest and the elbows often leave it.
+  const desk = p.get('cam') === 'desk';
+  const camera = new PerspectiveCamera(desk ? 60 : 55, W / H, 0.05, 20);
+  camera.position.set(0, head.y + 0.02, desk ? 0.6 : 0.8);
+  camera.lookAt(0, head.y - (desk ? 0.1 : 0.16), 0);
 
   const nb = (n: Parameters<typeof vrm.humanoid.getNormalizedBoneNode>[0]) => vrm.humanoid.getNormalizedBoneNode(n);
   const down = (side: 1 | -1) => new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), -side * 1.25);
@@ -379,7 +394,7 @@ async function main() {
   let lastT = 0;
   (window as unknown as { __clip: unknown }).__clip = {
     fps: FPS,
-    frames: Math.round(DURATION * FPS),
+    frames: Math.round(END * FPS),
     // The truth of the frame last rendered (includes the measured rig).
     /** World positions of a few bones (debug: checks the rotation-based truth). */
     positions: (names: string[]) =>
@@ -398,7 +413,9 @@ async function main() {
       const fix = (q: Quaternion) => (vrm0 ? q.set(-q.x, q.y, -q.z, q.w) : q);
       nb('neck')?.quaternion.copy(fix(new Quaternion().slerp(hq, 0.4)));
       nb('head')?.quaternion.copy(fix(new Quaternion().slerp(hq, 0.6)));
-      if (t >= BODY_START) {
+      if (SCRIPT === 'webcam') {
+        poser.pose(bodyAt(Math.max(t, START), KEYS));
+      } else if (t >= BODY_START) {
         poser.pose(bodyAt(t));
       } else {
         for (const [side, s] of [['left', 1], ['right', -1]] as const) {
@@ -412,6 +429,16 @@ async function main() {
       renderer.render(scene, camera);
       g.rig = poser.probe();
       g.handInFrame = { left: inFrame('left'), right: inFrame('right') };
+      const img = (b: string): [number, number] => {
+        const n = poser.node(b);
+        if (!n) return [NaN, NaN];
+        const q = n.getWorldPosition(new Vector3()).project(camera);
+        return [+((q.x + 1) / 2).toFixed(4), +((1 - q.y) / 2).toFixed(4)];
+      };
+      g.handPos = {
+        left: { wrist: img('leftHand'), mcp: img('leftMiddleProximal') },
+        right: { wrist: img('rightHand'), mcp: img('rightMiddleProximal') },
+      };
       lastTruth = g;
       return renderer.domElement.toDataURL('image/png');
     },

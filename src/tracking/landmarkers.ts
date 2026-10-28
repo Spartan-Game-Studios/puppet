@@ -12,7 +12,7 @@ import {
   type PoseLandmarkerResult,
 } from '@mediapipe/tasks-vision';
 import type { Landmark, Side } from '../core/bodySolver';
-import type { BodyMode, FaceResult, HandResult, Pipeline, PoseResult, TrackerResult } from './protocol';
+import type { BodyMode, FaceResult, HandResult, HandStatus, Pipeline, PoseResult, TrackerResult } from './protocol';
 import { roiFromLandmarks, roiFromPose, sameHand, stabilizeRoi, wristDistance, type Roi } from './handRoi';
 
 export interface LandmarkerSet {
@@ -125,7 +125,7 @@ interface HandSideState {
   roi: Roi | null;
   misses: number;
   /** What happened on the last frame (debug readout / harness). */
-  status: 'skip' | 'no-roi' | 'miss' | 'other-hand' | 'duplicate' | 'tracked' | 'found';
+  status: HandStatus;
 }
 
 /** A hand found this recently is tracked from its own landmarks rather than re-found from the pose. */
@@ -248,6 +248,9 @@ export class HandCropTracker {
   }
 }
 
+const handStatusOf = (set: LandmarkerSet): TrackerResult['handStatus'] =>
+  set.handTracker ? { left: set.handTracker.state.left.status, right: set.handTracker.state.right.status } : undefined;
+
 export function detect(
   set: LandmarkerSet,
   pipeline: Pipeline,
@@ -275,7 +278,7 @@ export function detect(
       ({ hands, ran: handsRan } = set.handTracker.run(image, width, height, t, poseHint));
     }
     timings.hands = timings.total = performance.now() - t0;
-    return { pipeline, t, width, height, hands, handsRan, timings };
+    return { pipeline, t, width, height, hands, handsRan, handStatus: handStatusOf(set), timings };
   }
   const pose = set.pose ? poseFrom(set.pose.detectForVideo(image, t)) : null;
   const t1 = performance.now();
@@ -290,5 +293,5 @@ export function detect(
   timings.pose = t1 - t0;
   timings.hands = t2 - t1;
   timings.total = t2 - t0;
-  return { pipeline, t, width, height, pose, hands, handsRan, timings };
+  return { pipeline, t, width, height, pose, hands, handsRan, handStatus: handStatusOf(set), timings };
 }

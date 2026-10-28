@@ -55,6 +55,16 @@ export interface HandResult {
   userSide?: 'left' | 'right';
 }
 
+/**
+ * What the hand search did for one user side on a frame (debug readout):
+ * skip = not looked for (weak pose wrist, looked only now and then),
+ * no-roi = nowhere to look (no usable pose wrist), miss = looked, found nothing,
+ * other-hand = found a hand that belonged to the other side, duplicate = the
+ * other side's crop found the same hand, tracked = found again from its own
+ * last landmarks, found = (re)found from a search.
+ */
+export type HandStatus = 'skip' | 'no-roi' | 'miss' | 'other-hand' | 'duplicate' | 'tracked' | 'found';
+
 export interface TrackerResult {
   type: 'result';
   pipeline: Pipeline;
@@ -68,6 +78,8 @@ export interface TrackerResult {
   hands?: HandResult[];
   /** Whether the hand model ran this frame (it is skipped when no wrist is in view). */
   handsRan?: boolean;
+  /** Per user side: what the hand search did this frame. */
+  handStatus?: Record<'left' | 'right', HandStatus>;
   timings: { face: number; pose: number; hands: number; total: number };
   /** Source video time of the frame (seconds), filled in on the main thread. */
   videoTime?: number;

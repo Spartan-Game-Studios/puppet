@@ -16,7 +16,9 @@ const browser = await launch();
 const page = await browser.newPage({ viewport: { width: 700, height: 520 } });
 page.on('console', (m) => m.type() === 'error' && console.log('[page]', m.text()));
 await serveLocal(page, { '/__local/model.vrm': model });
-await page.goto(`${BASE}/harness/?test=render&clean=${process.env.PUPPET_CLEAN ?? '0'}`);
+// PUPPET_SCRIPT=webcam renders the webcam-realism script (hands at the face, both hands up,
+// low, close, together); PUPPET_CAM=desk the closer desk-webcam framing.
+await page.goto(`${BASE}/harness/?test=render&clean=${process.env.PUPPET_CLEAN ?? '0'}&script=${process.env.PUPPET_SCRIPT ?? 'default'}&cam=${process.env.PUPPET_CAM ?? 'default'}`);
 await page.waitForFunction(() => document.title === 'ready' || document.title === 'error', null, { timeout: 180000 });
 if ((await page.title()) === 'error') throw new Error('render harness failed');
 const n = await page.evaluate(() => window.__clip.frames);

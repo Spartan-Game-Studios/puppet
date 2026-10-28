@@ -27,6 +27,6 @@ export class HandsMerge {
 
   private attach(body: TrackerResult, h: TrackerResult): TrackerResult | null {
     if (body.t - h.t >= 80) return null;
-    return { ...body, hands: h.hands, handsRan: h.handsRan, timings: { ...body.timings, hands: h.timings.hands } };
+    return { ...body, hands: h.hands, handsRan: h.handsRan, handStatus: h.handStatus, timings: { ...body.timings, hands: h.timings.hands } };
   }
 }

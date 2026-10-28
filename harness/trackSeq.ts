@@ -5,6 +5,7 @@
  * Driven by scripts/track-seq.mjs: window.__seq.run(from, to, step).
  */
 import { createLandmarkers, detect } from '../src/tracking/landmarkers';
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { roiFromPose } from '../src/tracking/handRoi';
 
 async function main() {
@@ -26,12 +27,42 @@ async function main() {
         out.push({
           i,
           pose: !!r.pose,
+          // Pose wrists (user left, right): image x, y and visibility.
+          wrists: r.pose ? [15, 16].map((k) => [r.pose!.image[k].x, r.pose!.image[k].y, r.pose!.image[k].visibility ?? 1]) : null,
           hands: (r.hands ?? []).map((h) => ({ side: h.userSide, label: h.handedness, score: h.score, wrist: [h.landmarks[0].x, h.landmarks[0].y], world: h.worldLandmarks.map((l) => [l.x, l.y, l.z]) })),
           handsRan: r.handsRan,
           status: set.handTracker ? [set.handTracker.state.left.status, set.handTracker.state.right.status] : null,
           ms: r.timings,
         });
       }
+      return out;
+    },
+    /**
+     * Experiment: a full-frame HandLandmarker (numHands 2, MediaPipe's own palm
+     * detector) over the frames, in VIDEO or IMAGE mode. Returns each frame's
+     * hands (wrist, handedness, score).
+     */
+    async full(from: number, to: number, step = 1, mode: 'VIDEO' | 'IMAGE' = 'VIDEO', det = 0.3) {
+      const fs = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
+      const hl = await HandLandmarker.createFromOptions(fs, {
+        baseOptions: { modelAssetPath: '/mediapipe/models/hand_landmarker.task', delegate: 'GPU' },
+        runningMode: mode,
+        numHands: 2,
+        minHandDetectionConfidence: det,
+        minHandPresenceConfidence: 0.4,
+        minTrackingConfidence: 0.4,
+      });
+      const out = [];
+      for (let i = from; i < to; i += step) {
+        const img = new Image();
+        img.src = `/__local/frames/${String(i).padStart(4, '0')}.png`;
+        await img.decode();
+        const t0 = performance.now();
+        const r = mode === 'VIDEO' ? hl.detectForVideo(img, Math.round((i * 1000) / 30) + 1) : hl.detect(img);
+        const ms = performance.now() - t0;
+        out.push({ i, ms, hands: r.landmarks.map((l, k) => ({ wrist: [l[0].x, l[0].y], mid: [l[9].x, l[9].y], label: r.handedness[k]?.[0]?.categoryName, score: r.handedness[k]?.[0]?.score })) });
+      }
+      hl.close();
       return out;
     },
     /** Frame i with the pose's image landmarks drawn on it (debug). */
