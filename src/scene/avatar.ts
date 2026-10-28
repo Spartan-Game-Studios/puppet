@@ -48,6 +48,19 @@ export const DEFAULT_DRIVE: DriveOptions = {
 
 const TORSO = new Set(['hips', 'spine', 'chest', 'upperChest']);
 
+/**
+ * Something blended over the tracked pose each frame (src/anim: idle and
+ * emote clips, hotkey expressions, mic lip sync). Called from update().
+ */
+export interface AvatarLayer {
+  /** After the tracked bones have moved toward their targets (head and neck not yet set). */
+  body(avatar: Avatar, dt: number): void;
+  /** After head and neck have been set from the face. */
+  head(avatar: Avatar, dt: number): void;
+  /** Adjust this frame's expression values (model expression name -> weight). */
+  expressions(values: Map<string, number>, avatar: Avatar, dt: number): void;
+}
+
 export interface LoadedAvatar {
   avatar: Avatar;
   hash: string;
@@ -108,6 +121,8 @@ export class Avatar {
   readonly chestChain: Array<[string, number]>;
   readonly solver: BodySolver;
   drive: DriveOptions = { ...DEFAULT_DRIVE };
+  /** Optional layer over tracking (see AvatarLayer). */
+  layer: AvatarLayer | null = null;
   /** Rest-pose bounds of the skinned meshes in the avatar's space (for camera framing). */
   readonly bounds = new Box3();
 
@@ -249,6 +264,16 @@ export class Avatar {
     for (const [b, q] of this.targets) this.bones.get(b)?.quaternion.copy(this.toBone(q));
   }
 
+  /** Face tracking is live (a face seen in the last 0.5 s). */
+  get faceTracked(): boolean {
+    return this.time - this.faceSeenAt <= 0.5;
+  }
+
+  /** Body tracking is live (upper/hands mode and a pose seen in the last 0.5 s). */
+  get bodyTracked(): boolean {
+    return this.drive.mode !== 'face' && this.time - this.bodySeenAt <= 0.5;
+  }
+
   /** Feed a processed face frame. */
   setFace(face: FaceState): void {
     this.face = face;
@@ -286,8 +311,8 @@ export class Avatar {
     this.time += dt;
     const d = this.drive;
     // Tracking lost for a while: settle to neutral / idle.
-    const faceStale = this.time - this.faceSeenAt > 0.5;
-    const bodyStale = d.mode === 'face' || this.time - this.bodySeenAt > 0.5;
+    const faceStale = !this.faceTracked;
+    const bodyStale = !this.bodyTracked;
     if (bodyStale) {
       const idle = new Map<string, Quaternion>();
       for (const side of ['left', 'right'] as const) {
@@ -331,8 +356,12 @@ export class Avatar {
       }
     }
 
+    this.layer?.body(this, dt);
+
     // Head relative to the (now updated) chest.
-    let parentWorld = new Quaternion();
+    // From the hips: tracking leaves them at rest, but an animation clip may bend them.
+    const hipsNode = this.bones.get('hips');
+    let parentWorld = hipsNode ? this.toBone(hipsNode.quaternion.clone()) : new Quaternion();
     for (const [b] of this.chestChain) parentWorld.multiply(this.toBone(this.bones.get(b)!.quaternion));
     const headLocal = this.toBone(parentWorld.invert().multiply(headWorld));
     const neck = this.bones.get('neck');
@@ -344,6 +373,8 @@ export class Avatar {
     } else if (head) {
       head.quaternion.slerp(headLocal, kh);
     }
+
+    this.layer?.head(this, dt);
 
     this.applyExpressions(face, dt);
 
@@ -360,10 +391,8 @@ export class Avatar {
   private applyExpressions(face: FaceState | null, dt: number): void {
     const em = this.vrm.expressionManager;
     if (!em) return;
-    const set = (name: string, v: number) => {
-      em.setValue(name, v);
-      this.expressionValues.set(name, v);
-    };
+    const out = new Map<string, number>();
+    const set = (name: string, v: number) => out.set(name, v);
     if (!face) {
       // Relax toward neutral.
       const k = Math.exp(-6 * dt);
@@ -372,19 +401,24 @@ export class Avatar {
         this.vrm.lookAt.yaw *= k;
         this.vrm.lookAt.pitch *= k;
       }
-      return;
-    }
-    if (this.usePerfectSync) {
-      for (const [arkit, expr] of this.perfectSync) set(expr, face.values[arkit] ?? 0);
     } else {
-      const p = derivePresets(face.values, this.drive.presetOptions);
-      for (const name of this.presets) set(name, p[name as keyof typeof p] ?? 0);
+      if (this.usePerfectSync) {
+        for (const [arkit, expr] of this.perfectSync) set(expr, face.values[arkit] ?? 0);
+      } else {
+        const p = derivePresets(face.values, this.drive.presetOptions);
+        for (const name of this.presets) set(name, p[name as keyof typeof p] ?? 0);
+      }
+      const la = this.vrm.lookAt;
+      if (la) {
+        // three-vrm: +yaw looks to the avatar's left, +pitch looks down.
+        la.yaw = face.gaze.yaw * this.drive.gazeGain;
+        la.pitch = -face.gaze.pitch * this.drive.gazeGain;
+      }
     }
-    const la = this.vrm.lookAt;
-    if (la) {
-      // three-vrm: +yaw looks to the avatar's left, +pitch looks down.
-      la.yaw = face.gaze.yaw * this.drive.gazeGain;
-      la.pitch = -face.gaze.pitch * this.drive.gazeGain;
+    this.layer?.expressions(out, this, dt);
+    for (const [n, v] of out) {
+      em.setValue(n, v);
+      this.expressionValues.set(n, v);
     }
   }
 }

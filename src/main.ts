@@ -52,6 +52,8 @@ import { VirtualCamOutput } from './vcam/output';
 import { loadSettings, saveSettings, type Settings } from './app/settings';
 import { bindEnvironmentUi } from './app/environmentUi';
 import { mountHome } from './app/home';
+import { mountMotion, type MotionFeatures } from './anim/features';
+import { withPresetBlends } from './vmc/presets';
 import type { PhysicsMode } from './physics/stableSprings';
 import { buildClothUI } from './app/clothUi';
 
@@ -160,6 +162,8 @@ tracker.onResult = (r) => {
 };
 
 // ---------------------------------------------------------------- model loading
+/** 07 MOTION / 08 HOTKEYS / 09 LIP SYNC (src/anim/features.ts), mounted below. */
+let motion: MotionFeatures | null = null;
 async function loadModel(buf: ArrayBuffer, label: string, path: string | null): Promise<boolean> {
   setStatus(`LOADING ${label}`);
   try {
@@ -171,6 +175,7 @@ async function loadModel(buf: ArrayBuffer, label: string, path: string | null): 
     viewer.frame(currentFraming);
     avatar = a;
     modelHash = hash;
+    motion?.attach(a, hash);
     if (path) {
       settings.lastModelPath = path;
       persist();
@@ -477,6 +482,10 @@ checkBind('vmc-enabled', () => settings.vmc.enabled, (v) => {
   persist();
   applyVmc();
 });
+checkBind('vmc-presets', () => settings.vmc.presets, (v) => {
+  settings.vmc.presets = v;
+  persist();
+});
 const hostEl = $<HTMLInputElement>('vmc-host');
 const portEl = $<HTMLInputElement>('vmc-port');
 hostEl.value = settings.vmc.host;
@@ -510,6 +519,8 @@ function sendVmc(): void {
     frame.bones.push([unityBoneName(name), ...toUnity(n.position, n.quaternion)]);
   }
   for (const [n, v] of a.expressionValues) frame.blends.push([vmcBlendName(n), v]);
+  // Preset-only receivers: also send Blink/A/I/U/E/O/Joy/... derived from ARKit.
+  if (settings.vmc.presets) frame.blends = withPresetBlends(frame.blends, a.drive.presetOptions);
   vmcBusy = true;
   vmcSend(frame)
     .catch((e) => setStatus(`VMC: ${e}`, true))
@@ -837,6 +848,8 @@ function setDebug(on: boolean): void {
   persist();
 }
 
+motion = await mountMotion({ settings, persist, setStatus, stage: $('stage'), tracker, debug: params.get('debuglog') === '1' ? debugLog : undefined });
+
 // ---------------------------------------------------------------- home (model library, src/app/home.ts)
 const home = await mountHome({
   loadModel,
@@ -889,7 +902,10 @@ await onNativeDrop(
     if (home.visible) return home.importPaths(paths);
     const p = paths.find((x) => /\.vrm$/i.test(x));
     if (p) await loadModel(await readPath(p), baseName(p), p);
-    else if (!(await envUi.dropPaths(paths))) setStatus('DROP A .VRM (OR A .GLB / .HDR ENVIRONMENT)', true);
+    else {
+      const rest = (await motion?.dropPaths(paths)) ?? paths; // animation clips
+      if (rest.length && !(await envUi.dropPaths(rest))) setStatus('DROP A .VRM, AN .FBX / .GLB CLIP (OR A .GLB / .HDR ENVIRONMENT)', true);
+    }
   },
   (on) => {
     drop.classList.toggle('on', on && !home.visible);
@@ -911,7 +927,10 @@ if (!isTauri) {
     if (home.visible) return home.importFiles(files);
     const f = files.find((x) => /\.vrm$/i.test(x.name));
     if (f) await loadModel(await f.arrayBuffer(), f.name, null);
-    else await envUi.dropFiles(files);
+    else {
+      const rest = (await motion?.dropFiles(files)) ?? files; // animation clips
+      if (rest.length) await envUi.dropFiles(rest);
+    }
   });
 }
 
@@ -928,6 +947,10 @@ function tick(now: number): void {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
   const t0f = performance.now();
+  if (motion) {
+    motion.hotkeys.enabled = !home.visible;
+    motion.tick(now);
+  }
   avatar?.update(dt);
   viewer.render();
   vcam.tick(now);
@@ -1046,6 +1069,7 @@ Object.assign(window, {
     record,
     calibrate,
     home,
+    motion,
     vcam,
     env: envUi,
     frame: (f: Framing) => {

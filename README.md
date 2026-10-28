@@ -15,7 +15,7 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
   - Per-blendshape **gain** and **curve** (exponent) so mouths read strongly. You can edit them live next to the raw and output bars.
 - **Upper body and hands.** PoseLandmarker world landmarks drive the spine, chest, shoulders and arms. HandLandmarker drives all finger bones. Choose FACE (`1`), +BODY (`2`) or +HANDS (`3`). Legs stay in an idle stance.
   - The solver is Puppet's own: direction vectors against the model's measured rest directions, with an elbow-hinge-aware upper-arm twist and part of the wrist twist moved into the forearm. Hands are found by cropping around each pose wrist, so small webcam hands are still seen. Untracked arms ease back to an idle pose.
-- **VMC protocol output** over OSC/UDP from the Rust side (`rosc`). Messages: `/VMC/Ext/OK`, `/VMC/Ext/T`, `/VMC/Ext/Root/Pos`, `/VMC/Ext/Bone/Pos` (all humanoid bones, Unity coordinates), `/VMC/Ext/Blend/Val` and `/VMC/Ext/Blend/Apply`. Host and port are configurable (default `127.0.0.1:39539`). Bundles are split under 1200 bytes so they also cross a real network.
+- **VMC protocol output** over OSC/UDP from the Rust side (`rosc`). Perfect-sync models also send the 13 VRM 0.x presets derived from the ARKit values, so preset-only receivers don't see a frozen face (see [VMC setup](#vmc-setup)). Messages: `/VMC/Ext/OK`, `/VMC/Ext/T`, `/VMC/Ext/Root/Pos`, `/VMC/Ext/Bone/Pos` (all humanoid bones, Unity coordinates), `/VMC/Ext/Blend/Val` and `/VMC/Ext/Blend/Apply`. Host and port are configurable (default `127.0.0.1:39539`). Bundles are split under 1200 bytes so they also cross a real network.
 - **Virtual camera output.** Puppet shows up as a webcam, **Puppet Virtual Camera**, in Zoom, Meet, Discord, FaceTime and OBS (**06 VIRTUAL CAM**, `W`). It sends the capture view at 1280×720 or 1920×1080, 30 fps. Cameras have no alpha, so the CLEAR background is sent as the chosen colour (green by default); a 3D environment is sent as rendered, except depth of field, which is display-only. See [Virtual camera](#virtual-camera).
   - macOS 12.3+: a CoreMediaIO Camera Extension inside Puppet.app (needs a Developer ID–signed build; see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)).
   - Windows 10/11: a DirectShow camera built from [softcam](https://github.com/tshino/softcam) (MIT); one admin prompt to register it.
@@ -28,6 +28,9 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
   - fixed-timestep (60 Hz × substeps), clamped speeds and smoothed torso input, as before.
 
   There is a global OFF / STIFF / NORMAL switch (`8` `9` `0`), the cloth groups (links on/off, stiffness, and per-chain grouping overrides), a per-chain table (on/off, stiffness/drag/gravity multipliers) and per-collider toggles, including the generated BODY colliders. Overrides are saved per model, keyed by the SHA-256 of the file. The previous solver (three-vrm's spring bones with stabilisers) stays available as SOLVER → LEGACY. See [Cloth benchmark](#cloth-benchmark) for measurements.
+- **Animation clips (07 MOTION).** Idle loops, emotes and your own FBX / glTF clips, retargeted onto any VRM (0.x and 1.0) and layered over live tracking. See [Motion, hotkeys and lip sync](#motion-hotkeys-and-lip-sync).
+- **Expression and emote hotkeys (08 HOTKEYS).** Keyboard, gamepad (first class) and, through an adapter, hand gestures; optional system-wide keys; an on-screen picker (`G` / pad RB).
+- **Mic lip sync (09 LIP SYNC).** Off by default. Drives the mouth from your microphone when the face isn't tracked (FALLBACK), together with tracking (BLEND) or alone (AUDIO).
 - **Model library (HOME).** The first screen at launch; `L` or `Esc` from the stage returns to it. See [Model library](#model-library).
 - **App UX.**
   - Open a VRM from a file dialog (`O`) or by dropping it on the window; it is added to the library too.
@@ -42,7 +45,45 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
 
 Stage: `L` / `Esc` home · `I` model info and licence · `O` open · `E` 3D environment on/off · `H` capture view · `Esc` leave capture view · `C` calibrate neutral · `M` mirror · `T` preview · `V` VMC on/off · `W` virtual camera on/off · `1` `2` `3` tracking mode · `8` `9` `0` physics off/stiff/normal · `R` settle physics · `F` `P` face/physics tab · `D` debug bar
 
+Hotkeys (defaults, editable in 08 HOTKEYS): `⌥1`–`⌥5` happy / angry / sad / relaxed / surprised · `⌥6` reset · `F3` wave · `F4` nod · `F5` shake · `F6` clap · `F7` cheer · `F8` bow · `F9` shrug · `F10` think · `G` picker. Gamepad (standard mapping): `A` wave · `B` nod · `X` clap · `Y` cheer · d-pad happy / surprised / sad / angry · `LB` shrug · `RB` picker · `BACK` reset. (Alt+digits because `1` `2` `3` are the tracking modes; F3 up because `F2` renames on HOME.)
+
 Home: `←` `↑` `↓` `→` move · `Enter` load · `S` favourite · `L` licence · `F2` rename · `Del` remove · `/` search · `I` import · `Esc` back to the stage
+
+## Motion, hotkeys and lip sync
+
+### Clips (07 MOTION)
+
+| clip | from | owns by default |
+|---|---|---|
+| IDLE: BREATHE / LOOK AROUND / TALKING / ARMS FOLDED | UAL `Idle_Loop`, `Idle_LookAround_Loop`, `Idle_Talking_Loop`, UAL2 `Idle_FoldArms_Loop` | idle (full body) |
+| NOD (YES), SHAKE (NO) | UAL2 `Yes`, `Idle_No_Loop` | head |
+| CHEER, ANGRY, CRY | UAL `Celebration`, `Counter_Angry`, `Crying` | body |
+| DANCE, SIT (loop until triggered again) | UAL `Dance_Loop`, `Sitting_Idle_Loop` | full |
+| DRINK | UAL `Drink` | arms |
+| WAVE, CLAP, POINT | Puppet (keyframed, `src/anim/authored.ts`) | arms |
+| SHRUG, THINK | Puppet | body |
+| BOW | Puppet | full |
+
+UAL = the [Quaternius Universal Animation Library](https://quaternius.com) 1 and 2 (CC0 1.0). The library has no wave, clap, bow, point, shrug or thinking pose, so those six are Puppet's own keyframes, authored against each avatar's measured rest directions. `scripts/build-builtin-clips.mjs` strips the UAL clips to bone tracks (no mesh, no skin, no scale tracks, rotations as normalized shorts, constant tracks as one key) into `public/clips/ual.glb`: 12 clips, 433 KiB.
+
+- **Your clips.** IMPORT CLIP, or drop an `.fbx` / `.glb` on the window (a `.glb` without animations is still taken as a 3D environment). Mixamo (`mixamorig:` names), UAL / Unreal-mannequin and VRoid rigs are detected by bone names; common Blender/Unity names work as a fallback. Puppet keeps a copy in `<appData>/clips/<sha256>/clip.fbx|glb` with a `clips.json` index (same rules as the model library). One entry per animation in the file; empty bind-pose takes are skipped. Mixamo's terms don't allow redistributing their files: import your own, never commit them.
+- **Retargeting** (`src/anim/retarget.ts`): the clip is sampled at 30 fps and stored per bone as its world rotation change from the source's rest pose, in a frame detected from the rest pose (up = hips → head, left = right arm → left arm), so Y-up, Z-up and either facing all work. On binding to a model, each bone gets a fix rotation from the model's rest direction to the source's (an A-pose source keeps its A-pose arms on a T-pose VRM), and local rotations follow from the bones the model has (a missing upperChest folds into the chest). VRM 0.x models are handled by the same 180° turn Puppet uses for tracking. Hips translation is scaled by hip height; travel is removed (in place), bob and sit height are kept.
+- **Layering** (`src/anim/player.ts`): the IDLE clip plays while body tracking is off (FACE mode, unless switched off) or lost; with the face tracked the head stays the face's, with the face lost too the idle owns it. An emote plays over live tracking and owns the bones of its mask (FULL, BODY = all but neck and head, ARMS, HEAD), fading in over 0.3 s and out over 0.45 s; clips that move the hips (sit) fade over 0.8 s, because a fast drop pushes the legs through skirts faster than cloth collision follows. Face expressions stay tracked during every emote. Clips are applied as a slerp from the tracked pose, so a clip start is a continuous motion for the cloth solver.
+
+### Hotkeys (08 HOTKEYS)
+
+Each binding maps a trigger (key or combo, gamepad button, hand gesture) to an action: play an emote, set an expression (TOGGLE, ON, or HOLD while pressed; any VRM preset or custom expression on the model, with fades), RESET, or the PICKER. Click a trigger to rebind it. The dot marks a binding that belongs to the current model only (expressions differ per model); a model's own binding overrides a global one on the same trigger. Clashes with another binding or with an app shortcut are outlined.
+
+- **GLOBAL** (off by default): the keyboard bindings are registered system-wide with `tauri-plugin-global-shortcut`, so they work while OBS or a game has focus. On macOS this uses Carbon hot keys (no Accessibility permission needed); verified with the desktop build running in the background (a synthesised `⌃⌥⇧F19` fired an emote). A registered key is taken from every other app while Puppet runs, so prefer combos for global use; a combo another app owns fails to register, is listed, and still works in-window.
+- **Gamepad** buttons work whenever the window can poll the Gamepad API (the app keeps rendering in the background).
+- **Hand gestures** plug in through `GestureSource` (`src/input/gestures.ts`); the tracker's gesture events are the TODO adapter there.
+- **Picker:** `G` or pad `RB` opens a grid of emotes and expressions over the stage. Arrows / d-pad / left stick move, `Enter` / `A` fires, `Esc` / `B` closes.
+
+### Lip sync (09 LIP SYNC)
+
+Pick the microphone and a mode: OFF, FALLBACK (audio drives the mouth only while the face isn't tracked, eased in and out), BLEND (the larger of tracked and audio, per shape) or AUDIO. The analysis (`src/audio/visemes.ts`) gates the frame level (GATE DB), estimates F1/F2 from a pre-emphasised, smoothed spectrum and matches them softly against the five vowels: preset models get `aa` `ih` `ou` `ee` `oh`, perfect-sync models `jawOpen`, `mouthFunnel`, `mouthPucker` and `mouthStretch`. Fast attack (30 ms), slower release (90 ms). The meter shows the level, the gate and each viseme.
+
+The desktop app asks for the microphone only when you pick a mode: `NSMicrophoneUsageDescription` (Info.plist) and `com.apple.security.device.audio-input` (both entitlement files) cover the signed, notarized macOS build; the webview's request is granted from Rust on all platforms (WebKitGTK media streams are already enabled on Linux).
 
 ## Model library
 
@@ -153,6 +194,7 @@ This works on every OS without installing a camera driver. Use it when the nativ
 2. In the receiver, enable VMC/OSC receiving on that port.
    - Bones are sent as normalized-rig local rotations (identity in T-pose) in Unity coordinates, which is what receivers expect from a normalized VRM.
    - Blendshapes go out under the model's own expression names. Presets use the VRM 0.x clip names (`Blink`, `Blink_L`, `A`, `I`, `U`, `E`, `O`, `Joy`, `Angry`, `Sorrow`, `Fun`, `Surprised`), and perfect-sync models send the ARKit names. In VSeeFace, enable perfect sync on the receiving model to use them.
+   - ALSO SEND VRM PRESETS (on by default) adds `Blink`, `Blink_L`, `Blink_R`, `A`, `I`, `U`, `E`, `O`, `Joy`, `Angry`, `Sorrow`, `Fun`, `Surprised` to every frame: derived from the ARKit values with the same mapping preset models use (blink from `eyeBlink*`, vowels from jaw and mouth shapes, `Joy` from the smile...), combined with the model's own preset values when it drives them. The ARKit values are still sent. `src/vmc/presets.ts`.
 
 The TX readout shows frames and bytes sent. "Nothing listening" errors are counted, not fatal.
 
@@ -191,6 +233,9 @@ The scripts in `scripts/` drive headless Chrome through Playwright, using your i
 - `PUPPET_MODEL=avatar.vrm node scripts/physics-test.mjs` runs the physics stability test below.
 - `PUPPET_MODEL=avatar.vrm node scripts/cloth-test.mjs [out.json]` runs the [cloth benchmark](#cloth-benchmark); `VIDEO=dir` also renders side-by-side videos.
 - `PUPPET_MODEL=avatar.vrm node scripts/record-pose.mjs clip-dir/ pose.json` records a real tracking session (the clip played through the app) as bone rotations, for the benchmark's `recorded` scenario (`PUPPET_POSE=pose.json`).
+- `PUPPET_MODELS=a.vrm,b.vrm [PUPPET_FBX=clip.fbx] node scripts/anim-test.mjs out/` plays every clip (and an imported FBX / GLB) on each avatar with the real animation layer and physics, in virtual time on its own Vite server (port 5211). It writes a contact sheet per avatar and an mp4 per clip (front and side), and reports the largest frame-to-frame limb jump, the peak cloth / hair speed relative to the hips, and how far the avatars' limb directions differ for the same clip (a VRM 0.x and a VRM 1.0 should move alike).
+- `PUPPET_MODEL=avatar.vrm [PUPPET_LIPSYNC_MODE=fallback|blend|audio] node scripts/lipsync-test.mjs` generates a WAV of five synthetic vowels, feeds it to Chrome as a fake microphone, and checks which viseme the analysis picked for each vowel and that the mouth closes in the gaps.
+- `node scripts/vmc-listen.mjs 39539 5 blends` also lists every blend shape name received, with its peak value.
 - `PUPPET_MODEL=avatar.vrm node scripts/screenshot.mjs ui.png` screenshots the UI.
 - `PUPPET_MODEL=avatar.vrm node scripts/vcam-test.mjs out/` checks the virtual camera frame source in headless Chrome (size, BGRA order, background composite, 30 fps), and `scripts/vcam-desktop-test.mjs` runs a built desktop app with the file sink and measures CPU with the output on and off.
 - `PUPPET_MODEL=avatar.vrm PUPPET_CLIP=clip.webm node scripts/env-bench.mjs out/` benchmarks the 3D environments in capture view at 1920×1080: render fps, frame time, tracking fps and inference time, and the avatar's face brightness, for every scene at LOW and HIGH against the flat background. It saves a screenshot of each scene. `PUPPET_UNCAPPED=1` removes vsync to show headroom.
@@ -255,7 +300,15 @@ On the same avatar the stability test above gives, for the cloth solver: 1.44 m/
   - Windows is untested.
 - **Hands** are the weakest tracker. Small, fast or overlapping hands drop out. On the rendered test footage, while both arms were raised, at least one hand was found in 52% of frames (26% per hand); the rendered hands are small (about 60 px) and pale. Real webcam footage was not available.
 - **Single-eye winks** register weakly with MediaPipe on the test footage. Both-eye blinks track well.
-- **Legs** are an idle stance only (v1). There is no hip translation or walking.
+- **Legs** follow the idle or an emote clip; tracking never moves them, and there is no walking.
+- **Animation clips.**
+  - Retargeting matches bone directions; a source with very different proportions (long arms, a hunched rest pose) reproduces its directions, not its contacts, so hand-to-face or clapping hands can miss or pass through each other on some models.
+  - Finger and wrist twist come from minimal rotations between rest directions; rigs whose hand rest orientation differs a lot from VRM's can show twisted wrists.
+  - The six keyframed emotes are simple poses, not motion capture.
+  - Root motion is kept in place only; turns in a clip (hips yaw) are kept.
+  - An imported `.gltf` with separate files isn't supported; use `.glb` or `.fbx`.
+- **Hotkeys.** Global keys are tested on macOS only. Windows and Linux use the same plugin (Windows RegisterHotKey, Linux X11 only: global keys are not available on a pure Wayland session). Hand-gesture triggers wait for the tracker's gesture events (adapter in `src/input/gestures.ts`).
+- **Mic lip sync.** Tested with a synthetic voice through a fake capture device in Chrome; the macOS microphone prompt in the signed app and real voices are untested. FALLBACK switches on face loss only; it can't tell when mouth tracking is merely weak.
 - **Pose model** changes (LITE/FULL) apply on the next launch.
 - **Virtual camera.**
   - macOS needs a Developer ID–signed build with the system-extension entitlement; unsigned builds (including CI artifacts) can't install the camera. The extension, its activation and the CMIO sink path have been built and checked as far as an unsigned build allows (activation stops at "missing entitlement"); the signed install and a real Zoom/Meet session are untested.

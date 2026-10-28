@@ -1,0 +1,54 @@
+/* 07 MOTION, 08 HOTKEYS, 09 LIP SYNC and the on-screen picker. Same tokens as styles.css. */
+
+.clip-list, .hk-list { display: flex; flex-direction: column; gap: 3px; }
+.clip-row { display: grid; grid-template-columns: 1fr 62px 22px; gap: 4px; align-items: center; font-size: 10px; }
+.clip-row.user { grid-template-columns: 1fr 62px 22px 22px; }
+.clip-row .play {
+  text-align: left; border: var(--thin); background: var(--white); height: 22px; padding: 0 6px; font-weight: 800; font-size: 10px;
+  cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.04em;
+}
+.clip-row .play:hover { background: var(--ink); color: var(--white); }
+.clip-row .play.on { background: var(--accent); color: var(--ink); }
+.clip-row select { height: 22px; font-size: 9px; padding: 0 2px; border-width: 1px; }
+.clip-row input[type='checkbox'] { justify-self: center; }
+.clip-row .x, .hk-row .x { height: 22px; border: var(--thin); background: transparent; cursor: pointer; font-weight: 800; padding: 0; }
+.clip-row .x:hover, .hk-row .x:hover { background: var(--ink); color: var(--white); }
+.clip-head, .hk-head { font-size: 9px; font-weight: 800; color: var(--mute); letter-spacing: 0.06em; display: grid; gap: 4px; }
+.clip-head { grid-template-columns: 1fr 62px 22px; }
+.drop-note { font-size: 9px; font-weight: 700; color: var(--mute); text-transform: uppercase; }
+
+.hk-head, .hk-row { grid-template-columns: 62px 1fr 64px 18px 22px; }
+.hk-row select.mode:disabled { visibility: hidden; }
+.hk-row { display: grid; gap: 4px; align-items: center; font-size: 10px; }
+.hk-row .trig {
+  height: 22px; border: var(--thin); background: var(--ink); color: var(--white); font-weight: 800; font-size: 10px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px;
+}
+.hk-row .trig.listen { background: var(--accent); color: var(--ink); }
+.hk-row .trig.clash { outline: 2px solid var(--accent); outline-offset: -2px; }
+.hk-row.fired .trig { background: var(--accent); color: var(--ink); }
+.hk-row select { height: 22px; font-size: 9px; padding: 0 2px; border-width: 1px; min-width: 0; }
+.hk-row.model .trig::after { content: ' ●'; color: var(--accent); }
+.hk-status { font-size: 9px; font-weight: 700; color: var(--mute); text-transform: uppercase; line-height: 1.5; }
+.hk-status.err { color: var(--accent); }
+
+.ls-meter { position: relative; height: 16px; border: var(--thin); background: var(--white); }
+.ls-meter .lvl { position: absolute; inset: 0 auto 0 0; background: var(--ink); width: 0; }
+.ls-meter .gate { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--accent); }
+.ls-visemes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.ls-visemes span { position: relative; height: 22px; border: var(--thin); background: var(--white); font-size: 9px; font-weight: 800; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+.ls-visemes span i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); height: 0; }
+.ls-visemes span b { position: relative; mix-blend-mode: multiply; }
+
+.picker { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; background: rgba(10, 10, 10, 0.35); }
+.picker-box { background: var(--paper); border: var(--rule); width: min(640px, 92%); max-height: 80%; display: flex; flex-direction: column; }
+.picker-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 10px; border-bottom: var(--rule); font-weight: 800; font-size: 12px; letter-spacing: 0.08em; }
+.picker-head .idx { color: var(--accent); }
+.picker-keys { font-size: 9px; color: var(--mute); }
+.picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 10px; overflow-y: auto; }
+.picker-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border: var(--rule); background: var(--white); padding: 8px; cursor: pointer; text-align: left; font-weight: 800; font-size: 11px; }
+.picker-item small { font-size: 8px; color: var(--mute); letter-spacing: 0.08em; }
+.picker-item.on { background: var(--accent); }
+.picker-item.sel { background: var(--ink); color: var(--white); }
+.picker-item.sel small { color: var(--accent); }
+body.capture .picker { background: transparent; }
