@@ -247,6 +247,7 @@ export class ClothSolver {
   private capNext = new Float64Array(0);
   private capR = new Float64Array(0);
   private cap = new Float64Array(0); // interpolated, for the current sub-position
+  private capBox = new Float64Array(0); // its bounding box (min xyz, max xyz), grown by the radius
   capEnabled = new Uint8Array(0);
 
   // Scratch
@@ -338,6 +339,7 @@ export class ClothSolver {
     this.capPrev = new Float64Array(6 * n);
     this.capNext = new Float64Array(6 * n);
     this.cap = new Float64Array(6 * n);
+    this.capBox = new Float64Array(6 * n);
     this.capR = new Float64Array(n);
     this.capEnabled = new Uint8Array(n).fill(1);
   }
@@ -427,8 +429,15 @@ export class ClothSolver {
   }
 
   private interpolateCapsules(alpha: number): void {
-    const a = this.capPrev, b = this.capNext, c = this.cap;
+    const a = this.capPrev, b = this.capNext, c = this.cap, box = this.capBox;
     for (let i = 0; i < c.length; i++) c[i] = a[i] + (b[i] - a[i]) * alpha;
+    for (let i = 0; i < this.nCapsules; i++) {
+      const o = 6 * i, r = this.capR[i];
+      for (let k = 0; k < 3; k++) {
+        box[o + k] = Math.min(c[o + k], c[o + 3 + k]) - r;
+        box[o + 3 + k] = Math.max(c[o + k], c[o + 3 + k]) + r;
+      }
+    }
   }
 
   /** Largest capsule displacement over the coming step, in units of its radius. */
@@ -472,11 +481,14 @@ export class ClothSolver {
       const o = 3 * p;
       const carry = 1 - this.drag[e];
       const s = this.stiffness[e] * h;
+      const d = this.tmp;
       for (let k = 0; k < 3; k++) {
-        const v = (x[o + k] - xp[o + k]) * carry;
+        d[k] = (x[o + k] - xp[o + k]) * carry + this.restDir[3 * e + k] * s + this.gravity[3 * e + k] * h;
         xp[o + k] = x[o + k];
-        x[o + k] += v + this.restDir[3 * e + k] * s + this.gravity[3 * e + k] * h;
       }
+      x[o] += d[0];
+      x[o + 1] += d[1];
+      x[o + 2] += d[2];
     }
 
     // 2. Constraints. Colliders sweep from their previous to their new pose
@@ -490,7 +502,8 @@ export class ClothSolver {
     for (let it = 0; it < iters; it++) {
       this.interpolateCapsules(Math.min(1, (it + 1) / Math.min(iters, sweeps)));
       this.solveLinks(h);
-      this.solveChains();
+      // Contacts every iteration while a collider sweeps fast, else on the last one only.
+      this.solveChains(sweeps > 1 || it === iters - 1);
     }
 
     // 3. Velocity limits: relative speed clamp, contact damping, sleep.
@@ -556,7 +569,7 @@ export class ClothSolver {
   }
 
   /** Root-to-tip: angle limit, exact length, segment-vs-capsule contacts. */
-  private solveChains(): void {
+  private solveChains(contacts: boolean): void {
     const { x } = this;
     for (let e = 0; e < this.nEdges; e++) {
       this.restFrame(e, true);
@@ -604,7 +617,7 @@ export class ClothSolver {
 
       // Contacts: swing the segment about its head out of each capsule.
       const cols = this.eColliders[e];
-      if (cols.length) this.collideSegment(e, hd, tl, L, cols, this.eColliderR[e]);
+      if (contacts && cols.length) this.collideSegment(e, hd, tl, L, cols, this.eColliderR[e]);
 
       dx = x[tl] - x[hd]; dy = x[tl + 1] - x[hd + 1]; dz = x[tl + 2] - x[hd + 2];
       d = Math.hypot(dx, dy, dz) || 1;
@@ -625,13 +638,16 @@ export class ClothSolver {
         // Contact distance: capsule + particle radius, capped to what the segment clears at rest.
         const R = Math.min(this.capR[c] + pr, caps[ci]);
         if (R <= 0) continue;
+        // Cheap reject: segment box vs capsule box (grown by the particle radius).
+        const bo = 6 * c;
+        const box = this.capBox;
+        const pm = pr;
+        const hx0 = x[hd], hy0 = x[hd + 1], hz0 = x[hd + 2], tx0 = x[tl], ty0 = x[tl + 1], tz0 = x[tl + 2];
+        if ((hx0 < tx0 ? hx0 : tx0) - pm > box[bo + 3] || (hx0 > tx0 ? hx0 : tx0) + pm < box[bo]) continue;
+        if ((hy0 < ty0 ? hy0 : ty0) - pm > box[bo + 4] || (hy0 > ty0 ? hy0 : ty0) + pm < box[bo + 1]) continue;
+        if ((hz0 < tz0 ? hz0 : tz0) - pm > box[bo + 5] || (hz0 > tz0 ? hz0 : tz0) + pm < box[bo + 2]) continue;
         const o = 6 * c;
         const ax = cap[o], ay = cap[o + 1], az = cap[o + 2], bx = cap[o + 3], by = cap[o + 4], bz = cap[o + 5];
-        // Cheap reject: tail and head both far from the capsule's bounding sphere.
-        const mx = (ax + bx) * 0.5, my = (ay + by) * 0.5, mz = (az + bz) * 0.5;
-        const half = 0.5 * Math.hypot(bx - ax, by - ay, bz - az) + R;
-        const sx = (x[hd] + x[tl]) * 0.5 - mx, sy = (x[hd + 1] + x[tl + 1]) * 0.5 - my, sz = (x[hd + 2] + x[tl + 2]) * 0.5 - mz;
-        if (sx * sx + sy * sy + sz * sz > (half + 0.5 * L) * (half + 0.5 * L)) continue;
 
         // If the head itself is inside (a pinned root dragged into a collider
         // by the body, or a parent that couldn't be resolved), swinging this

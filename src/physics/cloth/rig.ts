@@ -38,7 +38,9 @@ export const LINK_PRESETS: Record<GroupKind, LinkPreset> = {
   skirt: { stretch: 2e-7, compress: 3e-5, shear: 2e-4, maxAngle: 70 },
   cape: { stretch: 2e-7, compress: 5e-5, shear: 3e-4, maxAngle: 75 },
   sleeve: { stretch: 2e-7, compress: 5e-5, shear: 3e-4, maxAngle: 70 },
-  hair: { stretch: 2e-5, compress: Infinity, shear: Infinity, maxAngle: 100 },
+  // Hair: neighbouring strands are tied against spreading apart (no splaying
+  // into separate spikes) but may bunch together freely.
+  hair: { stretch: 2e-6, compress: 1e-3, shear: Infinity, maxAngle: 100 },
   other: { stretch: 1e-6, compress: 1e-4, shear: Infinity, maxAngle: 100 },
 };
 /**
@@ -48,10 +50,10 @@ export const LINK_PRESETS: Record<GroupKind, LinkPreset> = {
  */
 const BODY_FOR_KIND: Record<GroupKind, RegExp> = {
   skirt: /hips|spine|UpperLeg|LowerLeg/,
-  cape: /./,
+  cape: /hips|spine|chest|Chest|neck|Shoulder|Arm|Leg/,
   sleeve: /hips|spine|chest|Chest|UpperLeg|LowerLeg/,
-  hair: /spine|chest|Chest|UpperArm/,
-  other: /./,
+  hair: /head|neck|Shoulder|spine|chest|Chest|UpperArm/,
+  other: /hips|spine|chest|Chest|neck|Shoulder|Arm|Leg/,
 };
 const SINGLE_MAX_ANGLE: Record<GroupKind, number> = { skirt: 75, cape: 80, sleeve: 75, hair: 110, other: 120 };
 
@@ -66,6 +68,41 @@ export const DEFAULT_GROUP: GroupOverride = { enabled: true, stiffness: 1 };
 export interface RigChain {
   name: string;
   joints: VRMSpringBoneJoint[];
+  /** For a strand: the chain (spring name) it was split from, as listed in the UI. */
+  chain?: string;
+}
+
+/**
+ * Split chains into strands: one per root. A VRM may give one spring name to
+ * many strands (VRoid: every hair strand is "Hair"), which the UI lists as one
+ * chain but cloth needs as separate, neighbouring strands.
+ */
+export function splitStrands(chains: RigChain[]): RigChain[] {
+  const out: RigChain[] = [];
+  for (const c of chains) {
+    const byBone = new Map<Object3D, VRMSpringBoneJoint>();
+    for (const j of c.joints) if (j.child) byBone.set(j.child, j);
+    const rootOf = (j: VRMSpringBoneJoint): Object3D => {
+      let cur = j;
+      for (let guard = 0; guard < 1000; guard++) {
+        const p = byBone.get(cur.bone);
+        if (!p) break;
+        cur = p;
+      }
+      return cur.bone;
+    };
+    const strands = new Map<Object3D, VRMSpringBoneJoint[]>();
+    for (const j of c.joints) {
+      const r = rootOf(j);
+      if (!strands.has(r)) strands.set(r, []);
+      strands.get(r)!.push(j);
+    }
+    let k = 0;
+    for (const js of strands.values()) {
+      out.push({ name: strands.size > 1 ? `${c.name}#${++k}` : c.name, joints: js, chain: c.name });
+    }
+  }
+  return out;
 }
 
 export interface RigCollider {
@@ -108,9 +145,12 @@ const _s = new Vector3();
 
 export class ClothRig {
   readonly solver: ClothSolver;
+  /** Strands (chains split per root; `chain` names the UI chain). */
   readonly chains: RigChain[];
   readonly colliders: RigCollider[];
   groups: ClothGroup[] = [];
+  /** Kind of each chain (its group's, or guessed from its anchor and direction). */
+  chainKinds: GroupKind[] = [];
   /** Chain anchor (nearest humanoid ancestor of its root), per chain. */
   readonly anchors: string[];
   /** Particle path root -> tip per chain (for grouping and metrics). */
@@ -137,7 +177,8 @@ export class ClothRig {
   private colliderOnArm: boolean[] = [];
   private hasPrev = false;
 
-  constructor(chains: RigChain[], colliders: RigCollider[], humanoidBones: Map<Object3D, string>) {
+  constructor(uiChains: RigChain[], colliders: RigCollider[], humanoidBones: Map<Object3D, string>) {
+    const chains = splitStrands(uiChains);
     this.chains = chains;
     this.colliders = colliders;
 
@@ -354,10 +395,17 @@ export class ClothRig {
   configure(cfg: RigConfig): void {
     const s = this.solver;
     const infos = this.chainInfosRest();
-    this.groups = detectGroups(infos, { maxAngle: (60 * Math.PI) / 180, assign: cfg.assign });
+    // Assignments are made per UI chain (spring name); apply them to its strands.
+    const assign: Record<string, string> = {};
+    for (const c of this.chains) {
+      const a = cfg.assign[c.name] ?? cfg.assign[c.chain ?? c.name];
+      if (a) assign[c.name] = a;
+    }
+    this.groups = detectGroups(infos, { maxAngle: (60 * Math.PI) / 180, assign });
     const stiffDiv = cfg.stiff ? 10 : 1;
     const links: LinkDef[] = [];
     const chainKind = [...this.kinds];
+    this.chainKinds = chainKind;
     for (const g of this.groups) {
       const o = cfg.group(g.name);
       for (const c of g.chains) chainKind[c] = g.kind;
@@ -399,7 +447,7 @@ export class ClothRig {
     }
     for (let e = 0; e < this.edges.length; e++) {
       const c = this.edges[e].chain;
-      s.enabled[e] = cfg.chainEnabled(this.chains[c].name) ? 1 : 0;
+      s.enabled[e] = cfg.chainEnabled(this.chains[c].chain ?? this.chains[c].name) ? 1 : 0;
       const kind = chainKind[c];
       const deg = inGroup.has(c) ? LINK_PRESETS[kind].maxAngle : SINGLE_MAX_ANGLE[kind];
       s.maxAngle[e] = ((cfg.stiff ? 0.7 : 1) * deg * Math.PI) / 180;

@@ -153,6 +153,28 @@ function makeScenarios(recorded: RecordedPose | null): Record<string, Scenario> 
         return hipsDrive(hips, spine);
       },
     },
+    // Head turns, nods, tilts and a fast shake, with the chest following a little (hair).
+    head: {
+      name: 'head',
+      motionEnd: 7.5,
+      duration: 11.5,
+      dt: steadyDt,
+      drive: (t) => {
+        let yaw = 50 * Math.sin(2 * Math.PI * 0.5 * (t - 0.5)) * win(t, 0.5, 3.0, 0.4);
+        const pitch = 25 * Math.sin(2 * Math.PI * 1.0 * (t - 3.0)) * win(t, 3.0, 4.5, 0.25);
+        const roll = 20 * Math.sin(2 * Math.PI * 0.7 * (t - 4.5)) * win(t, 4.5, 6.0, 0.3);
+        yaw += 30 * Math.sin(2 * Math.PI * 2.5 * (t - 6.0)) * win(t, 6.0, 7.5, 0.2);
+        const h = qe(pitch, yaw, roll);
+        return {
+          bones: {
+            neck: new Quaternion().slerp(h, 0.35),
+            head: new Quaternion().slerp(h, 0.45),
+            chest: new Quaternion().slerp(h, 0.12),
+            spine: new Quaternion().slerp(h, 0.08),
+          },
+        };
+      },
+    },
     // Arms up overhead, swung forward and back, then dropped to the sides fast.
     arms: {
       name: 'arms',
@@ -233,6 +255,7 @@ function makeScenarios(recorded: RecordedPose | null): Record<string, Scenario> 
 }
 
 interface RecordedPose {
+  vrm0?: boolean;
   frames: Array<{ dt: number; bones: Record<string, [number, number, number, number]> }>;
 }
 
@@ -244,6 +267,7 @@ interface Seg {
   tail: Object3D | null;
   tailLocal: Vector3;
   cloth: boolean;
+  hair: boolean;
   /** Per core capsule: excluded because it already overlaps at rest. */
   restHit: boolean[];
 }
@@ -316,6 +340,9 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   const vrm = avatar.vrm;
   (window as unknown as { __clothAvatar: Avatar }).__clothAvatar = avatar;
   const sc = makeScenarios(recorded)[o.scenario];
+  // Recorded poses are normalized-bone rotations of the model they were recorded on
+  // (converted when that model's VRM version differs from this one's).
+  const recordedRun = o.scenario === 'recorded';
   if (!sc) throw new Error(`no scenario ${o.scenario}`);
   const rand = rng(o.seed);
   const ph = avatar.physics;
@@ -328,9 +355,13 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   const apply = (d: Drive | null) => {
     for (const [n, q] of idle) nb(n)!.quaternion.copy(q);
     if (d) {
-      for (const [n, q] of Object.entries(d.bones)) {
+      for (const [n, q0] of Object.entries(d.bones)) {
         const node = nb(n as VRMHumanBoneName);
-        if (!node || !q) continue;
+        if (!node || !q0) continue;
+        // Scenario rotations are in the avatar-facing (VRM 1.0) frame; a VRM 0.x
+        // model's normalized bones face -Z (see Avatar.toBone).
+        const flip = recordedRun ? avatar.isVrm0 !== !!recorded?.vrm0 : avatar.isVrm0;
+        const q = flip ? new Quaternion(-q0.x, q0.y, -q0.z, q0.w) : q0;
         // Arms are given absolute; torso/leg rotations multiply onto idle.
         if (/UpperArm/.test(n)) node.quaternion.copy(q);
         else node.quaternion.copy(idle.get(n as VRMHumanBoneName) ?? new Quaternion()).premultiply(q);
@@ -350,8 +381,11 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   }
 
   // Cloth = chains in groups of kind skirt/cape/sleeve (as detected by the cloth rig; same set for both solvers).
-  const clothChains = new Set<string>();
-  for (const g of rig?.groups ?? []) if (g.kind === 'skirt' || g.kind === 'cape' || g.kind === 'sleeve') for (const c of g.chains) clothChains.add(rig!.chains[c].name);
+  // Classified per joint (strands of one spring name can differ).
+  const clothJoints = new Set<unknown>();
+  for (const g of rig?.groups ?? []) if (g.kind === 'skirt' || g.kind === 'cape' || g.kind === 'sleeve') for (const c of g.chains) for (const j of rig!.chains[c].joints) clothJoints.add(j);
+  const hairJoints = new Set<unknown>();
+  rig?.chainKinds.forEach((k, i) => k === 'hair' && rig.chains[i].joints.forEach((j) => hairJoints.add(j)));
   const coreCaps: CoreCap[] = ph.colliders
     .filter((c) => c.body)
     .map((c) => ({ name: c.name, arm: /Arm/.test(c.name), bone: c.body!.bone, a: c.body!.a, b: c.body!.b, r: c.body!.core }));
@@ -368,7 +402,7 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   for (const ch of ph.chains) {
     for (const j of ch.joints) {
       const ji = j as unknown as { _initialLocalChildPosition: Vector3 };
-      const s: Seg = { chain: ch.name, head: j.bone, tail: j.child, tailLocal: ji._initialLocalChildPosition.clone(), cloth: clothChains.has(ch.name), restHit: [] };
+      const s: Seg = { chain: ch.name, head: j.bone, tail: j.child, tailLocal: ji._initialLocalChildPosition.clone(), cloth: clothJoints.has(j), hair: hairJoints.has(j), restHit: [] };
       segWorld(s, _h, _t);
       for (const c of coreCaps) {
         capWorld(c, _a, _b);
@@ -379,7 +413,7 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   }
   // Mesh samples: vertices mostly skinned to cloth bones.
   const clothBones = new Set<Object3D>();
-  for (const ch of ph.chains) if (clothChains.has(ch.name)) for (const j of ch.joints) clothBones.add(j.bone);
+  for (const ch of ph.chains) for (const j of ch.joints) if (clothJoints.has(j)) clothBones.add(j.bone);
   const samples: MeshSample[] = [];
   vrm.scene.traverse((obj) => {
     const m = obj as SkinnedMesh;
@@ -407,7 +441,8 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   const pairs: Array<{ a: Object3D; b: Object3D; rest: number }> = [];
   if (rig) {
     for (const g of rig.groups) {
-      if (!(g.kind === 'skirt' || g.kind === 'cape' || g.kind === 'sleeve')) continue;
+      // Sheets only (3+ chains): a pair of ribbons isn't a silhouette.
+      if (!(g.kind === 'skirt' || g.kind === 'cape' || g.kind === 'sleeve') || g.chains.length < 3) continue;
       const n = g.chains.length;
       for (let i = 0; i < (g.closed ? n : n - 1); i++) {
         const A = rig.chainParticles[g.chains[i]];
@@ -451,11 +486,13 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
     const head = vrm.humanoid.getRawBoneNode('head')!.getWorldPosition(new Vector3());
     const height = head.y + 0.15;
     camera = new PerspectiveCamera(30, o.render.w / o.render.h, 0.05, 30);
-    // Three-quarter view from her front-left, aimed a little below the hips.
-    const dist = 2.0 * height;
-    const az = 55 * D2R;
-    const target = new Vector3(0, hips.y * 0.75, 0);
-    camera.position.set(Math.sin(az) * dist, target.y + 0.15 * height, Math.cos(az) * dist);
+    // Three-quarter view from the front-left: the whole body (skirt and legs),
+    // or head to hips for the hair scenarios.
+    const upper = o.scenario === 'head' || o.scenario === 'recorded';
+    const dist = (upper ? 1.15 : 2.15) * height;
+    const az = (upper ? 40 : 55) * D2R;
+    const target = upper ? new Vector3(0, (head.y + hips.y) / 2 + 0.05 * height, 0) : new Vector3(0, hips.y * 0.62, 0);
+    camera.position.set(Math.sin(az) * dist, target.y + 0.12 * height, Math.cos(az) * dist);
     camera.lookAt(target);
   }
 
@@ -475,6 +512,10 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
     clipVerts: number;
     clipVertDepth: number;
     armSegs: number;
+    hairSegs: number;
+    hairDepth: number;
+    hairDisp: number;
+    hairSpeed: number;
     armVerts: number;
     spacingErr: number;
     disp: number;
@@ -484,7 +525,10 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   let nextRender = 0;
   const pens: number[] = [];
   const offenders = new Map<string, number>();
+  const hairOffenders = new Map<string, number>();
   const fastest = { speed: 0, what: '' };
+  const jitterTop = { d: 0, what: '' };
+  const spacingTop = { e: 0, what: '' };
   while (t < sc.duration) {
     const dt = sc.dt(t, rand);
     const d = sc.drive(t, rand);
@@ -500,13 +544,19 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
     inv.copy(hipsRaw.matrixWorld).invert();
     let maxS = 0, clothS = 0, disp = 0;
     let clipSegs = 0, clipDepth = 0, armSegs = 0;
+    let hairSegs = 0, hairDepth = 0, hairDisp = 0, hairSpeed = 0;
     for (let i = 0; i < joints.length; i++) {
       const s = joints[i];
       segWorld(s, _h, _t);
       _p.copy(_t).applyMatrix4(inv);
+      const dd0 = first ? 0 : _p.distanceTo(prev[i]);
       if (!first) {
         const dd = _p.distanceTo(prev[i]);
         disp = Math.max(disp, dd);
+        if (t > sc.duration - 1.5 && dd > jitterTop.d) {
+          jitterTop.d = dd;
+          jitterTop.what = `${s.chain}/${s.head.name}`;
+        }
         const sp = dd / dt;
         if (sp > maxS) maxS = sp;
         if (sp > fastest.speed) {
@@ -516,6 +566,25 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
         if (s.cloth && sp > clothS) clothS = sp;
       }
       prev[i].copy(_p);
+      if (s.hair) {
+        let worst = 0;
+        for (let c = 0; c < coreCaps.length; c++) {
+          if (s.restHit[c] || coreCaps[c].arm) continue;
+          capWorld(coreCaps[c], _a, _b);
+          const pen = segPen(_h, _t, _a, _b, coreCaps[c].r);
+          if (pen > worst) worst = pen;
+          if (pen > 0) {
+            const k = `${s.chain}>${coreCaps[c].name}`;
+            hairOffenders.set(k, (hairOffenders.get(k) ?? 0) + 1);
+          }
+        }
+        if (worst > 0) {
+          hairSegs++;
+          hairDepth = Math.max(hairDepth, worst);
+        }
+        if (dd0 > hairDisp) hairDisp = dd0;
+        if (!first && dd0 / dt > hairSpeed) hairSpeed = dd0 / dt;
+      }
       if (!s.cloth) continue;
       let worst = 0, worstArm = 0;
       for (let c = 0; c < coreCaps.length; c++) {
@@ -558,6 +627,10 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
     for (const p of pairs) {
       const e = Math.abs(p.a.getWorldPosition(_a).distanceTo(p.b.getWorldPosition(_b)) - p.rest) / Math.max(p.rest, 1e-4);
       spacingErr = Math.max(spacingErr, e);
+      if (e > spacingTop.e) {
+        spacingTop.e = e;
+        spacingTop.what = `${p.a.name}-${p.b.name} rest ${(1000 * p.rest).toFixed(0)}mm t=${t.toFixed(1)}`;
+      }
     }
     frames.push({
       t,
@@ -569,6 +642,10 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
       clipVerts: msamp.length ? clipVerts / msamp.length : 0,
       clipVertDepth,
       armSegs,
+      hairSegs,
+      hairDepth,
+      hairDisp,
+      hairSpeed,
       armVerts: msamp.length ? armVerts / msamp.length : 0,
       spacingErr,
       disp,
@@ -625,8 +702,15 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
     clipVertFracMax: max('clipVerts'),
     clipVertDepthMax: max('clipVertDepth'),
     clipVertDepthP95: quant(pens, 0.95),
-    fastest: `${fastest.what} ${fastest.speed.toFixed(1)} m/s`,
+    fastest: `${fastest.what} ${fastest.speed.toFixed(1)} m/s; jitter ${jitterTop.what} ${(1000 * jitterTop.d).toFixed(2)} mm; spacing ${spacingTop.what} ${(100 * spacingTop.e).toFixed(0)}%`,
     offenders: [...offenders].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${k} ${n}`),
+    hairJoints: joints.filter((j) => j.hair).length,
+    hairClipFrames: all.filter((f) => f.hairSegs > 0).length / all.length,
+    hairClipSegsMax: max('hairSegs'),
+    hairDepthMax: max('hairDepth'),
+    hairP99Speed: quant(moving.map((f) => f.hairSpeed), 0.99),
+    hairJitterMm: tail.length ? 1000 * quant(tail.map((f) => f.hairDisp), 0.5) : null,
+    hairOffenders: [...hairOffenders].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, n]) => `${k} ${n}`),
     armClipFrames: all.filter((f) => f.armSegs > 0).length / all.length,
     armVertFracMean: mean('armVerts'),
     // Shape
@@ -665,7 +749,7 @@ async function main() {
   const buf = await (await fetch(url)).arrayBuffer();
   let recorded: RecordedPose | null = null;
   if (p.get('pose')) {
-    const r = await fetch(p.get('pose')!);
+    const r = await fetch('/__local/pose.json');
     if (r.ok) recorded = await r.json();
   }
   let pending: string[] = [];

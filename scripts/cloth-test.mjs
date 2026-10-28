@@ -20,7 +20,7 @@ page.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && co
 const local = { '/__local/model.vrm': model };
 if (pose) local['/__local/pose.json'] = pose;
 await serveLocal(page, local);
-await page.goto(`${BASE}/harness/?test=cloth${pose ? '&pose=/__local/pose.json' : ''}`);
+await page.goto(`${BASE}/harness/?test=cloth${pose ? '&pose=1' : ''}`);
 await page.waitForFunction(() => window.__cloth?.ready, null, { timeout: 120000, polling: 250 });
 const err = await page.evaluate(() => window.__cloth.error);
 if (err) {
@@ -39,7 +39,7 @@ for (const scenario of scenarios) {
       const t0 = Date.now();
       const r = await page.evaluate((o) => window.__cloth.run(o), { condition, scenario, seed });
       results.push(r);
-      console.log(`${scenario} / ${condition} / seed ${seed}: ${((Date.now() - t0) / 1000).toFixed(1)} s; fastest ${r.fastest}; top clipping: ${r.offenders.join(', ')}`);
+      console.log(`${scenario} / ${condition} / seed ${seed}: ${((Date.now() - t0) / 1000).toFixed(1)} s; fastest ${r.fastest}; top clipping: ${r.offenders.join(', ')}; hair: ${r.hairOffenders.join(', ')}`);
     }
   }
 }
@@ -49,7 +49,7 @@ if (results.length) {
   console.log(`joints ${results[0].joints} (cloth ${results[0].clothJoints}), cloth mesh samples ${results[0].meshSamples}`);
 }
 const f = (x, d = 2) => (x == null ? 'never' : Number(x).toFixed(d));
-console.log('\nscenario | solver | clip frames % | clip segs max | seg depth max mm | clip verts % mean / max | vert depth p95 / max mm | spacing err p95 / max % | max / p99 speed all | max / p99 cloth | settle s | jitter mm (p50/max) | ms mean / p99 / max | arms: clip frames % / verts %');
+console.log('\nscenario | solver | clip frames % | clip segs max | seg depth max mm | clip verts % mean / max | vert depth p95 / max mm | spacing err p95 / max % | max / p99 speed all | max / p99 cloth | settle s | jitter mm (p50/max) | ms mean / p99 / max | arms: clip frames % / verts % | HAIR clip frames % / segs max / depth max mm / p99 speed / jitter mm');
 const by = new Map();
 for (const r of results) {
   const k = `${r.scenario}|${r.condition}`;
@@ -77,6 +77,7 @@ for (const [k, rs] of by) {
       `${f(mx('jitterMm'), 3)} / ${f(mx('jitterMaxMm'), 3)}`,
       `${f(mean('msMean'), 3)} / ${f(mx('msP99'), 3)} / ${f(mx('msMax'), 3)}`,
       `${f(100 * mean('armClipFrames'), 1)} / ${f(100 * mean('armVertFracMean'), 2)}`,
+      `${f(100 * mean('hairClipFrames'), 1)} / ${mx('hairClipSegsMax')} / ${f(1000 * mx('hairDepthMax'), 1)} / ${f(mx('hairP99Speed'))} / ${f(mx('hairJitterMm'), 3)}`,
     ].join(' | '),
   );
 }

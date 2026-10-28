@@ -6,6 +6,8 @@
  *  - Limbs (upper/lower legs and arms): a capsule along the bone, joint to
  *    joint, radius = a percentile of the distance of the bone's vertices
  *    from that axis.
+ *  - Neck and shoulders: capsules along the bones, as limbs.
+ *  - Head: a short upright capsule through the middle of the head.
  *  - Torso (hips, spine, chest, upper chest): a capsule across the body
  *    (left-right), centred on the bone's vertices, radius from their
  *    front-back spread, length from their side-to-side spread.
@@ -41,6 +43,9 @@ const LIMBS: Array<[VRMHumanBoneName, VRMHumanBoneName]> = [
   ['rightUpperArm', 'rightLowerArm'],
   ['leftLowerArm', 'leftHand'],
   ['rightLowerArm', 'rightHand'],
+  ['leftShoulder', 'leftUpperArm'],
+  ['rightShoulder', 'rightUpperArm'],
+  ['neck', 'head'],
 ];
 const TORSO: VRMHumanBoneName[] = ['hips', 'spine', 'chest', 'upperChest'];
 
@@ -77,7 +82,7 @@ export function fitBodyColliders(vrm: VRM, springBones: Set<Object3D>, opts: Fit
     const n = raw(a);
     if (n) targets.set(n, a);
   }
-  for (const t of TORSO) {
+  for (const t of [...TORSO, 'head'] as VRMHumanBoneName[]) {
     const n = raw(t);
     if (n) targets.set(n, t);
   }
@@ -163,6 +168,24 @@ export function fitBodyColliders(vrm: VRM, springBones: Set<Object3D>, opts: Fit
     const r = Math.min(quantile(dist, opts.collide), 0.45 * L);
     const core = Math.min(quantile(dist, opts.core), r);
     out.push({ name: `body:${from}`, bone: bf, a: toLocal(bf, A), b: toLocal(bf, B), r, core });
+  }
+
+  // Head: a short vertical capsule through the middle of the head's vertices
+  // (face and skull; hair on spring bones is excluded above). A lower
+  // percentile than the body, as rigid hair or accessories may be skinned
+  // to the head too.
+  const headBone = raw('head');
+  const hv = verts.get('head');
+  if (headBone && hv && hv.length >= 12) {
+    const xs = hv.map((p) => p.x), ys = hv.map((p) => p.y), zs = hv.map((p) => p.z);
+    const c = new Vector3(quantile(xs, 0.5), quantile(ys, 0.5), quantile(zs, 0.5));
+    const radial = hv.map((p) => Math.hypot(p.x - c.x, p.z - c.z));
+    const r = quantile(radial, 0.6);
+    const core = Math.min(quantile(radial, 0.35), r);
+    const half = Math.max(0, quantile(hv.map((p) => Math.abs(p.y - c.y)), 0.6) - r);
+    const A = c.clone().setY(c.y - half);
+    const B = c.clone().setY(c.y + half);
+    out.push({ name: 'body:head', bone: headBone, a: toLocal(headBone, A), b: toLocal(headBone, B), r, core });
   }
 
   // Torso: left-right axis from the legs (or arms), up = world up.

@@ -173,6 +173,14 @@ h3 {
 .chain-row .name small { color: var(--mute); font-weight: 400; }
 .chain-row.off .name { color: var(--mute); text-decoration: line-through; }
 .chain-row input[type='number'] { height: 20px; border-width: 1px; padding: 0 3px; font-size: 10px; text-align: right; }
+.group-row { display: grid; grid-template-columns: 24px 1fr 46px; gap: 6px; align-items: center; font-size: 10px; }
+.group-row .name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.group-row .name small { color: var(--mute); font-weight: 400; }
+.group-row.off .name { color: var(--mute); text-decoration: line-through; }
+.group-row input[type='number'] { height: 20px; border-width: 1px; padding: 0 3px; font-size: 10px; text-align: right; }
+details.grouping { font-size: 10px; margin-top: 6px; }
+details.grouping summary { cursor: pointer; font-weight: 800; color: var(--mute); }
+details.grouping .row .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .collider-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
 .collider-list .check { font-size: 10px; }
 .empty-note { color: var(--mute); font-size: 10px; }

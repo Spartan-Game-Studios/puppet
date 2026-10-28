@@ -176,7 +176,7 @@ export function detectGroups(chains: ChainInfo[], opts: GroupOptions = DEFAULT_G
       // Neighbours: close relative to both chains' own nearest spacing, and
       // not further apart than the chains are long (strands on opposite
       // sides of a head are not one sheet).
-      const limit = Math.min(1.8 * Math.max(nearest[a], nearest[b]), 0.6 * Math.max(lens[a], lens[b]));
+      const limit = Math.min(1.8 * Math.max(nearest[a], nearest[b]), Math.max(0.6 * Math.max(lens[a], lens[b]), 0.12));
       if (d <= limit) parent[find(a)] = find(b);
     }
   }
@@ -237,6 +237,6 @@ export function detectGroups(chains: ChainInfo[], opts: GroupOptions = DEFAULT_G
 function commonName(names: string[]): string {
   let p = names[0];
   for (const n of names) while (!n.startsWith(p)) p = p.slice(0, -1);
-  p = p.replace(/[_\-. ]+$/, '');
+  p = p.replace(/[_\-. #]+$/, '');
   return p.length >= 3 ? p : names[0];
 }
