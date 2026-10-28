@@ -56,14 +56,36 @@ export interface FitOptions {
   core: number;
   /** Max vertices sampled across all meshes. */
   maxSamples: number;
+  /** Fit the legs to their innermost mesh only (see innerShell). */
+  innerShell: boolean;
 }
 
-export const DEFAULT_FIT: FitOptions = { collide: 0.8, core: 0.45, maxSamples: 120000 };
+export const DEFAULT_FIT: FitOptions = { collide: 0.8, core: 0.45, maxSamples: 120000, innerShell: true };
+/** The fit before the inner-shell change (for comparing measurements with older runs). */
+export const LEGACY_FIT: FitOptions = { ...DEFAULT_FIT, innerShell: false };
 
 function quantile(a: number[], q: number): number {
   if (!a.length) return 0;
   const s = Float64Array.from(a).sort();
   return s[Math.min(s.length - 1, Math.max(0, Math.floor(q * (s.length - 1))))];
+}
+
+/**
+ * Limb vertex distances from the bone axis, grouped by mesh, keeping only the
+ * inner shell: a mesh whose median distance is far outside the innermost
+ * mesh's (a floor-length cape or gown skinned to the legs without spring
+ * weight) is clothing over the limb, not the limb, and would inflate the
+ * capsule (on the caped test avatar, the shins to 18 cm and one thigh to
+ * 15 cm). Meshes with too few samples to judge only count when nothing else
+ * does. A single mesh (body and clothes merged, as VRoid exports) is kept.
+ */
+export function innerShell<K>(perMesh: Map<K, number[]>, ratio = 1.6, minSamples = 12): number[] {
+  const med = (a: number[]) => quantile(a, 0.5);
+  const big = [...perMesh.values()].filter((a) => a.length >= minSamples);
+  if (!big.length) return [...perMesh.values()].flat();
+  const inner = Math.min(...big.map(med));
+  const limit = Math.max(inner * ratio, inner + 0.02);
+  return big.filter((a) => med(a) <= limit).flat();
 }
 
 /**
@@ -87,6 +109,8 @@ export function fitBodyColliders(vrm: VRM, springBones: Set<Object3D>, opts: Fit
     if (n) targets.set(n, t);
   }
   const verts = new Map<VRMHumanBoneName, Vector3[]>();
+  /** The mesh of each vertex in `verts`. */
+  const vertMesh = new Map<VRMHumanBoneName, SkinnedMesh[]>();
   // A vertex skinned to a non-humanoid helper bone (twist bones, e.g. Daz's
   // thigh_twist, or a pelvis under the hip) belongs to the nearest humanoid
   // ancestor of that bone.
@@ -138,8 +162,12 @@ export function fitBodyColliders(vrm: VRM, springBones: Set<Object3D>, opts: Fit
       if (!name) continue;
       m.getVertexPosition(i, v);
       v.applyMatrix4(m.matrixWorld);
-      if (!verts.has(name)) verts.set(name, []);
+      if (!verts.has(name)) {
+        verts.set(name, []);
+        vertMesh.set(name, []);
+      }
       verts.get(name)!.push(v.clone());
+      vertMesh.get(name)!.push(m);
     }
   }
 
@@ -157,13 +185,19 @@ export function fitBodyColliders(vrm: VRM, springBones: Set<Object3D>, opts: Fit
     const L = axis.length();
     if (L < 1e-4) continue;
     axis.divideScalar(L);
-    const dist: number[] = [];
-    for (const p of vs) {
+    const perMesh = new Map<SkinnedMesh, number[]>();
+    const vm = vertMesh.get(from)!;
+    vs.forEach((p, i) => {
       const d = p.clone().sub(A);
       const t = d.dot(axis) / L;
-      if (t < 0.08 || t > 0.92) continue;
-      dist.push(d.addScaledVector(axis, -t * L).length());
-    }
+      if (t < 0.08 || t > 0.92) return;
+      const r = d.addScaledVector(axis, -t * L).length();
+      const m = vm[i];
+      if (!perMesh.has(m)) perMesh.set(m, []);
+      perMesh.get(m)!.push(r);
+    });
+    // Legs only: that's where floor-length clothing is skinned over a limb.
+    const dist = opts.innerShell && /Leg/.test(from) ? innerShell(perMesh) : [...perMesh.values()].flat();
     if (dist.length < 8) continue;
     const r = Math.min(quantile(dist, opts.collide), 0.45 * L);
     const core = Math.min(quantile(dist, opts.core), r);

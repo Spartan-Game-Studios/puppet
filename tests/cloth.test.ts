@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ClothSolver, closestSegSeg, type EdgeDef } from '../src/physics/cloth/solver';
 import { detectGroups, type ChainInfo } from '../src/physics/cloth/groups';
+import { rootPush } from '../src/physics/cloth/rig';
+import { innerShell } from '../src/physics/cloth/bodyColliders';
 
 const ID: [number, number, number, number] = [0, 0, 0, 1];
 /** Rotation taking +Y to -Y about Z, so a bone with axis +Y hangs down. */
@@ -277,5 +279,87 @@ describe('detectGroups', () => {
     expect(g[0].chains).not.toContain(0);
     expect(g[0].chains).not.toContain(1);
     expect(g[0].closed).toBe(false);
+  });
+});
+
+describe('sheet (link) contacts', () => {
+  /** Two chains either side of a vertical capsule: each clears it, the cloth between them would not. */
+  function straddle(withContacts: boolean) {
+    const { s, chains } = hanging([[0, 0, 0], [0.2, 0, 0]], 4, 0.1);
+    s.setCapsuleCount(1);
+    const links = [];
+    for (let k = 1; k <= 4; k++) links.push({ a: chains[0][k], b: chains[1][k], rest: 0.2, stretch: 1e-6, compress: 1e-4 });
+    s.setLinks(links);
+    for (let e = 0; e < s.nEdges; e++) {
+      s.eColliders[e] = Int32Array.from([0]);
+      s.eColliderR[e] = Float64Array.from([1]);
+    }
+    if (withContacts) s.setLinkContacts(links.map((_, i) => ({ link: i, colliders: [0], caps: [1] })));
+    // Capsule along y between the chains, just behind them: 2 cm from the chord, 10 cm from each chain.
+    const cap = { a: [0.1, 0.05, -0.02] as [number, number, number], b: [0.1, -0.6, -0.02] as [number, number, number], r: 0.05 };
+    s.setCapsule(0, cap, true);
+    for (let i = 0; i < 240; i++) {
+      s.setCapsule(0, cap);
+      s.step(1 / 120);
+    }
+    // Closest approach of each link (the chord) to the capsule axis.
+    const o = new Float64Array(2);
+    let worst = Infinity;
+    for (const l of links) {
+      const a = P(s, l.a), b = P(s, l.b);
+      closestSegSeg(a[0], a[1], a[2], b[0], b[1], b[2], ...cap.a, ...cap.b, o);
+      const p = [a[0] + (b[0] - a[0]) * o[0], a[1] + (b[1] - a[1]) * o[0], a[2] + (b[2] - a[2]) * o[0]];
+      const q = [cap.a[0] + (cap.b[0] - cap.a[0]) * o[1], cap.a[1] + (cap.b[1] - cap.a[1]) * o[1], cap.a[2] + (cap.b[2] - cap.a[2]) * o[1]];
+      worst = Math.min(worst, dist(p, q));
+    }
+    return worst;
+  }
+
+  it('without them, the cloth between two chains cuts through a capsule both chains clear', () => {
+    expect(straddle(false)).toBeLessThan(0.05);
+  });
+
+  it('pushes the cloth between the chains out of the capsule', () => {
+    expect(straddle(true)).toBeGreaterThan(0.05 + 0.01 - 3e-3);
+  });
+});
+
+describe('rootPush', () => {
+  // One capsule along y at the origin, radius 0.1.
+  const caps = [0, 0, 0, 0, -1, 0];
+  it('moves a point inside a capsule out to the given radius, away from the axis', () => {
+    const o = rootPush([0.06, -0.5, 0], [0], [0.1], caps, () => true, 1);
+    expect(o[0]).toBeCloseTo(0.04);
+    expect(o[1]).toBeCloseTo(0);
+    expect(o[2]).toBeCloseTo(0);
+  });
+  it('leaves points outside alone, and ignores disabled colliders', () => {
+    expect(rootPush([0.2, -0.5, 0], [0], [0.1], caps, () => true, 1)).toEqual([0, 0, 0]);
+    expect(rootPush([0.06, -0.5, 0], [0], [0.1], caps, () => false, 1)).toEqual([0, 0, 0]);
+  });
+  it('clamps the total push', () => {
+    const o = rootPush([0.01, -0.5, 0], [0], [0.1], caps, () => true, 0.03);
+    expect(Math.hypot(...o)).toBeCloseTo(0.03);
+  });
+});
+
+describe('body collider fit', () => {
+  it('innerShell drops an outer mesh (a cape over the legs) and keeps the limb', () => {
+    const body = Array.from({ length: 40 }, (_, i) => 0.06 + 0.001 * (i % 10));
+    const cape = Array.from({ length: 40 }, (_, i) => 0.2 + 0.002 * (i % 10));
+    const r = innerShell(new Map([['body', body], ['cape', cape]]));
+    expect(r.length).toBe(40);
+    expect(Math.max(...r)).toBeLessThan(0.07);
+  });
+  it('innerShell keeps a single merged mesh, and close layers (tights over a leg)', () => {
+    const body = Array.from({ length: 40 }, () => 0.06);
+    expect(innerShell(new Map([['all', body]])).length).toBe(40);
+    const tights = Array.from({ length: 40 }, () => 0.065);
+    expect(innerShell(new Map([['body', body], ['tights', tights]])).length).toBe(80);
+  });
+  it('innerShell ignores meshes with too few samples unless nothing else has enough', () => {
+    const body = Array.from({ length: 40 }, () => 0.06);
+    expect(innerShell(new Map([['body', body], ['strap', [0.3, 0.3]]])).length).toBe(40);
+    expect(innerShell(new Map([['strap', [0.3, 0.3]]])).length).toBe(2);
   });
 });

@@ -278,7 +278,7 @@ Results on a VRM 1.0 avatar with a 20-chain skirt (120 skirt joints, 223 joints 
 `harness/cloth.ts` (`scripts/cloth-test.mjs`) drives a VRM through scripted motion in virtual time and measures what makes spring cloth look bad:
 
 - **scenarios:** `shake` (the stability test's root sway, jitter and hitches), `lean` (hips ±25° yaw, ±15° roll, 25° forward bend, then a quick twist, over planted legs), `head` (turns, nods, tilts and a fast shake), `arms` (raised high, swung, flicked and dropped), `hitch` (15–25° torso snaps in one frame and 150–300 ms stalls), and `recorded` (a real tracking session from `scripts/record-pose.mjs`);
-- **clipping:** cloth segments, and mesh vertices skinned to cloth, inside the body (the inner part of the generated body capsules), beyond whatever overlaps in the rest pose; hair segments the same way; arms reported separately;
+- **clipping:** cloth segments, and mesh vertices skinned to cloth, inside the body (the inner part of the generated body capsules), beyond whatever overlaps in the rest pose; hair segments the same way; arms reported separately. "Sim-only" leaves out root segments whose animated head is itself inside the body (physics can't move a head). `JOINTS=1` lists offenders per joint (`chain[k]`, 0 = root segment), and the log lists the cloth meshes whose vertices clip, per body part. `CORES=legacy` measures against the body fit as it was before the inner-shell change below, for comparing with older runs;
 - **shape:** how far neighbouring cloth chains drift from their rest spacing (splaying apart or bunching into a tube);
 - tail speed relative to the hips, settle time, jitter at rest, and the CPU time of the physics update.
 
@@ -294,6 +294,25 @@ Results on a VRM 1.0 avatar (223 joints in 41 chains: a 20-chain floor-length sk
 | hitch, after | 18.1%, 15 mm | 0.96% | 0.4%, 10 mm | 33% | 0.96 s | 0.56 / 1.9 |
 | recorded, before | 5.1%, 11 mm | 1.71% | 91.4%, 36 mm | 110% | 0.48 s | 0.40 / 0.6 |
 | recorded, after | 0% | 0.49% | 0.5%, 0.3 mm | 11% | 0.32 s | 0.55 / 0.9 |
+
+#### Leaning and hitches
+
+Three changes, measured on the same avatar against the corrected body fit (two seeds; "before" is the cloth solver as it was):
+
+- **Inner-shell leg fit** (`innerShell` in `bodyColliders.ts`). The leg capsules were fitted to every non-spring vertex the leg bones carry, and a floor-length cape skinned to the legs inflated them: shins 18 cm instead of 6 cm, one thigh 15 cm and the other 9 cm. That made the collisions lopsided, and the benchmark's "inside the body" core for the shins 18 cm wide, so it counted skirt 15 cm off the leg as clipping. The legs are now fitted to their innermost mesh only.
+- **Root push** (`pushRoots` in `rig.ts`). Most of what was left was skirt roots: they are pinned to the hips, so when the hips turn, roll or bend over planted legs, the front and side roots move into the thighs, and only the segments below a root are simulated. Each skirt root is now moved out of the leg capsules it clears at rest, by at most 3 cm, and the bone moves with it.
+- **Sheet contacts** (`collideLinks` in `solver.ts`). The links between neighbouring skirt and cape chains collide too, so two chains either side of a shin can't leave the mesh between them cutting through it.
+
+| scenario | skirt segments in the body (% of frames, max depth) | sim-only | cloth vertices in the body (mean / max %) | neighbour spacing error (p95) | max cloth speed | settle | physics ms/frame (mean / p99) |
+|---|---|---|---|---|---|---|---|
+| shake | 0% → 0% | 0 → 0 | 0.16 / 0.90 → 0.18 / 0.94 | 24% → 42% | 3.9 → 5.1 m/s | 0.86 → 0.76 s | 0.56 / 1.4 → 0.55 / 1.5 |
+| lean | 21.3%, 13 mm → **0%** | 0.6%, 2 mm → 0 | 0.28 / 1.32 → 0.30 / 1.39 | 39% → 38% | 2.5 → 1.6 m/s | 0.67 → 0.50 s | 0.52 / 0.8 → 0.54 / 0.9 |
+| head | 0% → 0% | 0 → 0 | 0 → 0 | 11% → 11% | 0.7 → 2.7 m/s | 0.30 → 0.30 s | 0.53 / 0.9 → 0.55 / 0.9 |
+| arms | 0% → 0% | 0 → 0 | 0 / 0 → 0.05 / 0.10 | 11% → 11% | 13.8 → 9.7 m/s | 0.38 → 0.38 s | 0.57 / 1.1 → 0.62 / 1.2 |
+| hitch | 35.2%, 10 mm → **0%** | 0 → 0 | 0.32 / 1.49 → 0.38 / 2.32 | 33% → 38% | 18.2 → 16.4 m/s | 1.21 → 2.15 s | 0.61 / 2.3 → 0.58 / 1.9 |
+| recorded | 0% → 0% | 0 → 0 | 0 / 0 → 0.02 / 0.10 | 11% → 11% | 9.5 → 8.7 m/s | 0.32 → 0.22 s | 0.53 / 0.9 → 0.55 / 1.0 |
+
+The hitch settle time is set by the shoulder ribbons, not the skirt. Most of the remaining cloth vertices in the legs belong to a gown panel that is skinned about half to the pelvis, down to the shins: it swings with the hips whatever the springs do, and only a re-export with those weights on the skirt bones would fix it. Against the old fit (`CORES=legacy`) lean and hitch read worse (32% and 28% of frames), all of it skirt within the old 18 cm shin core. The stiff-skirt variant: lean 20.9%, 52 mm → 0% and hitch 35.2% → 0%, cloth vertices 0.68 → 0.56% and 0.93 → 0.79%. The VRM 0.x model with a 10-chain skirt ring: unchanged (0–0.5% of frames, under 7 mm), 0.13 → 0.16 ms.
 
 On the same avatar the stability test above gives, for the cloth solver: 1.44 m/s max tail speed (p99 1.36, skirt median 0.53) and 0.29 s settle time.
 
