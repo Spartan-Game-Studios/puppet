@@ -6,7 +6,7 @@
  * run-to-run noise of playing the clip. Driven by scripts/track-replay.mjs:
  * window.__replay.run(log, options).
  */
-import { loadAvatar } from '../src/scene/avatar';
+import { limbFollowRateFor, loadAvatar } from '../src/scene/avatar';
 import { DEFAULT_PHYSICS } from '../src/physics/stableSprings';
 import { PoseFilter } from '../src/core/poseFilter';
 import { smoothingToParams, type OneEuroParams } from '../src/core/oneEuro';
@@ -46,6 +46,7 @@ async function main() {
       avatar.drive.mode = 'hands';
       avatar.drive.mirror = false;
       avatar.drive.smoothing = smoothing;
+      avatar.drive.limbFollowRate = limbFollowRateFor(smoothing);
       Object.assign(avatar.drive, o.drive ?? {});
       Object.assign(avatar.solver.opts, o.solve ?? {});
       const poseFilter = new PoseFilter();

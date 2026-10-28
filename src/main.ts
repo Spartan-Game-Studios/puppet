@@ -21,7 +21,7 @@ import { Euler, Quaternion } from 'three';
 import { ARKIT_NAMES, defaultGainCurves } from './core/blendshapes';
 import { smoothingToParams } from './core/oneEuro';
 import { PoseFilter } from './core/poseFilter';
-import { Avatar, loadAvatar } from './scene/avatar';
+import { Avatar, limbFollowRateFor, loadAvatar } from './scene/avatar';
 import { Viewer, type Framing } from './scene/viewer';
 import { FaceProcessor } from './tracking/faceProcessor';
 import { drawPreview } from './tracking/overlay';
@@ -144,7 +144,10 @@ tracker.onStatus = (s) => setStatus(s, s.includes('ERROR'));
 // ---------------------------------------------------------------- tracking -> avatar
 function updatePoseFilter(): void {
   poseFilter.setParams(smoothingToParams(settings.smoothing * 0.8));
-  if (avatar) avatar.drive.smoothing = settings.smoothing;
+  if (avatar) {
+    avatar.drive.smoothing = settings.smoothing;
+    avatar.drive.limbFollowRate = limbFollowRateFor(settings.smoothing);
+  }
 }
 updatePoseFilter();
 
@@ -254,6 +257,7 @@ function applyDrive(a: Avatar): void {
   a.drive.mode = settings.mode;
   a.drive.mirror = settings.mirror;
   a.drive.smoothing = settings.smoothing;
+  a.drive.limbFollowRate = limbFollowRateFor(settings.smoothing);
   a.drive.gazeGain = settings.gazeGain;
   a.drive.presetOptions.emotions = settings.emotions;
 }
