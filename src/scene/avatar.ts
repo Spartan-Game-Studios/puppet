@@ -2,7 +2,7 @@
  * Avatar: a loaded VRM plus everything that drives it — expressions (perfect
  * sync or presets), head/gaze, upper body and hands, and stabilised physics.
  */
-import { Box3, Mesh, Object3D, Quaternion, SkinnedMesh, Vector3 } from 'three';
+import { Box3, BufferAttribute, Mesh, Object3D, Quaternion, SkinnedMesh, Uint16BufferAttribute, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from '@pixiv/three-vrm';
 import {
@@ -58,13 +58,37 @@ export async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function loadAvatar(buf: ArrayBuffer, physics: PhysicsSettings): Promise<LoadedAvatar> {
+/**
+ * Store skin indices as 16-bit before VRMUtils.combineSkeletons. It remaps
+ * each mesh's joint indices into one combined skeleton but keeps the
+ * attribute's array type, so with 8-bit JOINTS_0 (common) and more than 256
+ * combined bones the indices wrap around and vertices end up skinned to
+ * unrelated bones (on a 427-bone Daz avatar, a third of the gown followed the
+ * hair spring bones: the skirt "exploded" whenever the hair moved).
+ */
+export function widenSkinIndices(root: Object3D): void {
+  root.traverse((o) => {
+    const m = o as SkinnedMesh;
+    if (!m.isSkinnedMesh) return;
+    const a = m.geometry.getAttribute('skinIndex') as BufferAttribute | undefined;
+    if (!a || !(a.array instanceof Uint8Array || a.array instanceof Int8Array)) return;
+    m.geometry.setAttribute('skinIndex', new Uint16BufferAttribute(Uint16Array.from(a.array), a.itemSize, a.normalized));
+  });
+}
+
+export async function loadAvatar(
+  buf: ArrayBuffer,
+  physics: PhysicsSettings,
+  /** Test hook: `widenSkin: false` reproduces the old loader (8-bit skin index overflow). */
+  opts: { widenSkin?: boolean } = {},
+): Promise<LoadedAvatar> {
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
   const [gltf, hash] = await Promise.all([loader.parseAsync(buf, ''), sha256Hex(buf)]);
   const vrm = gltf.userData.vrm as VRM | undefined;
   if (!vrm) throw new Error('Not a VRM file (no VRM extension found).');
   VRMUtils.removeUnnecessaryVertices(gltf.scene);
+  if (opts.widenSkin !== false) widenSkinIndices(gltf.scene);
   VRMUtils.combineSkeletons(gltf.scene);
   VRMUtils.rotateVRM0(vrm);
   vrm.scene.traverse((o) => (o.frustumCulled = false));
@@ -139,6 +163,8 @@ export class Avatar {
     this.physics = new StableSprings(vrm, physicsSettings, springNames);
     this.setIdle();
     this.applyBonesInstant();
+    vrm.humanoid.update();
+    this.physics.captureIdlePose();
     vrm.update(0);
     this.physics.reset();
     this.measureBounds();
