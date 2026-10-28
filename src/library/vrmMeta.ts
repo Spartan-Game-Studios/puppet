@@ -236,6 +236,25 @@ export function readVrmMeta(buf: ArrayBuffer): VrmMeta {
 export type LicenceTone = 'warn' | 'ok' | 'info' | 'unknown';
 export type LicenceBadge = 'AUTHOR ONLY' | 'LICENSED ONLY' | 'CC0' | 'COMMERCIAL OK' | 'SOLO COMMERCIAL' | 'PERSONAL' | 'NO TERMS';
 
+/**
+ * One letter per badge, for the square licence badge in the stage's bottom bar.
+ * No two share a letter; the tooltip spells the badge out (LICENCE_LETTER_TITLE).
+ */
+export const LICENCE_LETTER: Readonly<Record<LicenceBadge, string>> = {
+  'AUTHOR ONLY': 'A',
+  'LICENSED ONLY': 'L',
+  CC0: 'C',
+  'COMMERCIAL OK': 'B', // business: companies too
+  'SOLO COMMERCIAL': 'S',
+  PERSONAL: 'P',
+  'NO TERMS': 'N',
+};
+
+/** Tooltip for the letter badge: "A · AUTHOR ONLY". */
+export function licenceLetterTitle(badge: LicenceBadge): string {
+  return `${LICENCE_LETTER[badge]} · ${badge}${badge === 'COMMERCIAL OK' ? ' (BUSINESS USE ALLOWED)' : ''}`;
+}
+
 export interface LicenceLine {
   label: string;
   value: string;

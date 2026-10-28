@@ -39,7 +39,11 @@ export interface Settings {
   physicsOverrides: Record<string, PhysicsOverrides>;
   /** 3D environment (background kind 'environment'): scene, quality, per-scene look. */
   environment: EnvironmentSettings;
-  ui: { tab: 'face' | 'physics'; debug: boolean };
+  /**
+   * `tab`: unused since the FACE / PHYSICS tabs became modals (kept so old files load).
+   * `cam`: which camera-card sections are expanded. `preview` (above) = card not minimized.
+   */
+  ui: { tab: 'face' | 'physics'; debug: boolean; cam: { source: boolean; vcam: boolean } };
   /** 07 MOTION: idle clip and per-clip options (src/anim). */
   anim: AnimSettings & { clipOptions: Record<string, ClipOptions> };
   /** 08 HOTKEYS (src/input). Bindings with `model` set belong to that model. */
@@ -70,7 +74,7 @@ export function defaultSettings(): Settings {
     physics: { ...DEFAULT_PHYSICS },
     physicsOverrides: {},
     environment: defaultEnvironmentSettings(),
-    ui: { tab: 'face', debug: true },
+    ui: { tab: 'face', debug: true, cam: { source: true, vcam: false } },
     anim: { ...DEFAULT_ANIM, clipOptions: {} },
     hotkeys: { bindings: defaultBindings(), global: false },
     lipsync: { ...DEFAULT_LIPSYNC },

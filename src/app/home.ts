@@ -3,16 +3,19 @@
  * any time (L or Esc from the stage, the HOME button). Static layout is in
  * index.html (#home, #tpl-card, #home-confirm); this file fills and binds it.
  *
- * Also owns the stage's library bits: the header name and licence badge, the
- * MODEL INFO panel (I) and the one-time licence notice for restricted models.
+ * Also owns the stage's library bits: the bottom bar's model name, licence
+ * letter badge and model-check marker, the MODEL INFO modal (I, or a click on
+ * the name) and the one-time licence notice for restricted models.
  */
 import './home.css';
 import { baseName, isTauri, readPath } from './platform';
 import { pickVrmFiles, pickVrmPaths } from '../library/backend';
 import { Library, type Card, type ImportResult, type ImportSource, type ImportStep } from '../library/library';
 import { displayAuthor, displayName, formatBytes, formatCount, type LibraryQuery } from '../library/libraryIndex';
-import { readVrmMeta, summarizeLicence, type LicenceSummary, type VrmMeta } from '../library/vrmMeta';
-import { buildCard, renderLicence, renderWarnings, syncLabel } from './homeView';
+import { LICENCE_LETTER, licenceLetterTitle, readVrmMeta, summarizeLicence, type LicenceSummary, type VrmMeta } from '../library/vrmMeta';
+import { buildCard, CARD_WARNINGS, renderLicence, renderWarnings, syncLabel } from './homeView';
+import { getModal } from './modal';
+import { makeBadge } from './ui';
 import type { ModelWarning } from '../scene/modelChecks';
 
 export interface HomeDeps {
@@ -438,18 +441,26 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     library.setMigrationDone();
   });
 
-  // ---------------------------------------------------------------- stage: header, model info, notice
+  // ---------------------------------------------------------------- stage: bottom bar, model info, notice
+  /** Serious model-check warnings (the ones the library card shows too). */
+  const serious = (w: ModelWarning[]) => w.filter((x) => CARD_WARNINGS.has(x.code));
+
   function refreshStageHeader(): void {
     if (!stageId || !stageMeta) return;
     const c = library.cards.get(stageId) ?? null;
     stageMeta.card = c;
     if (c) $('model-name').textContent = displayName(c);
     const s = stageMeta.summary;
-    const lic = $('model-lic');
-    lic.textContent = s.badge;
-    lic.className = `lic ${s.tone}`;
-    $('btn-model-info').title = `${s.headline} (I: model info)`;
-    $('btn-model-info').classList.remove('hidden');
+    const letter = makeBadge(LICENCE_LETTER[s.badge], s.tone, licenceLetterTitle(s.badge));
+    letter.classList.add('lic-letter');
+    $('model-lic').replaceChildren(letter);
+    const bad = serious(stageMeta.warnings);
+    $('model-warn').replaceChildren(...(bad.length ? [makeBadge('!', 'warn', `MODEL CHECKS: ${bad.map((w) => w.text).join(' · ')}`)] : []));
+    const btn = $<HTMLButtonElement>('btn-model-info');
+    btn.disabled = false;
+    btn.title = `${s.badge}: ${s.headline}${bad.length ? ` ${bad.length} model check warning${bad.length > 1 ? 's' : ''}.` : ''} (I: model info and licence)`;
+    const m = getModal('model-info');
+    if (m) m.extra.replaceChildren(makeBadge(LICENCE_LETTER[s.badge], s.tone, licenceLetterTitle(s.badge)));
     renderModelInfo();
   }
 
@@ -491,15 +502,18 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
   }
 
   function toggleModelInfo(force?: boolean): void {
-    if (!stageMeta) return;
-    const el = $('model-info');
-    const on = force ?? el.classList.contains('hidden');
-    el.classList.toggle('hidden', !on);
-    $('btn-model-info').classList.toggle('on', on);
-    if (on) hideNotice();
+    const m = getModal('model-info');
+    if (!m) return;
+    const on = force ?? !m.isOpen;
+    if (on && !stageMeta) return;
+    if (on) {
+      hideNotice();
+      m.show($('btn-model-info'));
+      $('btn-model-info').classList.add('on');
+    } else m.close();
   }
   $('btn-model-info').addEventListener('click', () => toggleModelInfo());
-  $('btn-model-info-close').addEventListener('click', () => toggleModelInfo(false));
+  getModal('model-info')?.el.addEventListener('close', () => $('btn-model-info').classList.remove('on'));
 
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
   function hideNotice(): void {
@@ -596,8 +610,10 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
       }
       if (!meta) {
         stageMeta = null;
-        $('btn-model-info').classList.add('hidden');
-        $('model-info').classList.add('hidden');
+        $<HTMLButtonElement>('btn-model-info').disabled = true;
+        $('model-lic').replaceChildren();
+        $('model-warn').replaceChildren();
+        getModal('model-info')?.close();
         return;
       }
       const summary = summarizeLicence(meta);
