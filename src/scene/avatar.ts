@@ -2,7 +2,7 @@
  * Avatar: a loaded VRM plus everything that drives it — expressions (perfect
  * sync or presets), head/gaze, upper body and hands, and stabilised physics.
  */
-import { Object3D, Quaternion, Vector3 } from 'three';
+import { Box3, Mesh, Object3D, Quaternion, SkinnedMesh, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from '@pixiv/three-vrm';
 import {
@@ -84,6 +84,8 @@ export class Avatar {
   readonly chestChain: Array<[string, number]>;
   readonly solver: BodySolver;
   drive: DriveOptions = { ...DEFAULT_DRIVE };
+  /** Rest-pose bounds of the skinned meshes in the avatar's space (for camera framing). */
+  readonly bounds = new Box3();
 
   /** Latest values sent to the model (for VMC output and the readout). */
   readonly expressionValues = new Map<string, number>();
@@ -139,11 +141,32 @@ export class Avatar {
     this.applyBonesInstant();
     vrm.update(0);
     this.physics.reset();
+    this.measureBounds();
   }
 
   get name(): string {
     const meta = this.vrm.meta as { name?: string; title?: string };
-    return meta.name ?? meta.title ?? 'VRM';
+    // Some exporters write the literal string "undefined" for an empty name.
+    const ok = (v?: string) => (v && v.trim() && v !== 'undefined' ? v : undefined);
+    return ok(meta.name) ?? ok(meta.title) ?? 'VRM';
+  }
+
+  /** Sampled, skinning-aware bounds: a box per mesh from every few vertices. */
+  private measureBounds(): void {
+    const v = new Vector3();
+    this.vrm.scene.updateMatrixWorld(true);
+    this.vrm.scene.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh || !m.visible) return;
+      const pos = m.geometry.attributes.position;
+      const step = Math.max(1, Math.floor(pos.count / 4000));
+      for (let i = 0; i < pos.count; i += step) {
+        m.getVertexPosition(i, v);
+        if ((m as SkinnedMesh).isSkinnedMesh) (m as SkinnedMesh).applyBoneTransform(i, v);
+        this.bounds.expandByPoint(v.applyMatrix4(m.matrixWorld));
+      }
+    });
+    if (this.bounds.isEmpty()) this.bounds.set(new Vector3(-0.3, 0, -0.2), new Vector3(0.3, 1.7, 0.2));
   }
 
   get isVrm0(): boolean {

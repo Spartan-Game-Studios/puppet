@@ -88,8 +88,18 @@ export class Viewer {
   frame(f: Framing): void {
     if (!this.avatar) return;
     const head = this.avatar.headPosition();
-    const target = new Vector3(0, head.y - (f === 'bust' ? 0.12 : f === 'upper' ? 0.3 : head.y * 0.5), 0);
-    const dist = f === 'bust' ? 1.25 : f === 'upper' ? 2.1 : 4.2;
+    const b = this.avatar.bounds;
+    const target = new Vector3(0, f === 'full' ? (b.min.y + b.max.y) / 2 : head.y - (f === 'bust' ? 0.12 : 0.3), 0);
+    const human = f === 'bust' ? 1.25 : f === 'upper' ? 2.1 : 4.2;
+    // Human framing distances assume a face ~0.1 m in front of the head bone.
+    // If the model's front reaches within 0.3 m of that camera (a big or round
+    // avatar would swallow it), keep that gap from its actual front surface
+    // instead; FULL also fits the whole height.
+    let dist = b.max.z + 0.3 > human ? b.max.z + human - 0.1 : human;
+    if (f === 'full') {
+      const halfFov = ((this.camera.fov / 2) * Math.PI) / 180;
+      dist = Math.max(dist, b.max.z + (0.55 * (b.max.y - b.min.y)) / Math.tan(halfFov));
+    }
     this.controls.target.copy(target);
     this.camera.position.set(0, target.y + 0.03, dist);
     this.controls.update();
