@@ -5,6 +5,8 @@
 // Pass 2 (if shots-dir is given) pauses on key moments, mirrored as in normal
 // use, and screenshots the whole UI. With PUPPET_VIDEO=1 it also records the
 // UI playing the body section into <shots-dir>/mirror.mp4 (needs ffmpeg).
+// PUPPET_RAW=raw.json also saves the raw body / hands results for
+// scripts/track-replay.mjs.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BASE, launch, requireEnv, serveLocal } from './lib/browser.mjs';
@@ -40,6 +42,14 @@ await page.evaluate(async (cal) => {
   if (cal) window.__puppet.face.captureNeutral();
   else window.__puppet.face.clearCalibration();
   window.__puppet.record.length = 0;
+  // Raw body / hands results as they reach the main thread (PUPPET_RAW, for scripts/track-replay.mjs).
+  const tr = window.__puppet.tracker;
+  const handle = tr.handle.bind(tr);
+  window.__raw = [];
+  tr.handle = (pipeline, m) => {
+    handle(pipeline, m);
+    if (m.type === 'result' && pipeline !== 'face') window.__raw.push({ now: performance.now(), pipeline, m: { ...m } });
+  };
   v.currentTime = 0;
   await new Promise((r) => (v.onseeked = r));
   await v.play();
@@ -54,6 +64,7 @@ while (!(await page.evaluate(() => window.__puppet.source.video.ended))) {
   }));
 }
 const rec = await page.evaluate(() => window.__puppet.record);
+if (process.env.PUPPET_RAW) await writeFile(process.env.PUPPET_RAW, JSON.stringify(await page.evaluate(() => window.__raw)));
 const stats = await page.evaluate(() => window.__puppet.tracker.stats);
 await page.close();
 
