@@ -345,6 +345,22 @@ Measured with `scripts/track-clip.mjs` on the rendered test clip (49 s, 640×480
 - The arm-leaving-the-frame and T-pose segments are hard on the rendered footage: MediaPipe's pose model loses or misplaces an arm stretched out of view, and on the caped model it places the elbow inside the cape.
 - Rendered footage is not a webcam: anime hands, gloves and capes are harder for MediaPipe than real hands. Real webcam footage was not available.
 
+### Compatibility sweep
+
+`scripts/compat-sweep.mjs` (`harness/compat.ts`) loads each VRM with the app's own loader in headless Chrome on its own Vite server (port 5233) and checks what tends to break from model to model: load errors and warnings, VRM version and licence, humanoid bones Puppet needs, rest pose (T / A) and facing, bounds and the BUST / UPPER / FULL framing (camera outside the mesh, avatar in view), whether expressions and gaze visibly change the picture, spring chains and cloth groups under a shake (max speed, settle time, NaN), skinned bone count (over 256 takes the 16-bit skin-index path), materials (MToon, transparency, outlines, black or pink or missing textures), render fps at 1280×720, the IDLE / WAVE / CHEER clips (frame-to-frame limb jumps), and the library's import analysis and thumbnail. With `PUPPET_CLIP_DIR` set to a rendered test clip (`scripts/render-clip.mjs`) it also plays the clip through the real app per model, screenshots rest / head turn / arms up and checks the arms go up and the head turns the mirrored way, opens MODEL INFO and the library card. It writes `report.html` (one row per model, PASS / WARN / FAIL per check, thumbnails and screenshots) and `report.json`.
+
+```sh
+node scripts/fetch-test-avatars.mjs             # the CC0 test avatars (pinned URLs + SHA-256) into test-assets/cc0/
+node scripts/compat-sweep.mjs out/              # every .vrm in test-assets/cc0/
+PUPPET_CLIP_DIR=clip/ node scripts/compat-sweep.mjs out/ a.vrm b.vrm   # your own models, plus the tracking-clip pass
+```
+
+CI runs it on the two committed fixtures (`test-assets/cc0/devil.vrm`, `the-worm.vrm`; CC0, see `LICENSES.md` there) with software GL and fails on any FAIL. Reports made from your own models show those models: keep them out of the repo.
+
+**Model checks.** On load Puppet looks for authoring problems it can detect cheaply and reliably (`src/scene/modelChecks.ts`) and lists them under MODEL CHECKS in MODEL INFO; the serious ones also go on the library card: FACE POINTS AWAY FROM SKELETON (the face mesh is on the back of the head bone), MODEL FACES AWAY FROM THE CAMERA, MISSING BONES, FACE EXPRESSIONS ARE EMPTY (expressions listed but bound to nothing), NO FACE EXPRESSIONS, and (MODEL INFO only) a rest pose that is not a T-pose. Puppet never edits the model to "fix" these.
+
+Two behaviours came out of the sweep. Framing scales with the avatar: anything 1.3–2.1 m tall is framed as before, a 30 cm mascot or a 4 m giant proportionally, and a head much bigger than a person's (an all-head mascot, a 2 m ball) is kept partly in view instead of filling the frame. And a VRM 0.x model that declares bone look-at but has no eye bones, while its LookUp / Down / Left / Right expressions are bound (a common exporter default), has its eyes driven through those expressions.
+
 ## Known limitations
 
 - **Camera permission in the packaged app.**
