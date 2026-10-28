@@ -113,13 +113,17 @@ const all = await cardNames();
 console.log('      cards:', all.join(' | '));
 // Click an unrestricted card (restricted ones are kept for the one-time notice check below).
 const plain = await page.$$eval('#home-grid .card', (els) => els.findIndex((e) => !e.querySelector('.badges .lic.warn')) + 1);
+// A single click only selects; USE MODEL loads.
 await page.click(`#home-grid .card:nth-child(${plain}) .name`);
-// Clicking a card loads it; come back.
+await page.waitForTimeout(300);
+check(await page.evaluate(() => document.body.classList.contains('on-home')), 'single click does not load');
+await page.click(`#home-grid .card:nth-child(${plain}) .use`);
+// USE MODEL loads it; come back.
 await page.waitForFunction(() => !document.body.classList.contains('on-home'));
 await page.waitForFunction(() => window.__puppet.avatar, null, { timeout: 60000 });
 await page.keyboard.press('Escape');
 await page.waitForFunction(() => document.body.classList.contains('on-home'));
-check(true, 'click loads, Esc returns home');
+check(true, 'USE MODEL loads, Esc returns home');
 await page.focus('#home-grid .card');
 await page.keyboard.press('ArrowRight');
 const focused1 = await page.evaluate(() => document.activeElement?.dataset.id);
@@ -255,7 +259,7 @@ check(favsAfter === favsBefore && favsAfter > 0, 'favourites persist');
 check((await cardNames()).includes('Renamed In Test'), 'rename persists');
 if (restrictedName) {
   const n = (await cardNames()).indexOf(restrictedName) + 1;
-  await page.click(`#home-grid .card:nth-child(${n}) .name`);
+  await page.dblclick(`#home-grid .card:nth-child(${n}) .name`);
   await page.waitForFunction((name) => document.getElementById('model-name').textContent === name, restrictedName, { timeout: 90000 });
   await page.waitForTimeout(1500);
   check(!(await page.isVisible('#lic-notice')), 'the notice is one-time (not shown again)');

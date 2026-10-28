@@ -345,8 +345,13 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
       el.classList.remove('lic-open', 'menu-open');
       el.focus();
     } else if (t.closest('[data-act]')) act(id, t.closest<HTMLElement>('[data-act]')!.dataset.act!);
-    else if (t.closest('.drawer')) return; // reading the licence: no load
-    else loadCard(id);
+    // A single click only selects; loading is USE MODEL, a double click or Enter.
+  });
+  grid.addEventListener('dblclick', (e) => {
+    const t = e.target as HTMLElement;
+    const el = t.closest<HTMLElement>('.card');
+    if (!el || t.closest('input, button, .drawer')) return;
+    loadCard(el.dataset.id!);
   });
   grid.addEventListener('focusin', (e) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>('.card');

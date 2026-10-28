@@ -109,10 +109,18 @@ body.on-home.capture .home { display: none; }
 }
 .card .act:hover { background: var(--ink); color: var(--white); }
 .card .act:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.card .use {
+  appearance: none; border: 0; border-top: var(--rule); height: 36px; flex: none; position: relative; z-index: 3;
+  background: var(--accent); color: var(--ink); font-weight: 800; font-size: 11px; letter-spacing: 0.1em; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.card .use kbd { background: var(--ink); color: var(--accent); border-color: var(--ink); }
+.card .use:hover { background: var(--ink); color: var(--accent); }
+.card .use:focus-visible { outline: 3px solid var(--ink); outline-offset: -6px; }
 .card.lic-open .lic-toggle, .card.menu-open .more { background: var(--ink); color: var(--white); }
 
 .drawer {
-  display: none; position: absolute; left: 0; right: 0; top: 0; bottom: 30px; z-index: 2; background: var(--white);
+  display: none; position: absolute; left: 0; right: 0; top: 0; bottom: 66px; z-index: 2; background: var(--white);
   flex-direction: column; overflow-y: auto; scrollbar-width: thin; border-bottom: var(--rule); cursor: default;
 }
 .card.lic-open .lic-drawer, .card.menu-open .menu { display: flex; }
