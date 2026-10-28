@@ -50,6 +50,20 @@ fn settings_location(app: AppHandle) -> Result<String, String> {
     Ok(settings_path(&app)?.display().to_string())
 }
 
+/// Extra URL-style parameters from the PUPPET_QUERY environment variable, so
+/// the desktop app can be driven like `?source=file&src=...` in the browser
+/// (used for automated testing without a camera).
+#[tauri::command]
+fn dev_query() -> String {
+    std::env::var("PUPPET_QUERY").unwrap_or_default()
+}
+
+/// Print a line from the frontend to stdout (enabled with `debuglog=1`).
+#[tauri::command]
+fn debug_log(line: String) {
+    println!("[puppet] {line}");
+}
+
 #[tauri::command]
 fn vmc_configure(state: State<VmcState>, enabled: bool, host: String, port: u16) -> Result<(), String> {
     state.0.lock().map_err(|e| e.to_string())?.configure(enabled, &host, port)
@@ -96,6 +110,8 @@ pub fn run() {
             load_settings,
             save_settings,
             settings_location,
+            dev_query,
+            debug_log,
             vmc_configure,
             vmc_send,
             vmc_stats
