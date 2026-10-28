@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clean, parseVrmMeta, readGlbJson, readVrmMeta, summarizeLicence, vrmSpecOf } from '../src/library/vrmMeta';
+import { clean, LICENCE_LETTER, licenceLetterTitle, parseVrmMeta, readGlbJson, readVrmMeta, summarizeLicence, vrmSpecOf } from '../src/library/vrmMeta';
 import {
   IndexWriter,
   addEntry,
@@ -393,5 +393,17 @@ describe('formatting', () => {
     expect(formatCount(52_400)).toBe('52K');
     expect(formatCount(5_400)).toBe('5.4K');
     expect(formatCount(1_250_000)).toBe('1.3M');
+  });
+});
+
+describe('licence letter badge', () => {
+  it('gives every badge its own single letter', () => {
+    const letters = Object.values(LICENCE_LETTER);
+    expect(letters.every((l) => /^[A-Z]$/.test(l))).toBe(true);
+    expect(new Set(letters).size).toBe(letters.length);
+    expect(LICENCE_LETTER['AUTHOR ONLY']).toBe('A');
+    expect(LICENCE_LETTER['LICENSED ONLY']).toBe('L');
+    expect(LICENCE_LETTER.CC0).toBe('C');
+    expect(licenceLetterTitle('AUTHOR ONLY')).toBe('A · AUTHOR ONLY');
   });
 });

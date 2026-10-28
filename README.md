@@ -21,10 +21,10 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
     - **Occlusion:** each arm segment fades in and out with hysteresis. An arm reaching out of frame keeps its upper arm, and an untracked limb eases to idle instead of snapping. A wrist MediaPipe places at the chin with no hand found there is not followed.
     - **Fingers:** solved as anatomical angles (spread and bend at the knuckle, bend only at the middle and end joints), clamped to their ranges and smoothed per joint. The thumb's twist comes from the plane it bends in, so opposition reads.
   - **Hands** run in their own worker in parallel with the pose. Each hand is cropped from its last landmarks while tracked (the crop holds still, so MediaPipe's own tracking stays valid) and re-found from the pose wrist otherwise, with a wider retry. A found hand must sit on its own side's wrist, and one hand found by both crops is kept once.
-  - **Gestures** (HANDS mode): fist, open palm, point, peace, thumbs up, OK and rock, per hand, shown in the debug bar. They come from the hand landmarks (finger curls, thumb position) through hysteresis, so they don't flicker. Code can subscribe; see [Gesture events](#gesture-events).
+  - **Gestures** (HANDS mode): fist, open palm, point, peace, thumbs up, OK and rock, per hand, shown in the debug overlay. They come from the hand landmarks (finger curls, thumb position) through hysteresis, so they don't flicker. Code can subscribe; see [Gesture events](#gesture-events).
   - Pose LITE/FULL switches live.
 - **VMC protocol output** over OSC/UDP from the Rust side (`rosc`). Perfect-sync models also send the 13 VRM 0.x presets derived from the ARKit values, so preset-only receivers don't see a frozen face (see [VMC setup](#vmc-setup)). Messages: `/VMC/Ext/OK`, `/VMC/Ext/T`, `/VMC/Ext/Root/Pos`, `/VMC/Ext/Bone/Pos` (all humanoid bones, Unity coordinates), `/VMC/Ext/Blend/Val` and `/VMC/Ext/Blend/Apply`. Host and port are configurable (default `127.0.0.1:39539`). Bundles are split under 1200 bytes so they also cross a real network.
-- **Virtual camera output.** Puppet shows up as a webcam, **Puppet Virtual Camera**, in Zoom, Meet, Discord, FaceTime and OBS (**06 VIRTUAL CAM**, `W`). It sends the capture view at 1280×720 or 1920×1080, 30 fps. Cameras have no alpha, so the CLEAR background is sent as the chosen colour (green by default); a 3D environment is sent as rendered, except depth of field, which is display-only. See [Virtual camera](#virtual-camera).
+- **Virtual camera output.** Puppet shows up as a webcam, **Puppet Virtual Camera**, in Zoom, Meet, Discord, FaceTime and OBS (the camera card's **VIRTUAL CAM** section, `W`). It sends the capture view at 1280×720 or 1920×1080, 30 fps. Cameras have no alpha, so the CLEAR background is sent as the chosen colour (green by default); a 3D environment is sent as rendered, except depth of field, which is display-only. See [Virtual camera](#virtual-camera).
   - macOS 12.3+: a CoreMediaIO Camera Extension inside Puppet.app (needs a Developer ID–signed build; see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)).
   - Windows 10/11: a DirectShow camera built from [softcam](https://github.com/tshino/softcam) (MIT); one admin prompt to register it.
   - Linux: a v4l2loopback device you create with `modprobe`.
@@ -36,30 +36,34 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
   - fixed-timestep (60 Hz × substeps), clamped speeds and smoothed torso input, as before.
 
   There is a global OFF / STIFF / NORMAL switch (`8` `9` `0`), the cloth groups (links on/off, stiffness, and per-chain grouping overrides), a per-chain table (on/off, stiffness/drag/gravity multipliers) and per-collider toggles, including the generated BODY colliders. Overrides are saved per model, keyed by the SHA-256 of the file. The previous solver (three-vrm's spring bones with stabilisers) stays available as SOLVER → LEGACY. See [Cloth benchmark](#cloth-benchmark) for measurements.
-- **Animation clips (07 MOTION).** Idle loops, emotes and your own FBX / glTF clips, retargeted onto any VRM (0.x and 1.0) and layered over live tracking. See [Motion, hotkeys and lip sync](#motion-hotkeys-and-lip-sync).
-- **Expression and emote hotkeys (08 HOTKEYS).** Keyboard, gamepad (first class) and, through an adapter, hand gestures; optional system-wide keys; an on-screen picker (`G` / pad RB).
-- **Mic lip sync (09 LIP SYNC).** Off by default. Drives the mouth from your microphone when the face isn't tracked (FALLBACK), together with tracking (BLEND) or alone (AUDIO).
+- **Animation clips (MOTION, `A`).** Idle loops, emotes and your own FBX / glTF clips, retargeted onto any VRM (0.x and 1.0) and layered over live tracking. See [Motion, hotkeys and lip sync](#motion-hotkeys-and-lip-sync).
+- **Expression and emote hotkeys (HOTKEYS, `K`).** Keyboard, gamepad (first class) and, through an adapter, hand gestures; optional system-wide keys; an on-screen picker (`G` / pad RB).
+- **Mic lip sync (LIP SYNC, `S`).** Off by default. Drives the mouth from your microphone when the face isn't tracked (FALLBACK), together with tracking (BLEND) or alone (AUDIO).
 - **Model library (HOME).** The first screen at launch; `L` or `Esc` from the stage returns to it. See [Model library](#model-library).
 - **App UX.**
   - Open a VRM from a file dialog (`O`) or by dropping it on the window; it is added to the library too.
-  - Pick the camera, resolution and tracking rate.
-  - Toggle the tracking preview inset (`T`) with the landmark overlay.
+  - The stage: the viewport gets the space. A narrow left column holds TRACKING and FRAMING; everything else is one click (or key) away:
+    - **Top bar:** HOME, OPEN, then one button per settings window: **SCENE** (`B`, background + 3D environment), **FACE** (`F`, blendshape gains and curves), **PHYSICS** (`P`), **MOTION** (`A`), **HOTKEYS** (`K`), **LIP SYNC** (`S`), **VMC** (`N`). Each opens the same modal, docked right so the avatar stays in view; `Esc` / pad `B` closes it and focus returns to its button.
+    - **Camera card** (bottom left): the preview with the landmark overlay, the SOURCE section (camera, resolution, tracking rate, mirror, restart) and the VIRTUAL CAM section. Minimize (`T`) collapses it to a strip; tracking keeps running.
+    - **Bottom bar:** the model name (click or `I` for MODEL INFO and the licence) with a one-letter licence badge, a `!` for serious model-check warnings, the tracking state (TRACKING / LOST / FACE ONLY), the playing emote or held expression, PERFECT SYNC / PRESETS, outputs (VMC, VCAM) and the status line.
+    - **Debug overlay** (`D`), top right of the viewport: render fps and frame time, face/body tracking fps, latency, inference time, gestures, head and gaze.
+  - Licence letters: **A** AUTHOR ONLY · **L** LICENSED ONLY · **C** CC0 · **B** COMMERCIAL OK (business use) · **S** SOLO COMMERCIAL · **P** PERSONAL · **N** NO TERMS. AUTHOR ONLY and LICENSED ONLY show in the accent colour.
+  - Controller first: `Tab` reaches every control; on a gamepad, `LT` enters menu mode on the stage (d-pad / stick move focus, `A` presses, left/right change sliders and drop-downs, `B` backs out). Modals and HOME take the pad on their own. Outside those the pad stays the performer's (emote and expression hotkeys).
   - Background: solid colour (chroma key presets), transparent, an image, or a lit **3D environment** (`E`, see below).
   - **Capture view** (`H`, `Esc` to leave) hides all UI for clean OBS capture.
-  - A debug bar (`D`) shows render fps and frame time, face/body tracking fps, latency and inference time.
   - Settings persist to `settings.json` in the app config dir.
 
 ### Keys
 
-Stage: `L` / `Esc` home · `I` model info and licence · `O` open · `E` 3D environment on/off · `H` capture view · `Esc` leave capture view · `C` calibrate neutral · `M` mirror · `T` preview · `V` VMC on/off · `W` virtual camera on/off · `1` `2` `3` tracking mode · `8` `9` `0` physics off/stiff/normal · `R` settle physics · `F` `P` face/physics tab · `D` debug bar
+Stage: `L` / `Esc` home · `I` model info and licence · `O` open · `E` 3D environment on/off · `H` capture view · `Esc` leave capture view · `C` calibrate neutral · `M` mirror · `T` minimize / restore the camera card · `V` VMC on/off · `W` virtual camera on/off · `1` `2` `3` tracking mode · `8` `9` `0` physics off/stiff/normal · `R` settle physics · `B` scene · `F` face · `P` physics · `A` motion · `K` hotkeys · `S` lip sync · `N` VMC (each opens its window; the same key or `Esc` closes it) · `D` debug overlay · gamepad `LT` menu mode
 
-Hotkeys (defaults, editable in 08 HOTKEYS): `⌥1`–`⌥5` happy / angry / sad / relaxed / surprised · `⌥6` reset · `F3` wave · `F4` nod · `F5` shake · `F6` clap · `F7` cheer · `F8` bow · `F9` shrug · `F10` think · `G` picker. Gamepad (standard mapping): `A` wave · `B` nod · `X` clap · `Y` cheer · d-pad happy / surprised / sad / angry · `LB` shrug · `RB` picker · `BACK` reset. (Alt+digits because `1` `2` `3` are the tracking modes; F3 up because `F2` renames on HOME.)
+Hotkeys (defaults, editable in HOTKEYS): `⌥1`–`⌥5` happy / angry / sad / relaxed / surprised · `⌥6` reset · `F3` wave · `F4` nod · `F5` shake · `F6` clap · `F7` cheer · `F8` bow · `F9` shrug · `F10` think · `G` picker. Gamepad (standard mapping): `A` wave · `B` nod · `X` clap · `Y` cheer · d-pad happy / surprised / sad / angry · `LB` shrug · `RB` picker · `BACK` reset. (Alt+digits because `1` `2` `3` are the tracking modes; F3 up because `F2` renames on HOME.)
 
 Home: `←` `↑` `↓` `→` move · `Enter` load · `S` favourite · `L` licence · `F2` rename · `Del` remove · `/` search · `I` import · `Esc` back to the stage
 
 ## Motion, hotkeys and lip sync
 
-### Clips (07 MOTION)
+### Clips (MOTION)
 
 | clip | from | owns by default |
 |---|---|---|
@@ -78,7 +82,7 @@ UAL = the [Quaternius Universal Animation Library](https://quaternius.com) 1 and
 - **Retargeting** (`src/anim/retarget.ts`): the clip is sampled at 30 fps and stored per bone as its world rotation change from the source's rest pose, in a frame detected from the rest pose (up = hips → head, left = right arm → left arm), so Y-up, Z-up and either facing all work. On binding to a model, each bone gets a fix rotation from the model's rest direction to the source's (an A-pose source keeps its A-pose arms on a T-pose VRM), and local rotations follow from the bones the model has (a missing upperChest folds into the chest). VRM 0.x models are handled by the same 180° turn Puppet uses for tracking. Hips translation is scaled by hip height; travel is removed (in place), bob and sit height are kept.
 - **Layering** (`src/anim/player.ts`): the IDLE clip plays while body tracking is off (FACE mode, unless switched off) or lost; with the face tracked the head stays the face's, with the face lost too the idle owns it. An emote plays over live tracking and owns the bones of its mask (FULL, BODY = all but neck and head, ARMS, HEAD), fading in over 0.3 s and out over 0.45 s; clips that move the hips (sit) fade over 0.8 s, because a fast drop pushes the legs through skirts faster than cloth collision follows. Face expressions stay tracked during every emote. Clips are applied as a slerp from the tracked pose, so a clip start is a continuous motion for the cloth solver.
 
-### Hotkeys (08 HOTKEYS)
+### Hotkeys (HOTKEYS)
 
 Each binding maps a trigger (key or combo, gamepad button, hand gesture) to an action: play an emote, set an expression (TOGGLE, ON, or HOLD while pressed; any VRM preset or custom expression on the model, with fades), RESET, or the PICKER. Click a trigger to rebind it. The dot marks a binding that belongs to the current model only (expressions differ per model); a model's own binding overrides a global one on the same trigger. Clashes with another binding or with an app shortcut are outlined.
 
@@ -87,7 +91,7 @@ Each binding maps a trigger (key or combo, gamepad button, hand gesture) to an a
 - **Hand gestures** plug in through `GestureSource` (`src/input/gestures.ts`); the tracker's gesture events are the TODO adapter there.
 - **Picker:** `G` or pad `RB` opens a grid of emotes and expressions over the stage. Arrows / d-pad / left stick move, `Enter` / `A` fires, `Esc` / `B` closes.
 
-### Lip sync (09 LIP SYNC)
+### Lip sync (LIP SYNC)
 
 Pick the microphone and a mode: OFF, FALLBACK (audio drives the mouth only while the face isn't tracked, eased in and out), BLEND (the larger of tracked and audio, per shape) or AUDIO. The analysis (`src/audio/visemes.ts`) gates the frame level (GATE DB), estimates F1/F2 from a pre-emphasised, smoothed spectrum and matches them softly against the five vowels: preset models get `aa` `ih` `ou` `ee` `oh`, perfect-sync models `jawOpen`, `mouthFunnel`, `mouthPucker` and `mouthStretch`. Fast attack (30 ms), slower release (90 ms). The meter shows the level, the gate and each viseme.
 
@@ -112,7 +116,7 @@ Storage (desktop):
 
 ### Licences
 
-Every VRM carries its author's terms in its metadata. Puppet reads them (VRM 1.0 and 0.x, `src/library/vrmMeta.ts`) and shows them in plain language in the card's LICENCE drawer and in the stage's MODEL INFO panel (`I`). The card badge summarises them: **AUTHOR ONLY** / **LICENSED ONLY** (only the author, or people they licensed, may perform as the model), **CC0**, **COMMERCIAL OK** (companies too), **SOLO COMMERCIAL** (individuals may earn money), **PERSONAL** (non-profit only) or **NO TERMS**. Loading an AUTHOR ONLY or LICENSED ONLY model shows a one-time notice. Puppet never refuses to load a model: this is information, not DRM.
+Every VRM carries its author's terms in its metadata. Puppet reads them (VRM 1.0 and 0.x, `src/library/vrmMeta.ts`) and shows them in plain language in the card's LICENCE drawer and in the stage's MODEL INFO window (`I`, or click the model name in the bottom bar). The card badge summarises them: **AUTHOR ONLY** / **LICENSED ONLY** (only the author, or people they licensed, may perform as the model), **CC0**, **COMMERCIAL OK** (companies too), **SOLO COMMERCIAL** (individuals may earn money), **PERSONAL** (non-profit only) or **NO TERMS**. Loading an AUTHOR ONLY or LICENSED ONLY model shows a one-time notice. Puppet never refuses to load a model: this is information, not DRM.
 
 VRM 0.x fields map to 1.0 as the VRM consortium's migration does (`allowedUserName` → `avatarPermission`, `commercialUssageName` Allow → `personalProfit`); 0.x credit / redistribution / modification terms come from the licence name (CC0, CC_BY, ...) or a VRoid Hub licence URL. Literal `"undefined"` strings, which one exporter writes, count as empty.
 
@@ -122,7 +126,7 @@ VRM 0.x fields map to 1.0 as the VRM consortium's migration does (`allowedUserNa
 
 ![The six built-in environments](docs/environments.jpg)
 
-Background **3D** (`E`) stands the avatar in a lit scene; **05 ENVIRONMENT** picks the scene and the look. All six built-in scenes are procedural (three.js geometry, shaders and canvas textures generated at runtime), so they add no asset files to the app.
+Background **3D** (`E`) stands the avatar in a lit scene; the **SCENE** window (`B`) picks the scene and the look. All six built-in scenes are procedural (three.js geometry, shaders and canvas textures generated at runtime), so they add no asset files to the app.
 
 | scene | what it is |
 |---|---|
@@ -170,7 +174,7 @@ Puppet ships no avatar. Use your own `.vrm` (VRM 0.x or 1.0), for example one ex
 ## Virtual camera
 
 1. Pick a background in **03 BACKGROUND** (CLEAR is sent as the chosen colour).
-2. In **06 VIRTUAL CAM**, do the one-time setup the panel asks for:
+2. In the camera card's **VIRTUAL CAM** section, do the one-time setup the panel asks for:
    - **macOS:** Puppet must be in /Applications. Click **INSTALL** on the EXTENSION line, then **OPEN SETTINGS** and approve it in System Settings → General → Login Items & Extensions → Camera Extensions (macOS 13–14: Privacy & Security → Allow). This needs a signed build; unsigned builds say so and point to the OBS route.
    - **Windows:** click **REGISTER CAMERA** and accept the admin prompt.
    - **Linux:** create a loopback device once (the panel shows this command, click to copy):
@@ -196,7 +200,7 @@ This works on every OS without installing a camera driver. Use it when the nativ
 
 ## VMC setup
 
-1. In Puppet's **04 VMC OUT** panel, set the receiver's host and port and tick **SEND VMC** (`V`).
+1. In Puppet's **VMC** window (`N`), set the receiver's host and port and tick **SEND VMC** (`V`).
    - The default `127.0.0.1:39539` is the usual VMC receive port (VSeeFace, Warudo, VNyan, VMC4U, and others).
    - For a receiver on another PC, use its LAN IP.
 2. In the receiver, enable VMC/OSC receiving on that port.
@@ -210,7 +214,7 @@ The TX readout shows frames and bytes sent. "Nothing listening" errors are count
 
 ARKit (iPhone face tracking) defines 52 named blendshapes such as `eyeBlinkLeft`, `jawOpen` and `mouthSmileLeft`. A **perfect-sync** model ships one expression per ARKit name, sculpted by the modeller. The tracker's 52 numbers then drive the face directly, and every mouth and brow shape reads as the artist intended instead of being squeezed into five vowels and a blink. MediaPipe's FaceLandmarker outputs the same 52 names (minus `tongueOut`), so a webcam can drive a perfect-sync model without an iPhone.
 
-Puppet detects perfect sync when the model has at least 40 of the 52 names. The header shows `PERFECT SYNC n/52` or `PRESETS n/13`. Rows the model lacks are struck through in the FACE tab.
+Puppet detects perfect sync when the model has at least 40 of the 52 names. The bottom bar shows `PERFECT SYNC n/52` or `PRESETS n/13`. Rows the model lacks are struck through in the FACE window (`F`).
 
 ## Testing without a camera
 
@@ -333,7 +337,7 @@ gestures.current.right; // the right hand's gesture now
 off();                  // unsubscribe
 ```
 
-An event fires on every change, including back to `none` (a gesture let go, or the hand lost for 300 ms). A gesture is reported after it has won for 150 ms and dropped after it has scored under 0.3 for 200 ms. Gestures need HANDS mode. The 08 HOTKEYS gesture triggers (e.g. thumbs up → an emote) are fed from these events through `trackerGestureSource` (`src/input/gestures.ts`), with the names `fist`, `open_palm`, `point`, `peace`, `thumbs_up`, `ok` and `horns`, per user hand.
+An event fires on every change, including back to `none` (a gesture let go, or the hand lost for 300 ms). A gesture is reported after it has won for 150 ms and dropped after it has scored under 0.3 for 200 ms. Gestures need HANDS mode. The HOTKEYS gesture triggers (e.g. thumbs up → an emote) are fed from these events through `trackerGestureSource` (`src/input/gestures.ts`), with the names `fist`, `open_palm`, `point`, `peace`, `thumbs_up`, `ok` and `horns`, per user hand.
 
 ## Tracking quality
 

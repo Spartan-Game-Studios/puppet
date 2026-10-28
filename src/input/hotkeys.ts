@@ -20,6 +20,18 @@ export interface PickerControl {
   close(): void;
 }
 
+/**
+ * App UI navigation by gamepad (src/app/padNav.ts). While `active`, pad
+ * buttons go to press() instead of firing bindings, and d-pad / stick
+ * directions go to nav(). While inactive, only `menuButton` reaches it, and
+ * only when no binding uses that button.
+ */
+export interface UiNavControl {
+  readonly active: boolean;
+  nav(dir: NavDir): void;
+  press(button: number): boolean;
+}
+
 const isTyping = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
   if (!el) return false;
@@ -33,6 +45,9 @@ export class HotkeyManager {
   enabled = true;
   readonly gamepad = new GamepadInput();
   picker: PickerControl | null = null;
+  ui: UiNavControl | null = null;
+  /** Pad button that turns UI navigation on from the stage (LT). */
+  uiMenuButton = 6;
   globalStatus: GlobalResult = { registered: [], failed: [] };
   gestureSource: GestureSource | null = null;
   /** Fires on every resolved trigger (UI flash). */
@@ -52,6 +67,7 @@ export class HotkeyManager {
     this.gamepad.onButton = (button, pressed) => this.trigger({ kind: 'pad', button }, pressed);
     this.gamepad.onNav = (dir) => {
       if (this.picker?.open) this.picker.nav(dir);
+      else if (this.ui?.active) this.ui.nav(dir);
     };
   }
 
@@ -166,6 +182,18 @@ export class HotkeyManager {
         if (b?.action.kind === 'picker') this.picker.close();
       }
       return true;
+    }
+    if (this.ui && t.kind === 'pad') {
+      const held = this.down.has(triggerKey(t));
+      if (this.ui.active && !(held && !pressed)) {
+        // D-pad presses arrive through onNav (with the stick); the rest are UI buttons.
+        if (pressed && (t.button < 12 || t.button > 15)) this.ui.press(t.button);
+        return true;
+      }
+      if (!this.ui.active && t.button === this.uiMenuButton && !resolve(this.bindings, t, this.model)) {
+        if (pressed) this.ui.press(t.button);
+        return true;
+      }
     }
     if (!this.enabled) return false;
     const k = triggerKey(t);

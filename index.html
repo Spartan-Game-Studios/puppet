@@ -10,43 +10,24 @@
       <header class="bar top">
         <div class="brand">PUPPET<span class="ver">V0.1</span></div>
         <button id="btn-home" class="btn home-btn" title="Model library (home)"><span class="home-to">HOME <kbd>L</kbd></span><span class="stage-to">STAGE <kbd>ESC</kbd></span></button>
-        <button id="btn-open" class="btn" title="Open a .vrm file">OPEN VRM <kbd>O</kbd></button>
-        <div class="cell"><span class="lbl">MODEL</span><span id="model-name" class="val">NONE</span></div>
-        <button id="btn-model-info" class="btn lic-btn hidden" title="Model info and licence (I)"><span id="model-lic" class="lic">-</span><kbd>I</kbd></button>
-        <div class="cell"><span class="lbl">EXPR</span><span id="sync-mode" class="val">-</span></div>
-        <div class="cell grow"><span class="lbl">STATUS</span><span id="status" class="val">BOOTING</span></div>
-        <button id="btn-capture" class="btn accent" title="Hide all UI for OBS window capture">CAPTURE VIEW <kbd>H</kbd></button>
+        <button id="btn-open" class="btn" title="Open a .vrm file"><span>OPEN<span class="wide-only"> VRM</span></span> <kbd>O</kbd></button>
+        <!-- Settings: each button opens its modal (src/app/modal.ts, #tpl-modal). Contents live in #modal-src until mounted. -->
+        <nav class="settings-nav" id="settings-nav" aria-label="Settings">
+          <button class="btn" data-modal="scene" title="Background and 3D environment (B)">SCENE <kbd>B</kbd></button>
+          <button class="btn" data-modal="face" title="Blendshape readout, gains and curves (F)">FACE <kbd>F</kbd></button>
+          <button class="btn" data-modal="physics" title="Spring bones and cloth (P)">PHYSICS <kbd>P</kbd></button>
+          <button class="btn" data-modal="motion" title="Idle and emote clips (A)">MOTION <kbd>A</kbd></button>
+          <button class="btn" data-modal="hotkeys" title="Keyboard, gamepad and gesture bindings (K)">HOTKEYS <kbd>K</kbd></button>
+          <button class="btn" data-modal="lipsync" title="Microphone lip sync (S)">LIP SYNC <kbd>S</kbd></button>
+          <button class="btn" data-modal="vmc" title="VMC protocol output (N)">VMC <kbd>N</kbd></button>
+        </nav>
+        <div class="grow"></div>
+        <button id="btn-capture" class="btn accent" title="Hide all UI for OBS window capture"><span>CAPTURE<span class="wide-only"> VIEW</span></span> <kbd>H</kbd></button>
       </header>
 
       <aside class="panel left">
         <section class="block">
-          <h2><span class="idx">01</span>SOURCE</h2>
-          <label class="row"><span class="lbl">CAMERA</span><select id="camera"></select></label>
-          <label class="row"><span class="lbl">RES</span>
-            <select id="resolution">
-              <option value="640x480">640×480</option>
-              <option value="1280x720">1280×720</option>
-              <option value="1920x1080">1920×1080</option>
-            </select>
-          </label>
-          <label class="row"><span class="lbl">TRACK FPS</span>
-            <select id="track-fps">
-              <option value="15">15</option>
-              <option value="24">24</option>
-              <option value="30">30</option>
-              <option value="60">60</option>
-            </select>
-          </label>
-          <div class="row"><span class="lbl">ACTUAL</span><span id="cam-actual" class="val">-</span></div>
-          <div class="row btns">
-            <button id="btn-camera" class="btn">START CAMERA</button>
-          </div>
-          <label class="check"><input type="checkbox" id="mirror" /><span>MIRROR</span><kbd>M</kbd></label>
-          <label class="check"><input type="checkbox" id="preview" /><span>TRACKING PREVIEW</span><kbd>T</kbd></label>
-        </section>
-
-        <section class="block">
-          <h2><span class="idx">02</span>TRACKING</h2>
+          <h2><span class="idx">01</span>TRACKING</h2>
           <div class="seg" id="mode" role="radiogroup">
             <button data-value="face">FACE<kbd>1</kbd></button>
             <button data-value="upper">+BODY<kbd>2</kbd></button>
@@ -67,131 +48,103 @@
           </div>
           <div class="row"><span class="lbl">CALIB</span><span id="calib-state" class="val">NONE</span></div>
         </section>
-
         <section class="block">
-          <h2><span class="idx">03</span>BACKGROUND</h2>
-          <div class="seg" id="bg-kind" role="radiogroup">
-            <button data-value="color">COLOUR</button>
-            <button data-value="transparent">CLEAR</button>
-            <button data-value="image">IMAGE</button>
-            <button data-value="environment" title="3D environment (section 05)">3D<kbd>E</kbd></button>
-          </div>
-          <div class="row swatches" id="swatches">
-            <button data-color="#00ff00" style="background:#00ff00" title="Chroma green"></button>
-            <button data-color="#0000ff" style="background:#0000ff" title="Chroma blue"></button>
-            <button data-color="#ff00ff" style="background:#ff00ff" title="Magenta"></button>
-            <button data-color="#000000" style="background:#000000" title="Black"></button>
-            <button data-color="#ffffff" style="background:#ffffff" title="White"></button>
-            <input type="color" id="bg-color" title="Custom colour" />
-          </div>
-          <div class="row btns"><button id="btn-bg-image" class="btn">PICK IMAGE</button></div>
+          <h2><span class="idx">02</span>FRAMING</h2>
           <div class="seg" id="framing" role="radiogroup">
             <button data-value="bust">BUST</button>
             <button data-value="upper">UPPER</button>
             <button data-value="full">FULL</button>
           </div>
-        </section>
-
-        <section class="block">
-          <h2><span class="idx">04</span>VMC OUT</h2>
-          <label class="check"><input type="checkbox" id="vmc-enabled" /><span>SEND VMC (OSC/UDP)</span><kbd>V</kbd></label>
-          <label class="row"><span class="lbl">HOST</span><input id="vmc-host" type="text" spellcheck="false" /></label>
-          <label class="row"><span class="lbl">PORT</span><input id="vmc-port" type="number" min="1" max="65535" /></label>
-          <label class="check" title="Blink, A/I/U/E/O, Joy... derived from the ARKit values, for receivers that only read presets"><input type="checkbox" id="vmc-presets" /><span>ALSO SEND VRM PRESETS</span></label>
-          <div class="row"><span class="lbl">TX</span><span id="vmc-stats" class="val">OFF</span></div>
-        </section>
-
-        <section class="block env" id="env-block">
-          <h2><span class="idx">05</span>ENVIRONMENT</h2>
-          <label class="row"><span class="lbl">SCENE</span>
-            <select id="env-id">
-              <option value="studio">STUDIO CYCLORAMA</option>
-              <option value="room">COSY ROOM</option>
-              <option value="moor">MOOR AT DUSK</option>
-              <option value="forest">NIGHT CLEARING</option>
-              <option value="neon">NEON GRID</option>
-              <option value="hall">CONCRETE HALL</option>
-              <option value="custom">CUSTOM (GLB + HDR)</option>
-            </select>
-          </label>
-          <div class="row"><span class="lbl">QUALITY</span>
-            <div class="seg" id="env-quality" role="radiogroup">
-              <button data-value="low">LOW</button>
-              <button data-value="high">HIGH</button>
-            </div>
-          </div>
-          <div class="env-custom" id="env-custom">
-            <div class="row btns">
-              <button id="btn-env-scene" class="btn" title="Load a .glb / .gltf scene (or drop one on the window)">SCENE</button>
-              <button id="btn-env-sky" class="btn" title="Load an equirectangular .hdr / .exr sky (lights the scene)">SKY</button>
-              <button id="btn-env-sky-clear" class="btn ghost" title="Remove the custom sky">NO SKY</button>
-            </div>
-            <div class="row"><span class="lbl">SCENE FILE</span><span id="env-scene-name" class="val">NONE</span></div>
-            <div class="row"><span class="lbl">SKY FILE</span><span id="env-sky-name" class="val">NONE</span></div>
-            <label class="slider"><span class="lbl">SCALE</span><input type="range" id="env-scale" min="-2" max="2" step="0.01" /><output id="env-scale-out"></output></label>
-            <label class="slider"><span class="lbl">POS X</span><input type="range" id="env-x" min="-10" max="10" step="0.05" /><output id="env-x-out"></output></label>
-            <label class="slider"><span class="lbl">POS Y</span><input type="range" id="env-y" min="-10" max="10" step="0.05" /><output id="env-y-out"></output></label>
-            <label class="slider"><span class="lbl">POS Z</span><input type="range" id="env-z" min="-10" max="10" step="0.05" /><output id="env-z-out"></output></label>
-            <label class="slider"><span class="lbl">ROTATE °</span><input type="range" id="env-rot" min="-180" max="180" step="1" /><output id="env-rot-out"></output></label>
-          </div>
-          <h3>LIGHT</h3>
-          <div class="seg" id="env-style" role="radiogroup">
-            <button data-value="scene" title="The scene's own lighting">SCENE</button>
-            <button data-value="key" title="Strong key, soft fill">KEY</button>
-            <button data-value="rim" title="Back-lit rim, low key">RIM</button>
-            <button data-value="soft" title="Even ambient light">SOFT</button>
-          </div>
-          <label class="slider"><span class="lbl">INTENSITY</span><input type="range" id="env-intensity" min="0.25" max="2" step="0.01" /><output id="env-intensity-out"></output></label>
-          <label class="slider"><span class="lbl">TEMP K</span><input type="range" id="env-temp" min="2000" max="12000" step="100" /><output id="env-temp-out"></output></label>
-          <h3>ATMOSPHERE</h3>
-          <label class="slider"><span class="lbl">FOG</span><input type="range" id="env-fog" min="0" max="1" step="0.01" /><output id="env-fog-out"></output></label>
-          <label class="check"><input type="checkbox" id="env-shadow" /><span>GROUND SHADOW</span></label>
-          <label class="slider"><span class="lbl">FLOOR M</span><input type="range" id="env-floor" min="-1" max="1" step="0.01" /><output id="env-floor-out"></output></label>
-          <h3>CAMERA</h3>
-          <label class="check"><input type="checkbox" id="env-sway" /><span>IDLE SWAY</span></label>
-          <label class="check"><input type="checkbox" id="env-dof" /><span>DEPTH OF FIELD (HIGH ONLY)</span></label>
-          <div class="row btns"><button id="btn-env-reset" class="btn ghost" title="Reset this scene's look and placement">RESET THIS SCENE</button></div>
-        </section>
-        <section class="block">
-          <h2><span class="idx">06</span>VIRTUAL CAM</h2>
-          <!-- ON/OFF switch + macOS camera extension controls: src/app/vcamControls.ts -->
-          <div id="vcam-controls"></div>
-          <label class="row"><span class="lbl">RES</span>
-            <select id="vcam-res">
-              <option value="1280x720">1280×720 @30</option>
-              <option value="1920x1080">1920×1080 @30</option>
-            </select>
-          </label>
-          <label class="row hidden" id="vcam-device-row"><span class="lbl">DEVICE</span><select id="vcam-device"></select></label>
-          <div class="row"><span class="lbl">STATE</span><span id="vcam-state" class="val" title="">-</span></div>
-          <div class="row"><span class="lbl">TX</span><span id="vcam-stats" class="val">OFF</span></div>
-          <p class="note" id="vcam-hint"></p>
-          <code class="cmd hidden" id="vcam-cmd" title="Click to copy"></code>
           <div class="row btns">
-            <button id="btn-vcam-setup" class="btn hidden">INSTALL CAMERA</button>
-            <button id="btn-vcam-refresh" class="btn ghost">REFRESH</button>
+            <button id="btn-env-toggle" class="btn ghost" title="3D environment on / off">3D ENVIRONMENT <kbd>E</kbd></button>
           </div>
-          <p class="note mute" id="vcam-obs">NO NATIVE CAMERA? <kbd>H</kbd> CAPTURE VIEW → OBS WINDOW CAPTURE → START VIRTUAL CAMERA. CAMERAS HAVE NO ALPHA: CLEAR IS SENT AS THE CHOSEN COLOUR.</p>
         </section>
-        <!-- 07 MOTION, 08 HOTKEYS, 09 LIP SYNC: built by src/anim/features.ts -->
-        <section class="block" id="motion-block"></section>
-        <section class="block" id="hotkeys-block"></section>
-        <section class="block" id="lipsync-block"></section>
+        <section class="block keys-help">
+          <h2><span class="idx">?</span>CONTROLS</h2>
+          <p class="note mute"><kbd>TAB</kbd> MOVES BETWEEN CONTROLS. GAMEPAD: <kbd>LT</kbd> MENU, <kbd>✚</kbd> MOVE, <kbd>A</kbd> PRESS, <kbd>B</kbd> BACK. <kbd>G</kbd> / <kbd>RB</kbd> EMOTE PICKER.</p>
+        </section>
       </aside>
 
       <main class="stage" id="stage">
         <div class="grid-overlay" aria-hidden="true"></div>
         <div class="empty" id="empty"><div>NO MODEL LOADED<br /><kbd>O</kbd> OPEN, OR DROP A .VRM ANYWHERE</div></div>
         <div class="drop" id="drop">DROP .VRM</div>
-        <figure class="preview" id="preview-box">
+
+        <!-- Camera card: preview + source buttons + virtual camera. Minimize (T) keeps tracking running. -->
+        <figure class="preview" id="preview-box" aria-label="Camera">
+          <figcaption class="cam-head">
+            <span class="cam-title">CAM <span id="preview-info"></span></span>
+            <span class="cam-flags" id="cam-flags"></span>
+            <button type="button" id="btn-preview-min" class="ibtn" aria-pressed="false" title="Minimize the preview (T). Tracking keeps running."><span class="min-on">▁</span><span class="min-off">▢</span><kbd>T</kbd></button>
+          </figcaption>
           <canvas id="preview-canvas" width="320" height="180"></canvas>
-          <figcaption>CAM <span id="preview-info"></span></figcaption>
+          <div class="cam-scroll" id="cam-sections">
+            <div class="csec-mount" data-csec="source" data-idx="SRC" data-title="SOURCE">
+              <div class="cam-src">
+                <label class="cam-pick" id="cam-pick" title="Camera"><span class="lbl">CAM</span><select id="camera"></select></label>
+                <span class="cam-file hidden" id="cam-file" title="Recorded clip source"></span>
+                <label title="Camera resolution"><span class="lbl">RES</span>
+                  <select id="resolution">
+                    <option value="640x480">640×480</option>
+                    <option value="1280x720">1280×720</option>
+                    <option value="1920x1080">1920×1080</option>
+                  </select>
+                </label>
+                <label title="Tracking rate"><span class="lbl">FPS</span>
+                  <select id="track-fps">
+                    <option value="15">15</option>
+                    <option value="24">24</option>
+                    <option value="30">30</option>
+                    <option value="60">60</option>
+                  </select>
+                </label>
+              </div>
+              <div class="cam-btns">
+                <label class="tog" title="Mirror the camera (M)"><input type="checkbox" id="mirror" /><span>MIRROR</span><kbd>M</kbd></label>
+                <button id="btn-camera" class="btn" title="Restart the camera">START CAMERA</button>
+              </div>
+              <div class="row cam-actual"><span class="lbl">ACTUAL</span><span id="cam-actual" class="val">-</span></div>
+            </div>
+            <div class="csec-mount" data-csec="vcam" data-idx="OUT" data-title="VIRTUAL CAM" data-key="W">
+              <!-- Single mount point for the virtual camera settings. The ON/OFF switch and the
+                   macOS camera extension controls: src/app/vcamControls.ts (mountVcamControls). -->
+              <div class="vcam-mount" id="vcam-mount">
+                <div id="vcam-controls"></div>
+                <label class="row"><span class="lbl">RES</span>
+                  <select id="vcam-res">
+                    <option value="1280x720">1280×720 @30</option>
+                    <option value="1920x1080">1920×1080 @30</option>
+                  </select>
+                </label>
+                <label class="row hidden" id="vcam-device-row"><span class="lbl">DEVICE</span><select id="vcam-device"></select></label>
+                <div class="row"><span class="lbl">STATE</span><span id="vcam-state" class="val" title="">-</span></div>
+                <div class="row"><span class="lbl">TX</span><span id="vcam-stats" class="val">OFF</span></div>
+                <p class="note" id="vcam-hint"></p>
+                <code class="cmd hidden" id="vcam-cmd" title="Click to copy"></code>
+                <div class="row btns">
+                  <button id="btn-vcam-setup" class="btn hidden">INSTALL CAMERA</button>
+                  <button id="btn-vcam-refresh" class="btn ghost">REFRESH</button>
+                </div>
+                <p class="note mute" id="vcam-obs">NO NATIVE CAMERA? <kbd>H</kbd> CAPTURE VIEW → OBS WINDOW CAPTURE → START VIRTUAL CAMERA. CAMERAS HAVE NO ALPHA: CLEAR IS SENT AS THE CHOSEN COLOUR.</p>
+              </div>
+            </div>
+          </div>
         </figure>
-        <div class="capture-hint" id="capture-hint">CAPTURE VIEW: <kbd>H</kbd> / <kbd>ESC</kbd> TO EXIT</div>
-        <aside class="model-info hidden" id="model-info" aria-label="Model info">
-          <h2><span class="idx">i</span>MODEL INFO<button class="x" id="btn-model-info-close" title="Close (I)">×</button></h2>
-          <div class="mi-body" id="model-info-body"></div>
+
+        <!-- Debug readout (D): semi-transparent, opposite the camera card. -->
+        <aside class="debug-ov" id="debug" aria-label="Debug">
+          <div><b>RENDER</b><i id="d-render">-</i></div>
+          <div><b>TRACK</b><i id="d-track">-</i></div>
+          <div><b>LATENCY</b><i id="d-latency">-</i></div>
+          <div><b>INFER F/P/H</b><i id="d-infer">-</i></div>
+          <div><b>GESTURE</b><i id="d-gesture">-</i></div>
+          <div><b>ML</b><i id="d-where">-</i></div>
+          <div><b>PHYS</b><i id="d-phys">-</i></div>
+          <div><b>HEAD Y/P/R</b><i id="head-readout">-</i></div>
+          <div><b>GAZE Y/P</b><i id="gaze-readout">-</i></div>
         </aside>
+
+        <div class="capture-hint" id="capture-hint">CAPTURE VIEW: <kbd>H</kbd> / <kbd>ESC</kbd> TO EXIT</div>
         <div class="lic-notice hidden" id="lic-notice" role="status">
           <span class="lic warn" id="lic-notice-badge">AUTHOR ONLY</span>
           <p id="lic-notice-text"></p>
@@ -199,41 +152,139 @@
         </div>
       </main>
 
-      <aside class="panel right">
-        <nav class="tabs">
-          <button data-tab="face">FACE <kbd>F</kbd></button>
-          <button data-tab="physics">PHYSICS <kbd>P</kbd></button>
-        </nav>
-        <section class="tab" id="tab-face">
-          <div class="head-readout">
-            <div class="row"><span class="lbl">HEAD Y/P/R</span><span id="head-readout" class="val">-</span></div>
-            <div class="row"><span class="lbl">GAZE Y/P</span><span id="gaze-readout" class="val">-</span></div>
-          </div>
-          <div class="bs-head"><span>BLENDSHAPE</span><span>OUT <i>│RAW</i></span><span>GAIN</span><span>CURVE</span></div>
-          <div id="bs-list" class="bs-list"></div>
-        </section>
-        <section class="tab" id="tab-physics">
-          <div class="seg" id="phys-mode" role="radiogroup">
-            <button data-value="off">OFF<kbd>8</kbd></button>
-            <button data-value="stiff">STIFF<kbd>9</kbd></button>
-            <button data-value="normal">NORMAL<kbd>0</kbd></button>
-          </div>
-          <label class="check"><input type="checkbox" id="phys-stabilise" /><span>STABILISER (FIXED STEP + CLAMPS)</span></label>
-          <label class="slider"><span class="lbl">MAX SPEED M/S</span><input type="range" id="phys-maxspeed" min="0.5" max="10" step="0.1" /><output id="phys-maxspeed-out"></output></label>
-          <label class="slider"><span class="lbl">INERTIA</span><input type="range" id="phys-inertia" min="0" max="1" step="0.01" /><output id="phys-inertia-out"></output></label>
-          <label class="slider"><span class="lbl">COLLIDE DAMP</span><input type="range" id="phys-coldamp" min="0" max="1" step="0.01" /><output id="phys-coldamp-out"></output></label>
-          <label class="row"><span class="lbl">SUBSTEPS</span>
-            <select id="phys-substeps"><option value="1">1 (60 HZ)</option><option value="2">2 (120 HZ)</option><option value="3">3 (180 HZ)</option><option value="4">4 (240 HZ)</option></select>
-          </label>
-          <div class="row btns"><button id="btn-phys-reset" class="btn">SETTLE <kbd>R</kbd></button><button id="btn-phys-clear" class="btn ghost">RESET OVERRIDES</button></div>
-          <div id="cloth-ui"></div>
-          <h3>CHAINS <span id="chain-count"></span></h3>
-          <div class="chain-head"><span>ON</span><span>CHAIN</span><span>STIF</span><span>DRAG</span><span>GRAV</span></div>
-          <div id="chain-list" class="chain-list"></div>
-          <h3>COLLIDERS <span id="collider-count"></span></h3>
-          <div id="collider-list" class="collider-list"></div>
-        </section>
-      </aside>
+      <!-- Bottom bar: the model on stage and how it is being driven. -->
+      <footer class="bar bottom" id="statusbar">
+        <button id="btn-model-info" class="btn mname" disabled title="Model info and licence (I)">
+          <span id="model-lic" class="badge-slot"></span><span id="model-name" class="val">NO MODEL</span><span id="model-warn" class="badge-slot"></span><kbd>I</kbd>
+        </button>
+        <div class="cell"><span class="lbl">TRACK</span><span id="track-state" class="val">-</span></div>
+        <div class="cell"><span class="lbl">EXPR</span><span id="expr-state" class="val">-</span></div>
+        <div class="cell"><span class="lbl">SYNC</span><span id="sync-mode" class="val">-</span></div>
+        <div class="cell"><span class="lbl">OUT</span><span id="out-state" class="val">-</span></div>
+        <div class="cell grow"><span class="lbl">STATUS</span><span id="status" class="val">BOOTING</span></div>
+        <div class="cell hint"><kbd>D</kbd>DEBUG</div>
+      </footer>
+
+      <!-- Modal contents (moved into #tpl-modal dialogs by main.ts at boot). -->
+      <div class="modal-src" id="modal-src" hidden>
+        <div data-modal="scene" data-idx="B" data-title="SCENE">
+          <section class="block">
+            <h2><span class="idx">B1</span>BACKGROUND</h2>
+            <div class="seg" id="bg-kind" role="radiogroup">
+              <button data-value="color">COLOUR</button>
+              <button data-value="transparent">CLEAR</button>
+              <button data-value="image">IMAGE</button>
+              <button data-value="environment" title="3D environment (below)">3D<kbd>E</kbd></button>
+            </div>
+            <div class="row swatches" id="swatches">
+              <button data-color="#00ff00" style="background:#00ff00" title="Chroma green"></button>
+              <button data-color="#0000ff" style="background:#0000ff" title="Chroma blue"></button>
+              <button data-color="#ff00ff" style="background:#ff00ff" title="Magenta"></button>
+              <button data-color="#000000" style="background:#000000" title="Black"></button>
+              <button data-color="#ffffff" style="background:#ffffff" title="White"></button>
+              <input type="color" id="bg-color" title="Custom colour" />
+            </div>
+            <div class="row btns"><button id="btn-bg-image" class="btn">PICK IMAGE</button></div>
+          </section>
+          <section class="block env" id="env-block">
+            <h2><span class="idx">B2</span>ENVIRONMENT</h2>
+            <label class="row"><span class="lbl">SCENE</span>
+              <select id="env-id">
+                <option value="studio">STUDIO CYCLORAMA</option>
+                <option value="room">COSY ROOM</option>
+                <option value="moor">MOOR AT DUSK</option>
+                <option value="forest">NIGHT CLEARING</option>
+                <option value="neon">NEON GRID</option>
+                <option value="hall">CONCRETE HALL</option>
+                <option value="custom">CUSTOM (GLB + HDR)</option>
+              </select>
+            </label>
+            <div class="row"><span class="lbl">QUALITY</span>
+              <div class="seg" id="env-quality" role="radiogroup">
+                <button data-value="low">LOW</button>
+                <button data-value="high">HIGH</button>
+              </div>
+            </div>
+            <div class="env-custom" id="env-custom">
+              <div class="row btns">
+                <button id="btn-env-scene" class="btn" title="Load a .glb / .gltf scene (or drop one on the window)">SCENE</button>
+                <button id="btn-env-sky" class="btn" title="Load an equirectangular .hdr / .exr sky (lights the scene)">SKY</button>
+                <button id="btn-env-sky-clear" class="btn ghost" title="Remove the custom sky">NO SKY</button>
+              </div>
+              <div class="row"><span class="lbl">SCENE FILE</span><span id="env-scene-name" class="val">NONE</span></div>
+              <div class="row"><span class="lbl">SKY FILE</span><span id="env-sky-name" class="val">NONE</span></div>
+              <label class="slider"><span class="lbl">SCALE</span><input type="range" id="env-scale" min="-2" max="2" step="0.01" /><output id="env-scale-out"></output></label>
+              <label class="slider"><span class="lbl">POS X</span><input type="range" id="env-x" min="-10" max="10" step="0.05" /><output id="env-x-out"></output></label>
+              <label class="slider"><span class="lbl">POS Y</span><input type="range" id="env-y" min="-10" max="10" step="0.05" /><output id="env-y-out"></output></label>
+              <label class="slider"><span class="lbl">POS Z</span><input type="range" id="env-z" min="-10" max="10" step="0.05" /><output id="env-z-out"></output></label>
+              <label class="slider"><span class="lbl">ROTATE °</span><input type="range" id="env-rot" min="-180" max="180" step="1" /><output id="env-rot-out"></output></label>
+            </div>
+            <h3>LIGHT</h3>
+            <div class="seg" id="env-style" role="radiogroup">
+              <button data-value="scene" title="The scene's own lighting">SCENE</button>
+              <button data-value="key" title="Strong key, soft fill">KEY</button>
+              <button data-value="rim" title="Back-lit rim, low key">RIM</button>
+              <button data-value="soft" title="Even ambient light">SOFT</button>
+            </div>
+            <label class="slider"><span class="lbl">INTENSITY</span><input type="range" id="env-intensity" min="0.25" max="2" step="0.01" /><output id="env-intensity-out"></output></label>
+            <label class="slider"><span class="lbl">TEMP K</span><input type="range" id="env-temp" min="2000" max="12000" step="100" /><output id="env-temp-out"></output></label>
+            <h3>ATMOSPHERE</h3>
+            <label class="slider"><span class="lbl">FOG</span><input type="range" id="env-fog" min="0" max="1" step="0.01" /><output id="env-fog-out"></output></label>
+            <label class="check"><input type="checkbox" id="env-shadow" /><span>GROUND SHADOW</span></label>
+            <label class="slider"><span class="lbl">FLOOR M</span><input type="range" id="env-floor" min="-1" max="1" step="0.01" /><output id="env-floor-out"></output></label>
+            <h3>CAMERA</h3>
+            <label class="check"><input type="checkbox" id="env-sway" /><span>IDLE SWAY</span></label>
+            <label class="check"><input type="checkbox" id="env-dof" /><span>DEPTH OF FIELD (HIGH ONLY)</span></label>
+            <div class="row btns"><button id="btn-env-reset" class="btn ghost" title="Reset this scene's look and placement">RESET THIS SCENE</button></div>
+          </section>
+        </div>
+        <div data-modal="face" data-idx="F" data-title="FACE">
+          <section class="block" id="tab-face">
+            <div class="bs-head"><span>BLENDSHAPE</span><span>OUT <i>│RAW</i></span><span>GAIN</span><span>CURVE</span></div>
+            <div id="bs-list" class="bs-list"></div>
+          </section>
+        </div>
+        <div data-modal="physics" data-idx="P" data-title="PHYSICS">
+          <section class="block" id="tab-physics">
+            <div class="seg" id="phys-mode" role="radiogroup">
+              <button data-value="off">OFF<kbd>8</kbd></button>
+              <button data-value="stiff">STIFF<kbd>9</kbd></button>
+              <button data-value="normal">NORMAL<kbd>0</kbd></button>
+            </div>
+            <label class="check"><input type="checkbox" id="phys-stabilise" /><span>STABILISER (FIXED STEP + CLAMPS)</span></label>
+            <label class="slider"><span class="lbl">MAX SPEED M/S</span><input type="range" id="phys-maxspeed" min="0.5" max="10" step="0.1" /><output id="phys-maxspeed-out"></output></label>
+            <label class="slider"><span class="lbl">INERTIA</span><input type="range" id="phys-inertia" min="0" max="1" step="0.01" /><output id="phys-inertia-out"></output></label>
+            <label class="slider"><span class="lbl">COLLIDE DAMP</span><input type="range" id="phys-coldamp" min="0" max="1" step="0.01" /><output id="phys-coldamp-out"></output></label>
+            <label class="row"><span class="lbl">SUBSTEPS</span>
+              <select id="phys-substeps"><option value="1">1 (60 HZ)</option><option value="2">2 (120 HZ)</option><option value="3">3 (180 HZ)</option><option value="4">4 (240 HZ)</option></select>
+            </label>
+            <div class="row btns"><button id="btn-phys-reset" class="btn">SETTLE <kbd>R</kbd></button><button id="btn-phys-clear" class="btn ghost">RESET OVERRIDES</button></div>
+            <div id="cloth-ui"></div>
+            <h3>CHAINS <span id="chain-count"></span></h3>
+            <div class="chain-head"><span>ON</span><span>CHAIN</span><span>STIF</span><span>DRAG</span><span>GRAV</span></div>
+            <div id="chain-list" class="chain-list"></div>
+            <h3>COLLIDERS <span id="collider-count"></span></h3>
+            <div id="collider-list" class="collider-list"></div>
+          </section>
+        </div>
+        <!-- MOTION, HOTKEYS, LIP SYNC: built by src/anim/features.ts -->
+        <div data-modal="motion" data-idx="A" data-title="MOTION"><section class="block" id="motion-block"></section></div>
+        <div data-modal="hotkeys" data-idx="K" data-title="HOTKEYS"><section class="block" id="hotkeys-block"></section></div>
+        <div data-modal="lipsync" data-idx="S" data-title="LIP SYNC"><section class="block" id="lipsync-block"></section></div>
+        <div data-modal="vmc" data-idx="N" data-title="VMC OUT">
+          <section class="block">
+            <h2><span class="idx">N</span>VMC OUT</h2>
+            <label class="check"><input type="checkbox" id="vmc-enabled" /><span>SEND VMC (OSC/UDP)</span><kbd>V</kbd></label>
+            <label class="row"><span class="lbl">HOST</span><input id="vmc-host" type="text" spellcheck="false" /></label>
+            <label class="row"><span class="lbl">PORT</span><input id="vmc-port" type="number" min="1" max="65535" /></label>
+            <label class="check" title="Blink, A/I/U/E/O, Joy... derived from the ARKit values, for receivers that only read presets"><input type="checkbox" id="vmc-presets" /><span>ALSO SEND VRM PRESETS</span></label>
+            <div class="row"><span class="lbl">TX</span><span id="vmc-stats" class="val">OFF</span></div>
+          </section>
+        </div>
+        <div data-modal="model-info" data-idx="I" data-title="MODEL INFO">
+          <div class="mi-body" id="model-info-body"></div>
+        </div>
+      </div>
 
       <!-- 00 LIBRARY: the home screen (src/app/home.ts). Cards come from #tpl-card. -->
       <section class="home" id="home" aria-label="Model library">
@@ -297,17 +348,6 @@
         </footer>
       </section>
 
-      <footer class="bar bottom" id="debug">
-        <span><b>RENDER</b> <i id="d-render">-</i></span>
-        <span><b>TRACK</b> <i id="d-track">-</i></span>
-        <span><b>LATENCY</b> <i id="d-latency">-</i></span>
-        <span><b>INFER F/P/H</b> <i id="d-infer">-</i></span>
-        <span><b>GESTURE</b> <i id="d-gesture">-</i></span>
-        <span><b>ML</b> <i id="d-where">-</i></span>
-        <span><b>PHYS</b> <i id="d-phys">-</i></span>
-        <span class="grow"></span>
-        <span><kbd>D</kbd> DEBUG</span>
-      </footer>
     </div>
     <template id="tpl-card">
       <article class="card" role="gridcell" tabindex="-1">
@@ -340,6 +380,21 @@
           <button class="act danger" data-act="remove">REMOVE FROM LIBRARY <kbd>DEL</kbd></button>
         </div>
       </article>
+    </template>
+    <!-- Reusable stage components (src/app/ui.ts, src/app/modal.ts). -->
+    <template id="tpl-modal">
+      <dialog class="pm">
+        <h2><span class="idx"></span><span class="pm-title"></span><span class="pm-extra"></span><button type="button" class="x pm-close" title="Close (Esc / gamepad B)">×</button></h2>
+        <div class="pm-body"></div>
+        <footer class="pm-keys"><span><kbd>TAB</kbd> / <kbd>✚</kbd> MOVE</span><span><kbd>ESC</kbd> / <kbd>B</kbd> CLOSE</span></footer>
+      </dialog>
+    </template>
+    <template id="tpl-badge"><span class="badge" role="img"></span></template>
+    <template id="tpl-csec">
+      <section class="csec">
+        <button type="button" class="csec-head" aria-expanded="true"><span class="idx"></span><span class="csec-title"></span><span class="csec-state"></span><span class="csec-chev" aria-hidden="true"></span></button>
+        <div class="csec-body"></div>
+      </section>
     </template>
     <dialog class="modal" id="home-confirm">
       <h2><span class="idx">!</span>REMOVE FROM LIBRARY</h2>

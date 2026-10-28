@@ -59,6 +59,9 @@ import type { PhysicsMode } from './physics/stableSprings';
 import { buildClothUI } from './app/clothUi';
 import { installBackgroundLoop } from './app/backgroundLoop';
 import { mountVcamControls } from './app/vcamControls';
+import { createModal, openModal, type Modal } from './app/modal';
+import { mountCardSection } from './app/ui';
+import { PadNav } from './app/padNav';
 
 const params = new URLSearchParams(location.search);
 for (const [k, v] of new URLSearchParams(await devQuery())) params.set(k, v);
@@ -76,6 +79,31 @@ if (params.has('vcam')) settings.vcam.enabled = params.get('vcam') === '1';
 const urlVcamRes = params.get('vcamres') as VcamResolution | null;
 if (urlVcamRes && urlVcamRes in VCAM_RESOLUTIONS) settings.vcam.resolution = urlVcamRes;
 const persist = () => saveSettings(settings);
+
+// ---------------------------------------------------------------- stage layout: modals + camera card
+// Every settings window is the one modal component (src/app/modal.ts) holding
+// a group from #modal-src; the top-bar button with the same data-modal opens it.
+const modals: Record<string, Modal> = {};
+for (const group of [...document.querySelectorAll<HTMLElement>('#modal-src > [data-modal]')]) {
+  const id = group.dataset.modal!;
+  const buttons = [...document.querySelectorAll<HTMLElement>(`#settings-nav [data-modal="${id}"]`)];
+  modals[id] = createModal({ id: id === 'model-info' ? 'model-info' : `modal-${id}`, idx: group.dataset.idx ?? '', title: group.dataset.title ?? id.toUpperCase(), content: [...group.childNodes], buttons });
+  modals[id].el.dataset.modal = id;
+  group.remove();
+}
+/** Toggle a settings modal from its shortcut key (focus returns to its top-bar button). */
+function toggleModal(id: string): void {
+  modals[id]?.toggle(document.querySelector<HTMLElement>(`#settings-nav [data-modal="${id}"]`));
+}
+const camSections = Object.fromEntries(
+  [...document.querySelectorAll<HTMLElement>('#cam-sections > .csec-mount')].map((m) => {
+    const key = m.dataset.csec as 'source' | 'vcam';
+    return [key, mountCardSection(m, settings.ui.cam[key] ?? true, (open) => {
+      settings.ui.cam[key] = open;
+      persist();
+    })];
+  }),
+);
 
 // ---------------------------------------------------------------- core objects
 const viewer = new Viewer($('stage'));
@@ -199,7 +227,8 @@ async function loadModel(buf: ArrayBuffer, label: string, path: string | null): 
       settings.lastModelPath = path;
       persist();
     }
-    $('model-name').textContent = `${a.name} [${label}]`;
+    $('model-name').textContent = a.name || label;
+    $('model-name').title = `${a.name} [${label}]`;
     const ps = a.perfectSync.size;
     $('sync-mode').textContent = a.usePerfectSync
       ? `PERFECT SYNC ${ps}/52`
@@ -241,6 +270,10 @@ async function startSource(): Promise<void> {
     if (params.get('source') === 'file') {
       const src = params.get('src') ?? '/test-assets/clip.webm';
       info = await source.openFile(await mediaUrl(src), params.get('loop') !== '0');
+      $('cam-pick').classList.add('hidden');
+      $('cam-file').classList.remove('hidden');
+      $('cam-file').textContent = `FILE ${baseName(src)}`;
+      $('cam-file').title = src;
     } else {
       setStatus('OPENING CAMERA');
       info = await source.openCamera(settings.cameraId, settings.resolution, settings.trackFps);
@@ -248,7 +281,7 @@ async function startSource(): Promise<void> {
     }
     $('cam-actual').textContent = info;
     $('preview-info').textContent = info;
-    $('btn-camera').textContent = 'RESTART CAMERA';
+    $('btn-camera').textContent = source.kind === 'file' ? 'RESTART CLIP' : 'RESTART';
     tracker.start(source.video);
     setStatus(avatar ? 'TRACKING' : 'TRACKING (NO MODEL)');
   } catch (e) {
@@ -356,7 +389,7 @@ function selectBind(id: string, get: () => string, set: (v: string) => void): vo
 }
 function refreshInputs(): void {
   $<HTMLInputElement>('mirror').checked = settings.mirror;
-  $<HTMLInputElement>('preview').checked = settings.preview;
+  $('btn-preview-min').setAttribute('aria-pressed', String(!settings.preview));
   $<HTMLInputElement>('vmc-enabled').checked = settings.vmc.enabled;
   $<HTMLInputElement>('vcam-enabled').checked = settings.vcam.enabled;
   segSet('mode', settings.mode);
@@ -381,7 +414,7 @@ $<HTMLSelectElement>('camera').addEventListener('change', (e) => {
 });
 $('btn-camera').addEventListener('click', () => startSource());
 checkBind('mirror', () => settings.mirror, (v) => setMirror(v));
-checkBind('preview', () => settings.preview, (v) => setPreview(v));
+$('btn-preview-min').addEventListener('click', () => setPreview(!settings.preview));
 
 function setMirror(v: boolean): void {
   settings.mirror = v;
@@ -394,7 +427,8 @@ function setMirror(v: boolean): void {
 function setPreview(v: boolean): void {
   settings.preview = v;
   tracker.opts.wantFaceLandmarks = v;
-  $('preview-box').classList.toggle('hidden', !v);
+  // Off = the card minimized to a strip; the camera and tracking keep running.
+  $('preview-box').classList.toggle('min', !v);
   persist();
   refreshInputs();
 }
@@ -674,18 +708,6 @@ setInterval(() => {
   if (!document.body.classList.contains('capture')) refreshVcamStatus();
 }, 3000);
 
-// ---------------------------------------------------------------- tabs
-function setTab(t: 'face' | 'physics'): void {
-  settings.ui.tab = t;
-  persist();
-  document.querySelectorAll<HTMLButtonElement>('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
-  $('tab-face').classList.toggle('on', t === 'face');
-  $('tab-physics').classList.toggle('on', t === 'physics');
-}
-document.querySelectorAll<HTMLButtonElement>('.tabs button').forEach((b) =>
-  b.addEventListener('click', () => setTab(b.dataset.tab as 'face' | 'physics')),
-);
-
 // ---------------------------------------------------------------- blendshape list
 interface BsRow {
   name: string;
@@ -852,6 +874,7 @@ function buildPhysicsUI(): void {
 
 // ---------------------------------------------------------------- capture view
 function setCapture(on: boolean): void {
+  if (on) openModal()?.close();
   document.body.classList.toggle('capture', on);
   const hint = $('capture-hint');
   if (on) {
@@ -869,6 +892,8 @@ function setDebug(on: boolean): void {
   persist();
 }
 
+$('btn-env-toggle').addEventListener('click', () => envUi.toggle());
+
 motion = await mountMotion({ settings, persist, setStatus, stage: $('stage'), gestures, debug: params.get('debuglog') === '1' ? debugLog : undefined });
 
 // ---------------------------------------------------------------- home (model library, src/app/home.ts)
@@ -876,11 +901,41 @@ const home = await mountHome({
   loadModel,
   setStatus,
   lastModelPath: settings.lastModelPath,
-  onShow: () => requestAnimationFrame(() => viewer.resize()),
+  onShow: (on) => {
+    if (on) openModal()?.close();
+    requestAnimationFrame(() => viewer.resize());
+  },
 });
 
+// ---------------------------------------------------------------- gamepad UI navigation (src/app/padNav.ts)
+const padNav = new PadNav({
+  homeVisible: () => home.visible,
+  menuStart: () => document.querySelector<HTMLElement>('#settings-nav .btn'),
+  stageRoot: () => $('app'),
+});
+if (motion) motion.hotkeys.ui = padNav;
+
 // ---------------------------------------------------------------- keyboard
+/** Stage shortcut key -> settings modal. */
+const MODAL_KEYS: Record<string, string> = { b: 'scene', f: 'face', p: 'physics', a: 'motion', k: 'hotkeys', s: 'lipsync', n: 'vmc' };
 window.addEventListener('keydown', (e) => {
+  // A modal is open: Esc (or its own key) closes it; stage shortcuts wait.
+  const m = openModal();
+  if (m) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      m.close();
+      return;
+    }
+    const t = e.target as HTMLElement;
+    const typing = t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !['checkbox', 'range'].includes((t as HTMLInputElement).type));
+    const k = e.key.toLowerCase();
+    if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && (MODAL_KEYS[k] === m.el.dataset.modal || (k === 'i' && m.id === 'model-info'))) {
+      e.preventDefault();
+      m.close();
+    }
+    return;
+  }
   const tag = (e.target as HTMLElement).tagName;
   if (tag === 'INPUT' && (e.target as HTMLInputElement).type !== 'checkbox' && (e.target as HTMLInputElement).type !== 'range') return;
   if (tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -902,8 +957,7 @@ window.addEventListener('keydown', (e) => {
     applyVmc();
   } else if (k === 'w') setVcam(!settings.vcam.enabled);
   else if (k === 'd') setDebug(!settings.ui.debug);
-  else if (k === 'f') setTab('face');
-  else if (k === 'p') setTab('physics');
+  else if (MODAL_KEYS[k]) toggleModal(MODAL_KEYS[k]);
   else if (k === 'r') avatar?.physics.reset();
   else if (k === 'e') envUi.toggle();
   else if (k === '1') setMode('face');
@@ -1005,7 +1059,39 @@ function tick(now: number): void {
     $('d-phys').textContent = avatar
       ? `${settings.physics.mode.toUpperCase()} ${avatar.physics.lastSteps} STEP/F`
       : '-';
+    updateStatusBar();
   }
+}
+
+// ---------------------------------------------------------------- bottom bar: model status
+function trackState(): [string, boolean] {
+  const s = tracker.stats;
+  if (source.kind === 'none') return ['NO SOURCE', true];
+  if (!s.face.fps && !s.body.fps) return ['WAITING', false];
+  if (!lastFace?.face) return ['LOST', true];
+  if (settings.mode !== 'face' && lastBody && !lastBody.pose) return ['FACE ONLY', true];
+  if (settings.mode === 'hands' && !(lastBody?.hands?.length)) return ['NO HANDS', false];
+  return ['TRACKING', false];
+}
+function setCell(id: string, text: string, hot = false): void {
+  const el = $(id);
+  if (el.textContent !== text) {
+    el.textContent = text;
+    el.title = text;
+  }
+  el.classList.toggle('hot', hot);
+}
+function updateStatusBar(): void {
+  const [ts, bad] = trackState();
+  setCell('track-state', ts, bad);
+  const layer = motion?.layer;
+  const emote = layer?.playing[0];
+  const exprs = layer?.overlay.active ?? [];
+  setCell('expr-state', emote ? `▶ ${motion!.library.label(emote)}` : exprs.length ? exprs.join(' + ').toUpperCase() : '-', !!(emote || exprs.length));
+  const outs = [settings.vmc.enabled && 'VMC', vcam.running && 'VCAM'].filter(Boolean) as string[];
+  setCell('out-state', outs.length ? outs.join(' + ') : 'OFF', outs.length > 0);
+  camSections.vcam?.setState(vcam.running ? 'ON' : settings.vcam.enabled ? '…' : 'OFF', vcam.running);
+  $('btn-env-toggle').classList.toggle('on', settings.background.kind === 'environment');
 }
 
 // ?debuglog=1: print a stats line every 2 s (stdout in the desktop app).
@@ -1042,9 +1128,8 @@ setInterval(pollVmc, 1000);
 
 // ---------------------------------------------------------------- boot
 refreshInputs();
-setTab(settings.ui.tab);
 setDebug(settings.ui.debug);
-$('preview-box').classList.toggle('hidden', !settings.preview);
+$('preview-box').classList.toggle('min', !settings.preview);
 $<HTMLSelectElement>('phys-substeps').value = String(settings.physics.substeps);
 await applyBackground();
 buildBlendshapeList();
@@ -1094,6 +1179,8 @@ Object.assign(window, {
     calibrate,
     home,
     motion,
+    padNav,
+    modals,
     vcam,
     env: envUi,
     frame: (f: Framing) => {

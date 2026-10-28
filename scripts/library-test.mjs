@@ -223,7 +223,7 @@ if (restrictedName) {
   await page.waitForTimeout(2500);
   check(await page.isVisible('#lic-notice'), 'one-time licence notice on load (non-blocking)');
   check((await page.evaluate(() => !!window.__puppet.avatar)), 'model loaded despite the restriction');
-  check(await page.isVisible('#btn-model-info .lic.warn'), 'header licence badge');
+  check(await page.isVisible('#btn-model-info .badge.lic-letter.warn'), 'bottom-bar licence letter badge (accent for restricted)');
   await shot(page, 'stage-licence-notice');
   await page.keyboard.press('i');
   check(await page.isVisible('#model-info'), 'I opens MODEL INFO with the licence');
