@@ -37,6 +37,13 @@ export interface DriveOptions {
   presetOptions: PresetOptions;
   /** Bone follow rate, 1/s (higher = snappier). */
   followRate: number;
+  /**
+   * Follow rate for the arms, hands and fingers, 1/s. Faster than the torso:
+   * the one-euro filters before it already smooth them, and every 1/rate
+   * here is added lag. The app sets it from the smoothing setting
+   * (limbFollowRateFor).
+   */
+  limbFollowRate: number;
   /** Max torso/hips angular speed, rad/s (keeps tracking jumps out of physics). */
   maxTorsoSpeed: number;
   /** Body/finger smoothing, 0..1 (the app's smoothing setting). */
@@ -49,9 +56,16 @@ export const DEFAULT_DRIVE: DriveOptions = {
   gazeGain: 1,
   presetOptions: { emotions: true, emotionDeadzone: 0.25 },
   followRate: 16,
+  limbFollowRate: 32,
   maxTorsoSpeed: 4,
   smoothing: 0.5,
 };
+
+/**
+ * Limb follow rate for the smoothing setting (0..1): 32/s at the default 0.5,
+ * down to the torso's 16/s at 1 (steadier, ~30 ms more lag), up to 48/s at 0.
+ */
+export const limbFollowRateFor = (smoothing: number) => 16 + 32 * (1 - Math.min(1, Math.max(0, smoothing)));
 
 const TORSO = new Set(['hips', 'spine', 'chest', 'upperChest']);
 
@@ -396,6 +410,7 @@ export class Avatar {
     // Move bones toward targets; torso bones are also speed-limited so a
     // tracking jump becomes a bounded motion before physics sees it.
     const k = 1 - Math.exp(-d.followRate * dt);
+    const kLimb = 1 - Math.exp(-d.limbFollowRate * dt);
     for (const [b, target] of this.targets) {
       if (b === 'neck' || b === 'head') continue;
       const node = this.bones.get(b);
@@ -405,7 +420,7 @@ export class Avatar {
         const q = node.quaternion.clone().slerp(t, k);
         node.quaternion.rotateTowards(q, d.maxTorsoSpeed * dt);
       } else {
-        node.quaternion.slerp(t, k);
+        node.quaternion.slerp(t, kLimb);
       }
     }
 

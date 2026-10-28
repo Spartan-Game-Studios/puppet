@@ -2,13 +2,16 @@
  * Main-thread side of tracking: pulls frames from a <video> and ships them to
  * three workers, 'face', 'body' (pose) and 'hands', which run in parallel.
  * Each pipeline has at most one frame in flight and is capped at `maxFps`.
- * Face and body results go to `onResult` as they arrive; hand results are
- * attached to the next body result (the hands worker gets the latest pose as
- * a hint for finding hands). Falls back to running MediaPipe on the main
- * thread (pose then hands in one step) if workers can't start.
+ * Face and body results go to `onResult` as they arrive. Hands (whose worker
+ * gets the latest pose as a hint for finding hands) are applied as soon as
+ * they arrive: the last body result is sent again with them (`handsUpdate`),
+ * and each new body result carries the latest hands until newer ones come
+ * (see HandsMerge). Falls back to running MediaPipe on the main thread (pose
+ * then hands in one step) if workers can't start.
  */
 import type { BodyMode, FromWorker, Pipeline, PoseResult, TrackerResult } from './protocol';
 import { createLandmarkers, detect, setPoseModel, type LandmarkerSet } from './landmarkers';
+import { HandsMerge } from './handsMerge';
 
 export interface PipelineStats {
   fps: number;
@@ -64,7 +67,7 @@ export class Tracker {
   };
   private main: LandmarkerSet | null = null;
   private latestPose: PoseResult | null = null;
-  private latestHands: TrackerResult | null = null;
+  private merge = new HandsMerge();
   private video: HTMLVideoElement | null = null;
   private lastT = 0;
   private raf = 0;
@@ -136,18 +139,13 @@ export class Tracker {
       m.videoTime = lane.sentVideoTime;
       this.account(lane, m);
       if (pipeline === 'hands') {
-        this.latestHands = m;
+        const b = this.merge.onHands(m);
+        if (b) this.onResult(b);
         return;
       }
       if (pipeline === 'body') {
         this.latestPose = m.pose ?? null;
-        const h = this.latestHands;
-        // Hands found on a frame at most ~2 frames older than this pose.
-        if (this.lanes.hands.worker && h && m.t - h.t < 80) {
-          m.hands = h.hands;
-          m.handsRan = h.handsRan;
-          m.timings.hands = h.timings.hands;
-        }
+        if (this.lanes.hands.worker) m = this.merge.onBody(m);
       }
       this.onResult(m);
     } else if (m.type === 'error') {

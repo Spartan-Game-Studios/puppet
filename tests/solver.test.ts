@@ -233,6 +233,26 @@ describe('BodySolver: depth from bone lengths', () => {
     const foreRaw = dirOf(raw.bones.get('leftUpperArm')!.clone().multiply(raw.bones.get('leftLowerArm')!), rest.leftLowerArm!);
     expect(foreRaw.x).toBeLessThan(0.85);
   });
+  it('the upper arm keeps MediaPipe\'s depth (only the forearm is rebuilt)', () => {
+    // A hanging upper arm projects at nearly its full length, so a rebuilt one
+    // tilts forward on any length overestimate: it is left as MediaPipe has it.
+    const long = pose({
+      11: [0.2, -0.5, 0], 12: [-0.2, -0.5, 0], 13: [0.53, -0.5, 0], 14: [-0.45, -0.5, 0],
+      15: [0.78, -0.5, 0], 16: [-0.7, -0.5, 0], 23: [0.1, 0, 0], 24: [-0.1, 0, 0],
+    });
+    const hang = pose({
+      11: [0.2, -0.5, 0], 12: [-0.2, -0.5, 0], 13: [0.22, -0.2, 0.08], 14: [-0.22, -0.2, 0],
+      15: [0.23, 0.05, 0.08], 16: [-0.23, 0.05, 0], 23: [0.1, 0, 0], 24: [-0.1, 0, 0],
+    });
+    const s = new BodySolver(rest, { mirror: false, hands: false });
+    let t = 0;
+    for (; t < 0.5; t += 1 / 30) s.solve({ poseWorld: long, poseImage: imageOf(long), aspect: 4 / 3, t }, [['spine', 1]]);
+    const sol = s.solve({ poseWorld: hang, poseImage: imageOf(hang), aspect: 4 / 3, t }, [['spine', 1]]);
+    const raw = new BodySolver(rest, { mirror: false, hands: false, depthFromLengths: false }).solve({ poseWorld: hang }, [['spine', 1]]);
+    const up = dirOf(sol.bones.get('leftUpperArm')!, rest.leftUpperArm!);
+    const upRaw = dirOf(raw.bones.get('leftUpperArm')!, rest.leftUpperArm!);
+    expect(up.distanceTo(upRaw)).toBeLessThan(1e-6);
+  });
 });
 
 describe('BodySolver: occlusion and false wrists', () => {
@@ -248,10 +268,22 @@ describe('BodySolver: occlusion and false wrists', () => {
     const gone = down.map((l, i) => ([13, 15, 17, 19].includes(i) ? { ...l, visibility: 0.05 } : l));
     const weights: number[] = [];
     for (let k = 0; k < 30; k++, t += 1 / 30) weights.push(s.solve({ poseWorld: gone, t }, [['spine', 1]]).armWeight.left);
-    // Holds briefly (hysteresis), then ramps down; never jumps by more than 4/s * dt.
+    // Holds briefly (hysteresis), then ramps down; never jumps by more than limbFadeOut * dt.
     expect(weights[0]).toBe(1);
     expect(weights.at(-1)).toBe(0);
-    for (let k = 1; k < weights.length; k++) expect(weights[k - 1] - weights[k]).toBeLessThanOrEqual(4 / 30 + 1e-9);
+    for (let k = 1; k < weights.length; k++) expect(weights[k - 1] - weights[k]).toBeLessThanOrEqual(s.opts.limbFadeOut / 30 + 1e-9);
+  });
+
+  it('an arm coming into view is followed within a few frames', () => {
+    const s = new BodySolver(rest, { mirror: false, hands: false });
+    const hidden = down.map((l, i) => ([13, 15].includes(i) ? { ...l, visibility: 0.1 } : l));
+    let t = 0;
+    for (; t < 0.5; t += 1 / 30) s.solve({ poseWorld: hidden, t }, [['spine', 1]]);
+    const weights: number[] = [];
+    for (let k = 0; k < 5; k++, t += 1 / 30) weights.push(s.solve({ poseWorld: down, t }, [['spine', 1]]).armWeight.left);
+    // Two frames to confirm, then a short ramp: fully shown by the 5th frame (~0.13 s).
+    expect(weights[0]).toBe(0);
+    expect(weights[4]).toBe(1);
   });
 
   it('a one-frame visibility blip does not switch an arm on', () => {
@@ -318,6 +350,29 @@ describe('BodySolver: fingers', () => {
       [['spine', 1]],
     );
   };
+
+  it('smooths the hand\'s orientation over time, like the fingers', () => {
+    // The whole hand rolls +-6 degrees about the forearm every frame (landmark noise).
+    const roll = (a: number) =>
+      leftHand(0.3).map((l) => {
+        const y = l.y + 0.5, z = l.z;
+        return { ...l, y: -0.5 + y * Math.cos(a) - z * Math.sin(a), z: y * Math.sin(a) + z * Math.cos(a) };
+      });
+    const handWorld = (sol: ReturnType<BodySolver['solve']>) =>
+      ['leftUpperArm', 'leftLowerArm', 'leftHand'].reduce((q, b) => q.multiply(sol.bones.get(b) ?? new Quaternion()), new Quaternion());
+    const spread = (temporal: boolean) => {
+      const s = new BodySolver(handRest, { mirror: false, hands: true });
+      const qs: Quaternion[] = [];
+      for (let k = 0; k < 30; k++) {
+        const lm = roll(k % 2 ? 0.1 : -0.1);
+        const sol = s.solve({ poseWorld: T_POSE, hands: [{ landmarks: lm, worldLandmarks: lm, handedness: 'Right', score: 0.9, userSide: 'left' }], ...(temporal ? { t: k / 30 } : {}) }, [['spine', 1]]);
+        qs.push(handWorld(sol));
+      }
+      return Math.max(...qs.slice(20).map((q, i, a) => (i ? q.angleTo(a[i - 1]) : 0)));
+    };
+    expect(spread(false)).toBeGreaterThan(0.15);
+    expect(spread(true)).toBeLessThan(0.5 * spread(false));
+  });
 
   it('a bent finger bends at its hinge, toward the palm', () => {
     const sol = solveHand(1.0);

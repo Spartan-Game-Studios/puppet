@@ -16,11 +16,11 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
 - **Upper body and hands.** PoseLandmarker world landmarks drive the spine, chest, shoulders and arms. HandLandmarker drives all finger bones. Choose FACE (`1`), +BODY (`2`) or +HANDS (`3`). Legs stay in an idle stance.
   - The solver is Puppet's own: direction vectors against the model's measured rest directions.
     - **Arms:** the elbow is a true hinge (0–150°, never backwards); the plane it bends in sets the upper arm's twist, which is limited and held while the arm is too straight to show it. Part of the wrist twist moves into the forearm. The clavicles follow arm raises and shrugs.
-    - **Depth:** MediaPipe's z is its noisiest axis, so arm and shoulder depth is rebuilt from the 2D image and each bone's tracked length; z only decides the sign.
+    - **Depth:** MediaPipe's z is its noisiest axis, so forearm and shoulder-line depth is rebuilt from the 2D image and each bone's tracked length; z only decides the sign. The upper arm keeps MediaPipe's depth: it mostly hangs near the image plane, where any length error would tilt it forward.
     - **Torso:** lean and twist are solved and limited separately; the twist sits mostly in the upper chest.
-    - **Occlusion:** each arm segment fades in and out with hysteresis. An arm reaching out of frame keeps its upper arm, and an untracked limb eases to idle instead of snapping. A wrist MediaPipe places at the chin with no hand found there is not followed.
-    - **Fingers:** solved as anatomical angles (spread and bend at the knuckle, bend only at the middle and end joints), clamped to their ranges and smoothed per joint. The thumb's twist comes from the plane it bends in, so opposition reads.
-  - **Hands** run in their own worker in parallel with the pose. Each hand is cropped from its last landmarks while tracked (the crop holds still, so MediaPipe's own tracking stays valid) and re-found from the pose wrist otherwise, with a wider retry. A found hand must sit on its own side's wrist, and one hand found by both crops is kept once.
+    - **Occlusion:** each arm segment fades in and out with hysteresis, kept short (two frames to come in, three to go) so it doesn't add lag. An arm reaching out of frame keeps its upper arm, and an untracked limb eases to idle instead of snapping. A wrist MediaPipe places at the chin with no hand found there is not followed.
+    - **Fingers:** solved as anatomical angles (spread and bend at the knuckle, bend only at the middle and end joints), clamped to their ranges and smoothed per joint; the hand's orientation is smoothed the same way. The thumb's twist comes from the plane it bends in, so opposition reads.
+  - **Hands** run in their own worker in parallel with the pose, and each result is applied as soon as it arrives rather than with the next pose. Each hand is cropped from its last landmarks while tracked (the crop holds still, so MediaPipe's own tracking stays valid) and re-found from the pose wrist otherwise, with a wider retry. A found hand must sit on its own side's wrist, and one hand found by both crops is kept once.
   - **Gestures** (HANDS mode): fist, open palm, point, peace, thumbs up, OK and rock, per hand, shown in the debug overlay. They come from the hand landmarks (finger curls, thumb position) through hysteresis, so they don't flicker. Code can subscribe; see [Gesture events](#gesture-events).
   - Pose LITE/FULL switches live.
 - **VMC protocol output** over OSC/UDP from the Rust side (`rosc`). Perfect-sync models also send the 13 VRM 0.x presets derived from the ARKit values, so preset-only receivers don't see a frozen face (see [VMC setup](#vmc-setup)). Messages: `/VMC/Ext/OK`, `/VMC/Ext/T`, `/VMC/Ext/Root/Pos`, `/VMC/Ext/Bone/Pos` (all humanoid bones, Unity coordinates), `/VMC/Ext/Blend/Val` and `/VMC/Ext/Blend/Apply`. Host and port are configurable (default `127.0.0.1:39539`). Bundles are split under 1200 bytes so they also cross a real network.
@@ -245,6 +245,7 @@ The scripts in `scripts/` drive headless Chrome through Playwright, using your i
   - body, 14.6–49 s: the seven gestures held 0.9 s each with transitions (each hand runs its own order), slow finger curls, crossed arms, hands at the face, torso lean and twist, an arm leaving the frame, a T-pose and an arms-out-forearms-up pose.
   - The truth includes each arm bone's direction and every finger joint's bend, measured from the posed model, the held gesture per hand, and whether each hand is in frame. `PUPPET_CLEAN=1` paints out heavy face makeup, which MediaPipe misreads (black lipstick reads as a pucker). `node scripts/render-frames.mjs out/ 16.2 30` renders single moments for a quick look.
 - `PUPPET_MODEL=avatar.vrm node scripts/track-clip.mjs out/ shots/` plays that clip through the real app pipeline (`?source=file`). It reports detection rates, fps, latency and the correlation of each face channel with the truth; for the body section, per segment: hand detection rate, finger-joint error, upper-arm and forearm direction error and elbow error, plus gesture accuracy with a confusion matrix, gesture flicker, jitter at rest, end-to-end lag and peak arm speed. It then screenshots key moments; `PUPPET_VIDEO=1` also records `shots/mirror.mp4`.
+- `PUPPET_RAW=raw.json` with `track-clip.mjs` also saves the raw body and hand results as they reached the main thread; `PUPPET_MODEL=avatar.vrm node scripts/track-replay.mjs out/ raw.json ['{"handsOnArrival":false}' ...]` replays them through the app's body path (hands merge, pose filter, solver, bone follow) in virtual time and reports the body metrics. The input is identical on every replay, so pipeline changes can be compared without the run-to-run noise of playing the clip; each JSON argument is a variant (`harness/replay.ts`, `ReplayOptions`).
 - `node scripts/track-seq.mjs out/` runs the pose and hand models over the clip's frames on the main thread, frame by frame, and prints hand detection per segment: quicker and more repeatable than playing the video.
 - `PUPPET_MODEL=avatar.vrm node scripts/physics-test.mjs` runs the physics stability test below.
 - `PUPPET_MODEL=avatar.vrm node scripts/cloth-test.mjs [out.json]` runs the [cloth benchmark](#cloth-benchmark); `VIDEO=dir` also renders side-by-side videos.
@@ -367,6 +368,33 @@ Measured with `scripts/track-clip.mjs` on the rendered test clip (49 s, 640×480
 - Arm jitter at rest went up on two models: arm depth now comes from the 2D image points, which carry their own noise.
 - The arm-leaving-the-frame and T-pose segments are hard on the rendered footage: MediaPipe's pose model loses or misplaces an arm stretched out of view, and on the caped model it places the elbow inside the cape.
 - Rendered footage is not a webcam: anime hands, gloves and capes are harder for MediaPipe than real hands. Real webcam footage was not available.
+
+### Tracking lag
+
+The `end-to-end lag` row is the time shift that best lines up the tracked signal (both elbow bends plus the finger joints' sum / 10) with the truth, so it covers body and hands; the elbows carry most of it. The tracking-quality work above raised it. Measured stage by stage with `scripts/track-replay.mjs` (same captured input every time), what it added and what changed:
+
+- **Limb gates:** an arm waited 0.12 s for confidence, then faded in over 0.25 s, on every re-entry. Now two frames in, three out, with short fades.
+- **Upper-arm depth from bone length:** a hanging upper arm projects at nearly its full length, so a slightly long length estimate tilted it forward: upper-arm error, rest jitter, and elbow-signal error that read as lag. Only the forearm and shoulder line are rebuilt now.
+- **Hands waiting for the next pose:** the hands worker finishes after the pose (about 25 vs 13 ms), so hands were 38–56 ms old when applied; applied on arrival, 23–34 ms.
+- **Bone follow:** arms, hands and fingers eased toward their targets at 16/s (about 60 ms). They now follow at 32/s at the default SMOOTHING (16/s at full SMOOTHING), and the hand's orientation is one-euro filtered like the fingers.
+- The pose one-euro filter and finger smoothing added little; worker scheduling adds 13–22 ms (pose) and 24–35 ms (hands) from frame grab to the main thread. Nothing else buffers a frame.
+
+Replayed through the body path, 13 captures per model, before → after (hand detection is unchanged by construction):
+
+| metric | realistic VRM 0.x | anime VRM 0.x | VRM 1.0, caped |
+|---|---|---|---|
+| end-to-end lag (ms) | 200 → 120 | 237 → 149 | 332 → 163 |
+| upper arm direction error (°) | 18.1 → 15.9 | 18.4 → 16.6 | 22 → 21.4 |
+| forearm direction error (°) | 35.8 → 34.8 | 30.1 → 29.2 | 41.1 → 41 |
+| forearm error, lean and twist (°) | 55.6 → 57.3 | 42.1 → 45.9 | 53.6 → 59.1 |
+| forearm error, arm leaving frame (°) | 48.2 → 51.8 | 55.9 → 61.6 | 91.9 → 94.3 |
+| forearm error, 90° abduction (°) | 34.9 → 29.3 | 48.5 → 37.2 | 49 → 41.6 |
+| finger joint error (°) | 16.9 → 16.2 | 22.4 → 22.3 | 20.3 → 19.4 |
+| gesture accuracy (%) | 89.7 → 90.6 | 74.4 → 74.5 | 78.8 → 79.9 |
+| jitter at rest, arms (°) | 1.9 → 2.4 | 2.9 → 4.5 | 2.6 → 3.6 |
+| jitter at rest, fingers (°) | 1.6 → 2.8 | 2.4 → 4.5 | 1.5 → 2.5 |
+
+The captures span a loaded and a quiet machine; on the three quiet ones (hands at 27–29 fps, as in the table above) the lag is 100 / 127 / 180 ms. The extra rest jitter is the price of the faster follow. SMOOTHING at 1 (on the same quiet captures) gives less jitter than before this change (arms 1.4 / 2.1 / 1.8°, fingers 1.0 / 1.9 / 1.4°) at about the old lag (173 / 187 / 213 ms).
 
 ### Compatibility sweep
 

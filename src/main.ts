@@ -19,8 +19,9 @@ import './styles.css';
 
 import { Euler, Quaternion } from 'three';
 import { ARKIT_NAMES, defaultGainCurves } from './core/blendshapes';
-import { OneEuroVector, smoothingToParams } from './core/oneEuro';
-import { Avatar, loadAvatar } from './scene/avatar';
+import { smoothingToParams } from './core/oneEuro';
+import { PoseFilter } from './core/poseFilter';
+import { Avatar, limbFollowRateFor, loadAvatar } from './scene/avatar';
 import { Viewer, type Framing } from './scene/viewer';
 import { FaceProcessor } from './tracking/faceProcessor';
 import { drawPreview } from './tracking/overlay';
@@ -116,9 +117,7 @@ face.mirror = settings.mirror;
 face.gains = settings.gains;
 face.calibration = settings.calibration;
 face.setSmoothing(settings.smoothing);
-const poseFilter = new OneEuroVector(33 * 3);
-// The solver rebuilds arm depth from the 2D image points, so they are smoothed too.
-const poseImageFilter = new OneEuroVector(33 * 2);
+const poseFilter = new PoseFilter();
 const tracker = new Tracker({
   mode: settings.mode,
   maxFps: settings.trackFps,
@@ -144,10 +143,11 @@ tracker.onStatus = (s) => setStatus(s, s.includes('ERROR'));
 
 // ---------------------------------------------------------------- tracking -> avatar
 function updatePoseFilter(): void {
-  const p = smoothingToParams(settings.smoothing * 0.8);
-  poseFilter.setParams(p);
-  poseImageFilter.setParams(p);
-  if (avatar) avatar.drive.smoothing = settings.smoothing;
+  poseFilter.setParams(smoothingToParams(settings.smoothing * 0.8));
+  if (avatar) {
+    avatar.drive.smoothing = settings.smoothing;
+    avatar.drive.limbFollowRate = limbFollowRateFor(settings.smoothing);
+  }
 }
 updatePoseFilter();
 
@@ -164,15 +164,13 @@ tracker.onResult = (r) => {
   } else {
     lastBody = r;
     if (avatar && settings.mode !== 'face' && r.pose) {
-      const flat = r.pose.world.flatMap((l) => [l.x, l.y, l.z]);
-      const f = poseFilter.filter(flat, t);
-      const world = r.pose.world.map((l, i) => ({ x: f[3 * i], y: f[3 * i + 1], z: f[3 * i + 2], visibility: l.visibility }));
-      const fi = poseImageFilter.filter(r.pose.image.flatMap((l) => [l.x, l.y]), t);
-      const image = r.pose.image.map((l, i) => ({ x: fi[2 * i], y: fi[2 * i + 1], z: l.z, visibility: l.visibility }));
-      avatar.setBody({ poseWorld: world, poseImage: image, hands: settings.mode === 'hands' ? (r.hands ?? []) : [], aspect: r.width / r.height });
+      // A hands update re-sends a pose that is already filtered.
+      const pose = (r.handsUpdate && poseFilter.last) || poseFilter.filter(r.pose, t);
+      avatar.setBody({ poseWorld: pose.world, poseImage: pose.image, hands: settings.mode === 'hands' ? (r.hands ?? []) : [], aspect: r.width / r.height });
     }
     gestures.update(settings.mode === 'hands' ? (r.hands ?? []) : [], r.t);
-    if (record && avatar) {
+    // One row per pose (a hands update shows up in the next row's rig).
+    if (record && avatar && !r.handsUpdate) {
       record.push({ body: true, vt: r.videoTime, hands: (r.hands ?? []).map((h) => h.userSide ?? h.handedness), handsRan: !!r.handsRan, rig: avatar.probe(), gestures: { ...gestures.current } });
     }
   }
@@ -259,6 +257,7 @@ function applyDrive(a: Avatar): void {
   a.drive.mode = settings.mode;
   a.drive.mirror = settings.mirror;
   a.drive.smoothing = settings.smoothing;
+  a.drive.limbFollowRate = limbFollowRateFor(settings.smoothing);
   a.drive.gazeGain = settings.gazeGain;
   a.drive.presetOptions.emotions = settings.emotions;
 }
