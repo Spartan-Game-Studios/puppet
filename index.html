@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Puppet</title>
+  </head>
+  <body>
+    <div id="app" class="app">
+      <header class="bar top">
+        <div class="brand">PUPPET<span class="ver">V0.1</span></div>
+        <button id="btn-open" class="btn" title="Open a .vrm file">OPEN VRM <kbd>O</kbd></button>
+        <div class="cell"><span class="lbl">MODEL</span><span id="model-name" class="val">NONE</span></div>
+        <div class="cell"><span class="lbl">EXPR</span><span id="sync-mode" class="val">-</span></div>
+        <div class="cell grow"><span class="lbl">STATUS</span><span id="status" class="val">BOOTING</span></div>
+        <button id="btn-capture" class="btn accent" title="Hide all UI for OBS window capture">CAPTURE VIEW <kbd>H</kbd></button>
+      </header>
+
+      <aside class="panel left">
+        <section class="block">
+          <h2><span class="idx">01</span>SOURCE</h2>
+          <label class="row"><span class="lbl">CAMERA</span><select id="camera"></select></label>
+          <label class="row"><span class="lbl">RES</span>
+            <select id="resolution">
+              <option value="640x480">640×480</option>
+              <option value="1280x720">1280×720</option>
+              <option value="1920x1080">1920×1080</option>
+            </select>
+          </label>
+          <label class="row"><span class="lbl">TRACK FPS</span>
+            <select id="track-fps">
+              <option value="15">15</option>
+              <option value="24">24</option>
+              <option value="30">30</option>
+              <option value="60">60</option>
+            </select>
+          </label>
+          <div class="row"><span class="lbl">ACTUAL</span><span id="cam-actual" class="val">-</span></div>
+          <div class="row btns">
+            <button id="btn-camera" class="btn">START CAMERA</button>
+          </div>
+          <label class="check"><input type="checkbox" id="mirror" /><span>MIRROR</span><kbd>M</kbd></label>
+          <label class="check"><input type="checkbox" id="preview" /><span>TRACKING PREVIEW</span><kbd>T</kbd></label>
+        </section>
+
+        <section class="block">
+          <h2><span class="idx">02</span>TRACKING</h2>
+          <div class="seg" id="mode" role="radiogroup">
+            <button data-value="face">FACE<kbd>1</kbd></button>
+            <button data-value="upper">+BODY<kbd>2</kbd></button>
+            <button data-value="hands">+HANDS<kbd>3</kbd></button>
+          </div>
+          <label class="row"><span class="lbl">POSE MODEL</span>
+            <select id="pose-model">
+              <option value="lite">LITE (FAST)</option>
+              <option value="full">FULL (ACCURATE)</option>
+            </select>
+          </label>
+          <label class="slider"><span class="lbl">SMOOTHING</span><input type="range" id="smoothing" min="0" max="1" step="0.01" /><output id="smoothing-out"></output></label>
+          <label class="slider"><span class="lbl">GAZE GAIN</span><input type="range" id="gaze-gain" min="0" max="2" step="0.05" /><output id="gaze-gain-out"></output></label>
+          <label class="check"><input type="checkbox" id="emotions" /><span>EMOTIONS (PRESET MODELS)</span></label>
+          <div class="row btns">
+            <button id="btn-calibrate" class="btn">CALIBRATE <kbd>C</kbd></button>
+            <button id="btn-calib-clear" class="btn ghost" title="Clear calibration">CLR</button>
+          </div>
+          <div class="row"><span class="lbl">CALIB</span><span id="calib-state" class="val">NONE</span></div>
+        </section>
+
+        <section class="block">
+          <h2><span class="idx">03</span>BACKGROUND</h2>
+          <div class="seg" id="bg-kind" role="radiogroup">
+            <button data-value="color">COLOUR</button>
+            <button data-value="transparent">CLEAR</button>
+            <button data-value="image">IMAGE</button>
+          </div>
+          <div class="row swatches" id="swatches">
+            <button data-color="#00ff00" style="background:#00ff00" title="Chroma green"></button>
+            <button data-color="#0000ff" style="background:#0000ff" title="Chroma blue"></button>
+            <button data-color="#ff00ff" style="background:#ff00ff" title="Magenta"></button>
+            <button data-color="#000000" style="background:#000000" title="Black"></button>
+            <button data-color="#ffffff" style="background:#ffffff" title="White"></button>
+            <input type="color" id="bg-color" title="Custom colour" />
+          </div>
+          <div class="row btns"><button id="btn-bg-image" class="btn">PICK IMAGE</button></div>
+          <div class="seg" id="framing" role="radiogroup">
+            <button data-value="bust">BUST</button>
+            <button data-value="upper">UPPER</button>
+            <button data-value="full">FULL</button>
+          </div>
+        </section>
+
+        <section class="block">
+          <h2><span class="idx">04</span>VMC OUT</h2>
+          <label class="check"><input type="checkbox" id="vmc-enabled" /><span>SEND VMC (OSC/UDP)</span><kbd>V</kbd></label>
+          <label class="row"><span class="lbl">HOST</span><input id="vmc-host" type="text" spellcheck="false" /></label>
+          <label class="row"><span class="lbl">PORT</span><input id="vmc-port" type="number" min="1" max="65535" /></label>
+          <div class="row"><span class="lbl">TX</span><span id="vmc-stats" class="val">OFF</span></div>
+        </section>
+      </aside>
+
+      <main class="stage" id="stage">
+        <div class="grid-overlay" aria-hidden="true"></div>
+        <div class="empty" id="empty"><div>NO MODEL LOADED<br /><kbd>O</kbd> OPEN, OR DROP A .VRM ANYWHERE</div></div>
+        <div class="drop" id="drop">DROP .VRM</div>
+        <figure class="preview" id="preview-box">
+          <canvas id="preview-canvas" width="320" height="180"></canvas>
+          <figcaption>CAM <span id="preview-info"></span></figcaption>
+        </figure>
+        <div class="capture-hint" id="capture-hint">CAPTURE VIEW: <kbd>H</kbd> / <kbd>ESC</kbd> TO EXIT</div>
+      </main>
+
+      <aside class="panel right">
+        <nav class="tabs">
+          <button data-tab="face">FACE <kbd>F</kbd></button>
+          <button data-tab="physics">PHYSICS <kbd>P</kbd></button>
+        </nav>
+        <section class="tab" id="tab-face">
+          <div class="head-readout">
+            <div class="row"><span class="lbl">HEAD Y/P/R</span><span id="head-readout" class="val">-</span></div>
+            <div class="row"><span class="lbl">GAZE Y/P</span><span id="gaze-readout" class="val">-</span></div>
+          </div>
+          <div class="bs-head"><span>BLENDSHAPE</span><span>OUT <i>│RAW</i></span><span>GAIN</span><span>CURVE</span></div>
+          <div id="bs-list" class="bs-list"></div>
+        </section>
+        <section class="tab" id="tab-physics">
+          <div class="seg" id="phys-mode" role="radiogroup">
+            <button data-value="off">OFF<kbd>8</kbd></button>
+            <button data-value="stiff">STIFF<kbd>9</kbd></button>
+            <button data-value="normal">NORMAL<kbd>0</kbd></button>
+          </div>
+          <label class="check"><input type="checkbox" id="phys-stabilise" /><span>STABILISER (FIXED STEP + CLAMPS)</span></label>
+          <label class="slider"><span class="lbl">MAX SPEED M/S</span><input type="range" id="phys-maxspeed" min="0.5" max="10" step="0.1" /><output id="phys-maxspeed-out"></output></label>
+          <label class="slider"><span class="lbl">INERTIA</span><input type="range" id="phys-inertia" min="0" max="1" step="0.01" /><output id="phys-inertia-out"></output></label>
+          <label class="slider"><span class="lbl">COLLIDE DAMP</span><input type="range" id="phys-coldamp" min="0" max="1" step="0.01" /><output id="phys-coldamp-out"></output></label>
+          <label class="row"><span class="lbl">SUBSTEPS</span>
+            <select id="phys-substeps"><option value="1">1 (60 HZ)</option><option value="2">2 (120 HZ)</option><option value="3">3 (180 HZ)</option><option value="4">4 (240 HZ)</option></select>
+          </label>
+          <div class="row btns"><button id="btn-phys-reset" class="btn">SETTLE <kbd>R</kbd></button><button id="btn-phys-clear" class="btn ghost">RESET OVERRIDES</button></div>
+          <h3>CHAINS <span id="chain-count"></span></h3>
+          <div class="chain-head"><span>ON</span><span>CHAIN</span><span>STIF</span><span>DRAG</span><span>GRAV</span></div>
+          <div id="chain-list" class="chain-list"></div>
+          <h3>COLLIDERS <span id="collider-count"></span></h3>
+          <div id="collider-list" class="collider-list"></div>
+        </section>
+      </aside>
+
+      <footer class="bar bottom" id="debug">
+        <span><b>RENDER</b> <i id="d-render">-</i></span>
+        <span><b>TRACK</b> <i id="d-track">-</i></span>
+        <span><b>LATENCY</b> <i id="d-latency">-</i></span>
+        <span><b>INFER F/P/H</b> <i id="d-infer">-</i></span>
+        <span><b>ML</b> <i id="d-where">-</i></span>
+        <span><b>PHYS</b> <i id="d-phys">-</i></span>
+        <span class="grow"></span>
+        <span><kbd>D</kbd> DEBUG</span>
+      </footer>
+    </div>
+    <video id="video" muted playsinline></video>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

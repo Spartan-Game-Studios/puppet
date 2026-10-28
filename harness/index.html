@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Puppet test harness</title>
+    <style>
+      html, body { margin: 0; background: #777; font: 12px monospace; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <!-- Dev-only harness pages driven by scripts/*.mjs (not part of the app build). -->
+    <script type="module">
+      const test = new URLSearchParams(location.search).get('test');
+      if (test === 'physics') import('./physics.ts');
+      else if (test === 'render') import('./renderClip.ts');
+      else if (test === 'hands') import('./handCheck.ts');
+      else document.body.textContent = 'use ?test=physics or ?test=render';
+    </script>
+  </body>
+</html>
