@@ -6,6 +6,10 @@
 //   PUPPET_POSE=/path/pose.json   a recorded tracking session (scripts/record-pose.mjs) for the 'recorded' scenario
 //   VIDEO=/out/dir   also render each scenario per condition and a side-by-side mp4 (needs ffmpeg)
 //   VIDEO_SCENARIOS=lean,arms   which scenarios to film (default: all run)
+//   VIDEO_CONDITIONS=main,cloth   which conditions to film side by side; VIDEO_LABELS=BEFORE,AFTER overrides their captions
+//   SOLVER_OPTS='{"iterations":3}'   override ClothSolver options (experiments)
+//   JOINTS=1   list clipping offenders per joint (chain[k], 0 = root segment) instead of per chain
+//   CORES=legacy   measure clipping against the body fit as it was before the inner-shell change (cape/gown vertices inflated the legs)
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -20,7 +24,7 @@ page.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && co
 const local = { '/__local/model.vrm': model };
 if (pose) local['/__local/pose.json'] = pose;
 await serveLocal(page, local);
-await page.goto(`${BASE}/harness/?test=cloth${pose ? '&pose=1' : ''}`);
+await page.goto(`${BASE}/harness/?test=cloth${pose ? '&pose=1' : ''}${process.env.JOINTS ? '&joints=1' : ''}${process.env.SOLVER_OPTS ? `&solver=${encodeURIComponent(process.env.SOLVER_OPTS)}` : ''}`);
 await page.waitForFunction(() => window.__cloth?.ready, null, { timeout: 120000, polling: 250 });
 const err = await page.evaluate(() => window.__cloth.error);
 if (err) {
@@ -31,15 +35,16 @@ const available = await page.evaluate(() => window.__cloth.scenarios);
 const scenarios = (process.env.SCENARIOS ?? available.join(',')).split(',').filter((s) => available.includes(s));
 const conditions = (process.env.CONDITIONS ?? 'main,legacy,cloth').split(',');
 const seeds = (process.env.SEEDS ?? '1').split(',').map(Number);
+const cores = process.env.CORES === 'legacy' ? 'legacy' : 'current';
 
 const results = [];
 for (const scenario of scenarios) {
   for (const condition of conditions) {
     for (const seed of seeds) {
       const t0 = Date.now();
-      const r = await page.evaluate((o) => window.__cloth.run(o), { condition, scenario, seed });
+      const r = await page.evaluate((o) => window.__cloth.run(o), { condition, scenario, seed, cores });
       results.push(r);
-      console.log(`${scenario} / ${condition} / seed ${seed}: ${((Date.now() - t0) / 1000).toFixed(1)} s; fastest ${r.fastest}; top clipping: ${r.offenders.join(', ')}; hair: ${r.hairOffenders.join(', ')}`);
+      console.log(`${scenario} / ${condition} / seed ${seed}: ${((Date.now() - t0) / 1000).toFixed(1)} s; fastest ${r.fastest}; top clipping: ${r.offenders.join(', ')}; verts: ${r.vertOffenders.join(', ')}; hair: ${r.hairOffenders.join(', ')}`);
     }
   }
 }
@@ -49,7 +54,7 @@ if (results.length) {
   console.log(`joints ${results[0].joints} (cloth ${results[0].clothJoints}), cloth mesh samples ${results[0].meshSamples}`);
 }
 const f = (x, d = 2) => (x == null ? 'never' : Number(x).toFixed(d));
-console.log('\nscenario | solver | clip frames % | clip segs max | seg depth max mm | clip verts % mean / max | vert depth p95 / max mm | spacing err p95 / max % | max / p99 speed all | max / p99 cloth | settle s | jitter mm (p50/max) | ms mean / p99 / max | arms: clip frames % / verts % | HAIR clip frames % / segs max / depth max mm / p99 speed / jitter mm');
+console.log('\nscenario | solver | clip frames % | clip segs max | seg depth max mm | sim-only clip frames % / depth mm | clip verts % mean / max | vert depth p95 / max mm | spacing err p95 / max % | max / p99 speed all | max / p99 cloth | settle s | jitter mm (p50/max) | ms mean / p99 / max | arms: clip frames % / verts % | HAIR clip frames % / segs max / depth max mm / p99 speed / jitter mm');
 const by = new Map();
 for (const r of results) {
   const k = `${r.scenario}|${r.condition}`;
@@ -68,6 +73,7 @@ for (const [k, rs] of by) {
       f(100 * mean('clipFrames'), 1),
       mx('clipSegsMax'),
       f(1000 * mx('clipDepthMax'), 1),
+      `${f(100 * mean('simClipFrames'), 1)} / ${f(1000 * mx('simClipDepthMax'), 1)}`,
       `${f(100 * mean('clipVertFracMean'), 2)} / ${f(100 * mx('clipVertFracMax'), 2)}`,
       `${f(1000 * mx('clipVertDepthP95'), 1)} / ${f(1000 * mx('clipVertDepthMax'), 1)}`,
       `${f(100 * mx('spacingErrP95'), 1)} / ${f(100 * mx('spacingErrMax'), 1)}`,
@@ -91,13 +97,14 @@ if (videoDir) {
   for (const scenario of vids) {
     const dirs = [];
     const vconds = (process.env.VIDEO_CONDITIONS ?? 'main,cloth').split(',');
-    for (const condition of vconds) {
+    const vlabels = process.env.VIDEO_LABELS?.split(',') ?? [];
+    for (const [ci, condition] of vconds.entries()) {
       const dir = join(videoDir, `${scenario}_${condition}_frames`);
       await rm(dir, { recursive: true, force: true });
       await mkdir(dir, { recursive: true });
       dirs.push(dir);
       let n = 0;
-      const label = { main: 'BEFORE (main)', legacy: 'LEGACY SOLVER + LOADER FIX', cloth: 'AFTER (cloth)', off: 'PHYSICS OFF' }[condition] ?? condition;
+      const label = vlabels[ci] || ({ main: 'BEFORE (main)', legacy: 'LEGACY SOLVER + LOADER FIX', cloth: 'AFTER (cloth)', off: 'PHYSICS OFF' }[condition] ?? condition);
       const done = page.evaluate((o) => window.__cloth.render(o), { condition, scenario, seed: 1, render: { w: W, h: H, fps: FPS, label } }).then(() => true);
       let finished = false;
       done.then(() => (finished = true));

@@ -34,6 +34,7 @@ import type { VRMHumanBoneName } from '@pixiv/three-vrm';
 import { loadAvatar, type Avatar } from '../src/scene/avatar';
 import { DEFAULT_PHYSICS, type PhysicsSettings } from '../src/physics/stableSprings';
 import { closestSegSeg } from '../src/physics/cloth/solver';
+import { DEFAULT_FIT, fitBodyColliders, LEGACY_FIT } from '../src/physics/cloth/bodyColliders';
 import { OneEuroFilter } from '../src/core/oneEuro';
 
 // ---------------------------------------------------------------- conditions
@@ -263,6 +264,10 @@ interface RecordedPose {
 // ---------------------------------------------------------------- metrics setup
 interface Seg {
   chain: string;
+  /** Joint index within its chain. */
+  k: number;
+  /** A chain's first segment: its head is the animated root bone, which physics can't move. */
+  root: boolean;
   head: Object3D;
   /** Tail object, or bone + local offset for a virtual tail. */
   tail: Object3D | null;
@@ -329,10 +334,14 @@ interface RunOptions {
   condition: string;
   scenario: string;
   seed: number;
+  /** Which body core to measure against: the current fit (default, as the physics uses) or the legacy one. */
+  cores?: 'current' | 'legacy';
   render?: { w: number; h: number; fps: number; label?: string };
 }
 
 let renderer: WebGLRenderer | null = null;
+/** ?joints=1: list clipping offenders per joint (chain[k]) instead of per chain. */
+const OFFENDER_JOINT = new URLSearchParams(location.search).has('joints');
 const label = document.createElement('canvas');
 
 async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOptions, onFrame?: (png: string) => Promise<void>) {
@@ -340,6 +349,9 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   const { avatar } = await loadAvatar(buf.slice(0), settings, { widenSkin: o.condition !== 'main' });
   const vrm = avatar.vrm;
   (window as unknown as { __clothAvatar: Avatar }).__clothAvatar = avatar;
+  // ?solver={...}: override ClothSolver options (experiments, SOLVER_OPTS in cloth-test.mjs).
+  const so = new URLSearchParams(location.search).get('solver');
+  if (so && avatar.physics.rig) Object.assign(avatar.physics.rig.solver.opts, JSON.parse(so));
   const sc = makeScenarios(recorded)[o.scenario];
   // Recorded poses are normalized-bone rotations of the model they were recorded on
   // (converted when that model's VRM version differs from this one's).
@@ -387,9 +399,6 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   for (const g of rig?.groups ?? []) if (g.kind === 'skirt' || g.kind === 'cape' || g.kind === 'sleeve') for (const c of g.chains) for (const j of rig!.chains[c].joints) clothJoints.add(j);
   const hairJoints = new Set<unknown>();
   rig?.chainKinds.forEach((k, i) => k === 'hair' && rig.chains[i].joints.forEach((j) => hairJoints.add(j)));
-  const coreCaps: CoreCap[] = ph.colliders
-    .filter((c) => c.body)
-    .map((c) => ({ name: c.name, arm: /Arm/.test(c.name), bone: c.body!.bone, a: c.body!.a, b: c.body!.b, r: c.body!.core }));
 
   // Rest reference: T-pose with springs at rest, for exclusions (what already
   // overlaps in the model as authored) and rest spacing.
@@ -399,11 +408,17 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   vrm.springBoneManager?.reset();
   rig?.writeRest();
   vrm.scene.updateMatrixWorld(true);
+  // The body "core" that counts as inside: fitted here, in the rest pose, as
+  // the physics' body colliders are (cores: 'legacy' = the fit as it was
+  // before the inner-shell change, for comparing with older runs).
+  const coreCaps: CoreCap[] = fitBodyColliders(vrm, new Set(ph.chains.flatMap((c) => c.joints.map((j) => j.bone))), o.cores === 'legacy' ? LEGACY_FIT : DEFAULT_FIT)
+    .map((c) => ({ name: c.name, arm: /Arm/.test(c.name), bone: c.bone, a: c.a, b: c.b, r: c.core }));
   const segs: Seg[] = [];
+  const childBones = new Set(ph.chains.flatMap((c) => c.joints.map((j) => j.child)));
   for (const ch of ph.chains) {
-    for (const j of ch.joints) {
+    for (const [k, j] of ch.joints.entries()) {
       const ji = j as unknown as { _initialLocalChildPosition: Vector3 };
-      const s: Seg = { chain: ch.name, head: j.bone, tail: j.child, tailLocal: ji._initialLocalChildPosition.clone(), cloth: clothJoints.has(j), hair: hairJoints.has(j), restHit: [] };
+      const s: Seg = { chain: ch.name, k, root: !childBones.has(j.bone), head: j.bone, tail: j.child, tailLocal: ji._initialLocalChildPosition.clone(), cloth: clothJoints.has(j), hair: hairJoints.has(j), restHit: [] };
       segWorld(s, _h, _t);
       for (const c of coreCaps) {
         capWorld(c, _a, _b);
@@ -510,6 +525,9 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
     clothSpeed: number;
     clipSegs: number;
     clipDepth: number;
+    /** Clipping segments other than root segments whose animated head is itself inside the body. */
+    simSegs: number;
+    simDepth: number;
     clipVerts: number;
     clipVertDepth: number;
     armSegs: number;
@@ -527,6 +545,8 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
   const pens: number[] = [];
   const offenders = new Map<string, number>();
   const hairOffenders = new Map<string, number>();
+  /** Cloth vertices in the body, per mesh and body part: vertex-frames and max depth. */
+  const vertOffenders = new Map<string, { n: number; depth: number }>();
   const fastest = { speed: 0, what: '' };
   const jitterTop = { d: 0, what: '' };
   const spacingTop = { e: 0, what: '' };
@@ -539,12 +559,14 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
     ph.update(dt);
     const ms = performance.now() - t0;
     vrm.scene.updateMatrixWorld(true);
+    // Debug probe: called every frame after physics, with the avatar's StableSprings.
+    (window as unknown as { __clothHook?: (t: number, ph: unknown, sc: string) => void }).__clothHook?.(t, ph, o.scenario);
 
     // Speeds (tails, hips frame).
     hipsRaw.updateWorldMatrix(true, false);
     inv.copy(hipsRaw.matrixWorld).invert();
     let maxS = 0, clothS = 0, disp = 0;
-    let clipSegs = 0, clipDepth = 0, armSegs = 0;
+    let clipSegs = 0, clipDepth = 0, armSegs = 0, simSegs = 0, simDepth = 0;
     let hairSegs = 0, hairDepth = 0, hairDisp = 0, hairSpeed = 0;
     for (let i = 0; i < joints.length; i++) {
       const s = joints[i];
@@ -587,15 +609,16 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
         if (!first && dd0 / dt > hairSpeed) hairSpeed = dd0 / dt;
       }
       if (!s.cloth) continue;
-      let worst = 0, worstArm = 0;
+      let worst = 0, worstArm = 0, worstSim = 0;
       for (let c = 0; c < coreCaps.length; c++) {
         if (s.restHit[c]) continue;
         capWorld(coreCaps[c], _a, _b);
         const pen = segPen(_h, _t, _a, _b, coreCaps[c].r);
         if (coreCaps[c].arm) worstArm = Math.max(worstArm, pen);
         else if (pen > worst) worst = pen;
+        if (!coreCaps[c].arm && pen > worstSim && !(s.root && pointPen(_h, _a, _b, coreCaps[c].r) > 0)) worstSim = pen;
         if (pen > 0 && !coreCaps[c].arm) {
-          const k = `${s.chain}>${coreCaps[c].name}`;
+          const k = `${s.chain}${OFFENDER_JOINT ? `[${s.k}]` : ''}>${coreCaps[c].name}`;
           offenders.set(k, (offenders.get(k) ?? 0) + 1);
         }
       }
@@ -603,22 +626,34 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
         clipSegs++;
         clipDepth = Math.max(clipDepth, worst);
       }
+      if (worstSim > 0) {
+        simSegs++;
+        simDepth = Math.max(simDepth, worstSim);
+      }
       if (worstArm > 0) armSegs++;
     }
     first = false;
     let clipVerts = 0, clipVertDepth = 0, armVerts = 0;
     for (const s of msamp) {
       s.mesh.getVertexPosition(s.index, _p).applyMatrix4(s.mesh.matrixWorld);
-      let worst = 0, worstArm = 0;
+      let worst = 0, worstArm = 0, worstCap = 0;
       for (let c = 0; c < coreCaps.length; c++) {
         if (s.restHit[c]) continue;
         capWorld(coreCaps[c], _a, _b);
         const pen = pointPen(_p, _a, _b, coreCaps[c].r);
         if (coreCaps[c].arm) worstArm = Math.max(worstArm, pen);
-        else if (pen > worst) worst = pen;
+        else if (pen > worst) {
+          worst = pen;
+          worstCap = c;
+        }
       }
       if (worstArm > 0) armVerts++;
       if (worst > 0) {
+        const k = `${s.mesh.name}>${coreCaps[worstCap].name}`;
+        const vo = vertOffenders.get(k) ?? { n: 0, depth: 0 };
+        vo.n++;
+        vo.depth = Math.max(vo.depth, worst);
+        vertOffenders.set(k, vo);
         clipVerts++;
         clipVertDepth = Math.max(clipVertDepth, worst);
         pens.push(worst);
@@ -640,6 +675,8 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
       clothSpeed: clothS,
       clipSegs,
       clipDepth,
+      simSegs,
+      simDepth,
       clipVerts: msamp.length ? clipVerts / msamp.length : 0,
       clipVertDepth,
       armSegs,
@@ -699,11 +736,15 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
     clipFrames: all.filter((f) => f.clipSegs > 0).length / all.length,
     clipSegsMax: max('clipSegs'),
     clipDepthMax: max('clipDepth'),
+    simClipFrames: all.filter((f) => f.simSegs > 0).length / all.length,
+    simClipDepthMax: max('simDepth'),
     clipVertFracMean: mean('clipVerts'),
     clipVertFracMax: max('clipVerts'),
     clipVertDepthMax: max('clipVertDepth'),
     clipVertDepthP95: quant(pens, 0.95),
     fastest: `${fastest.what} ${fastest.speed.toFixed(1)} m/s; jitter ${jitterTop.what} ${(1000 * jitterTop.d).toFixed(2)} mm; spacing ${spacingTop.what} ${(100 * spacingTop.e).toFixed(0)}%`,
+    vertOffenders: [...vertOffenders].sort((a, b) => b[1].n - a[1].n).slice(0, 6).map(([k, v]) => `${k} ${v.n} (${(1000 * v.depth).toFixed(0)} mm)`),
+    worstVertFrames: [...frames].sort((a, b) => b.clipVerts - a.clipVerts).slice(0, 8).map((f) => `t=${f.t.toFixed(2)} ${(100 * f.clipVerts).toFixed(2)}%`),
     offenders: [...offenders].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${k} ${n}`),
     hairJoints: joints.filter((j) => j.hair).length,
     hairClipFrames: all.filter((f) => f.hairSegs > 0).length / all.length,
