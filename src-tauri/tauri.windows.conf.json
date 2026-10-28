@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeDevCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-softcam.ps1 && pnpm dev",
+    "beforeBuildCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-softcam.ps1 && pnpm build"
+  },
+  "bundle": {
+    "resources": {
+      "vendor/softcam/softcam.dll": "softcam.dll",
+      "vendor/softcam/LICENSE-softcam.txt": "LICENSE-softcam.txt"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: build-camera-extension.sh fills @TEAM_ID@. Camera extensions
+     must be sandboxed, and their Mach service name must sit inside an app
+     group the extension belongs to. -->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+  <key>com.apple.security.application-groups</key>
+  <array>
+    <string>@TEAM_ID@.com.spartangamestudios.puppet.camera</string>
+  </array>
+@PROFILE_ENTITLEMENTS@</dict>
+</plist>

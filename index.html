@@ -96,6 +96,27 @@
           <label class="row"><span class="lbl">PORT</span><input id="vmc-port" type="number" min="1" max="65535" /></label>
           <div class="row"><span class="lbl">TX</span><span id="vmc-stats" class="val">OFF</span></div>
         </section>
+
+        <section class="block">
+          <h2><span class="idx">05</span>VIRTUAL CAM</h2>
+          <label class="check"><input type="checkbox" id="vcam-enabled" /><span>SEND TO VIRTUAL CAMERA</span><kbd>W</kbd></label>
+          <label class="row"><span class="lbl">RES</span>
+            <select id="vcam-res">
+              <option value="1280x720">1280×720 @30</option>
+              <option value="1920x1080">1920×1080 @30</option>
+            </select>
+          </label>
+          <label class="row hidden" id="vcam-device-row"><span class="lbl">DEVICE</span><select id="vcam-device"></select></label>
+          <div class="row"><span class="lbl">STATE</span><span id="vcam-state" class="val" title="">-</span></div>
+          <div class="row"><span class="lbl">TX</span><span id="vcam-stats" class="val">OFF</span></div>
+          <p class="note" id="vcam-hint"></p>
+          <code class="cmd hidden" id="vcam-cmd" title="Click to copy"></code>
+          <div class="row btns">
+            <button id="btn-vcam-setup" class="btn hidden">INSTALL CAMERA</button>
+            <button id="btn-vcam-refresh" class="btn ghost">REFRESH</button>
+          </div>
+          <p class="note mute" id="vcam-obs">NO NATIVE CAMERA? <kbd>H</kbd> CAPTURE VIEW → OBS WINDOW CAPTURE → START VIRTUAL CAMERA. CAMERAS HAVE NO ALPHA: CLEAR IS SENT AS THE CHOSEN COLOUR.</p>
+        </section>
       </aside>
 
       <main class="stage" id="stage">
