@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Template: build-camera-extension.sh fills @TEAM_ID@ and @VERSION@. -->
+<!-- Template: build-camera-extension.sh fills @TEAM_ID@, @VERSION@ (the app's
+     version) and @BUILD@ (camera-extension/BUILD). macOS replaces an installed
+     extension only when CFBundleVersion differs, and the app compares it with
+     the installed copy to show NEEDS UPDATE: bump BUILD whenever the extension
+     changes. -->
 <plist version="1.0">
 <dict>
   <key>CFBundleDevelopmentRegion</key>
@@ -20,7 +24,7 @@
   <key>CFBundleShortVersionString</key>
   <string>@VERSION@</string>
   <key>CFBundleVersion</key>
-  <string>@VERSION@</string>
+  <string>@BUILD@</string>
   <key>CFBundleSupportedPlatforms</key>
   <array>
     <string>MacOSX</string>

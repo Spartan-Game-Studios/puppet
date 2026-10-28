@@ -4,7 +4,7 @@ Puppet can show up as a webcam called **Puppet Virtual Camera**, so Zoom, Meet, 
 
 | OS | How | One-time setup by the user | Status |
 |---|---|---|---|
-| macOS 12.3+ | CoreMediaIO Camera Extension (a system extension inside Puppet.app) | Puppet in /Applications, click **INSTALL CAMERA**, approve in System Settings | Needs a Developer ID–signed build (see [Signing](#macos-signing)). Unsigned builds show the OBS route. |
+| macOS 12.3+ | CoreMediaIO Camera Extension (a system extension inside Puppet.app) | Puppet in /Applications, click **INSTALL** on the EXTENSION line, approve in System Settings | Needs a Developer ID–signed build (see [Signing](#macos-signing)). Unsigned builds show the OBS route. |
 | Windows 10/11 | [softcam](https://github.com/tshino/softcam) (MIT), a DirectShow virtual camera | Click **REGISTER CAMERA**, accept the admin prompt | Builds in CI; not run on hardware yet. |
 | Linux | [v4l2loopback](https://github.com/umlaeute/v4l2loopback) device you create | `sudo modprobe v4l2loopback …` (see below) | Builds and unit-tests in CI; not run on hardware yet. |
 
@@ -54,14 +54,46 @@ If all three frame buffers are still in flight when the next frame is due, that 
 ### What the user does (signed build)
 
 1. Move **Puppet.app** to **/Applications** and open it from there. macOS installs system extensions only from apps in /Applications.
-2. In **06 VIRTUAL CAM**, click **INSTALL CAMERA**.
+2. In **06 VIRTUAL CAM**, click **INSTALL** on the **EXTENSION** line.
 3. macOS asks for approval. Click **OPEN SETTINGS** in the panel to jump to the right page (macOS has no in-app approval prompt for system extensions):
    - macOS 15 and later: **System Settings → General → Login Items & Extensions → Camera Extensions**, switch **Puppet** on.
    - macOS 13–14: **System Settings → Privacy & Security**, under "System software from application Puppet was blocked", click **Allow**.
-4. The panel switches to **PUPPET VIRTUAL CAMERA INSTALLED**. Tick **SEND TO VIRTUAL CAMERA** (`W`).
-5. In Zoom / Meet / Discord / FaceTime pick **Puppet Virtual Camera**. Apps that were already open may need a restart to see a new camera.
+4. The EXTENSION line reads **ACTIVE**. Switch **CAMERA OUTPUT** on (`W`, or START on a gamepad).
+5. In Zoom / Meet / Discord / FaceTime pick **Puppet Virtual Camera**.
 
-When Puppet isn't sending, the camera shows a dark frame. Updating Puppet replaces the extension automatically on the next INSTALL CAMERA (it always takes the copy shipped with the app). To remove it, delete Puppet.app from /Applications; macOS removes its extension.
+### The camera exists only while Puppet sends
+
+The extension publishes the **Puppet Virtual Camera** device only while Puppet is running with **CAMERA OUTPUT** on. Turn the output off, quit Puppet, or let it crash, and the camera disappears from every app's camera list: no frozen or black "Puppet" camera is left behind.
+
+How: while the output is on, the app sends a heartbeat once a second, a Darwin notification (`com.spartangamestudios.puppet.camera.presence`, `pvc_presence` in `PuppetVCamBridge.m`) whose state is a beat counter. The extension (`ProviderSource` in `Provider.swift`) adds the device on the first beat and removes it when the app posts "off" (output off, or quit: the app closes the output on exit) or when no beat or frame arrives for 3.5 s (crash, force quit). A stale beat left by a crashed app does not bring the device back when the extension restarts; only a fresh beat does. Between the device appearing and the first frame (or if frames stall), apps see a **PUPPET / WAITING FOR FRAMES** card.
+
+Darwin notifications are allowed by the camera-extension sandbox (`cmioextension.sb` imports `system.sb`, which permits `com.apple.system.notification_center`). If registering for them ever fails, the extension falls back to keeping the device present.
+
+### Extension controls (EXTENSION line)
+
+`src/app/vcamControls.ts` (`mountVcamControls(container)`) shows the extension's state and the buttons that apply:
+
+| State | Buttons |
+|---|---|
+| NOT INSTALLED | INSTALL (an activation request) |
+| WAITING FOR APPROVAL | OPEN SETTINGS (Login Items & Extensions) |
+| ACTIVE vN | UNINSTALL |
+| NEEDS UPDATE (installed and bundled versions differ) | UPDATE, UNINSTALL |
+| RESTART YOUR MAC TO FINISH / REMOVED AFTER A RESTART | none |
+| FAILED | RETRY (unless it's a signing or location problem) |
+
+**UNINSTALL** asks for a second press (**CONFIRM UNINSTALL?**, 5 s; Escape cancels), turns the output off and submits a deactivation request; macOS may ask for an administrator password. The extension's version is its `CFBundleVersion`, taken from `src-tauri/macos/camera-extension/BUILD`: **bump BUILD whenever the extension changes**, since macOS only replaces an installed extension whose `CFBundleVersion` differs, and the app compares the installed and bundled values to show NEEDS UPDATE. The first release's extension (always-on device, version 0.1.0) shows as NEEDS UPDATE.
+
+Removing Puppet.app from /Applications also removes its extension.
+
+### Minimized, hidden or covered
+
+Puppet keeps tracking, rendering and sending (virtual camera and VMC) while its window is minimized, hidden (Cmd-H) or covered. WebKit stops `requestAnimationFrame` for a page it considers not visible, whatever the background-throttling setting, and every loop in Puppet runs off rAF. Two fixes:
+
+- `src-tauri/macos/bridge/PuppetBackground.m`: turns off WKWebView's window-occlusion detection (a covered or off-screen window stays "visible", rAF keeps its full rate), WebKit's hidden-page timer throttling and visibility-based process suppression, and opts the process out of App Nap (an `NSProcessInfo` activity that still allows idle system sleep).
+- `src/app/backgroundLoop.ts`: wraps `requestAnimationFrame`; a Worker ticks at 60 Hz and runs pending callbacks when real rAF has been silent for 100 ms (minimized / hidden). In the foreground nothing changes.
+
+`scripts/background-test.mjs` checks it on a built binary (`hide` = app hidden from start, `offscreen` = window off every screen; `PUPPET_EXTRA_QUERY=bgloop=0` turns the frontend half off).
 
 The panel shows every state in plain words: not in /Applications, waiting for approval, restart needed, not signed (with the OBS route), installed, running.
 

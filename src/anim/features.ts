@@ -19,6 +19,7 @@ import { mountHotkeyPanel } from '../input/panel';
 import { trackerGestureSource, type GestureSource, type TrackerGestures } from '../input/gestures';
 import { LipSync } from '../audio/lipsync';
 import { mountLipSyncPanel } from '../audio/panel';
+import { toggleVcamOutput } from '../app/vcamControls';
 
 export interface MotionContext {
   settings: Settings;
@@ -63,6 +64,10 @@ export async function mountMotion(ctx: MotionContext) {
   function run(action: Action, pressed: boolean): void {
     if (action.kind === 'picker') {
       if (pressed) picker.toggle();
+      return;
+    }
+    if (action.kind === 'camera') {
+      if (pressed) toggleVcamOutput();
       return;
     }
     if (!layer) return;

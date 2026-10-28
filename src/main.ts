@@ -57,9 +57,13 @@ import { mountMotion, type MotionFeatures } from './anim/features';
 import { withPresetBlends } from './vmc/presets';
 import type { PhysicsMode } from './physics/stableSprings';
 import { buildClothUI } from './app/clothUi';
+import { installBackgroundLoop } from './app/backgroundLoop';
+import { mountVcamControls } from './app/vcamControls';
 
 const params = new URLSearchParams(location.search);
 for (const [k, v] of new URLSearchParams(await devQuery())) params.set(k, v);
+// Keep rendering, tracking and sending while minimized / hidden (?bgloop=0 turns it off for A/B tests).
+const bgLoop = params.get('bgloop') === '0' ? null : installBackgroundLoop();
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const ACCENT = '#ff3b00';
 
@@ -76,6 +80,7 @@ const persist = () => saveSettings(settings);
 // ---------------------------------------------------------------- core objects
 const viewer = new Viewer($('stage'));
 const vcam = new VirtualCamOutput(viewer);
+mountVcamControls($('vcam-controls')); // owns #vcam-enabled; mount before the binds below
 vcam.send = params.get('vcamsend') !== '0';
 const source = new VideoSource($<HTMLVideoElement>('video'));
 const face = new FaceProcessor();
@@ -1008,7 +1013,7 @@ if (params.get('debuglog') === '1') {
   setInterval(() => {
     const s = tracker.stats;
     debugLog(
-      `render ${renderTimes.length}fps frame ${frameMs.toFixed(1)}ms | ${vcamLogLine()} | face ${s.face.fps}fps lat ${s.face.latency.toFixed(0)}ms inf ${s.face.infer.toFixed(1)}ms | body ${s.body.fps}fps lat ${s.body.latency.toFixed(0)}ms pose ${s.body.pose.toFixed(1)} hands ${s.body.hands.toFixed(1)}ms | ${s.where} ${s.delegate} | ${$('status').textContent} | ${$('sync-mode').textContent} | vmc ${$('vmc-stats').textContent}`,
+      `render ${renderTimes.length}fps frame ${frameMs.toFixed(1)}ms | ${vcamLogLine()} | face ${s.face.fps}fps lat ${s.face.latency.toFixed(0)}ms inf ${s.face.infer.toFixed(1)}ms | body ${s.body.fps}fps lat ${s.body.latency.toFixed(0)}ms pose ${s.body.pose.toFixed(1)} hands ${s.body.hands.toFixed(1)}ms | ${s.where} ${s.delegate} | ${$('status').textContent} | ${$('sync-mode').textContent} | vmc ${$('vmc-stats').textContent} | ${bgLoop?.active ? 'bg' : 'fg'} ${document.visibilityState}`,
     );
   }, 2000);
 }

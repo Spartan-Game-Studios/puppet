@@ -171,7 +171,7 @@ Puppet ships no avatar. Use your own `.vrm` (VRM 0.x or 1.0), for example one ex
 
 1. Pick a background in **03 BACKGROUND** (CLEAR is sent as the chosen colour).
 2. In **06 VIRTUAL CAM**, do the one-time setup the panel asks for:
-   - **macOS:** Puppet must be in /Applications. Click **INSTALL CAMERA**, then **OPEN SETTINGS** and approve it in System Settings → General → Login Items & Extensions → Camera Extensions (macOS 13–14: Privacy & Security → Allow). This needs a signed build; unsigned builds say so and point to the OBS route.
+   - **macOS:** Puppet must be in /Applications. Click **INSTALL** on the EXTENSION line, then **OPEN SETTINGS** and approve it in System Settings → General → Login Items & Extensions → Camera Extensions (macOS 13–14: Privacy & Security → Allow). This needs a signed build; unsigned builds say so and point to the OBS route.
    - **Windows:** click **REGISTER CAMERA** and accept the admin prompt.
    - **Linux:** create a loopback device once (the panel shows this command, click to copy):
      ```sh

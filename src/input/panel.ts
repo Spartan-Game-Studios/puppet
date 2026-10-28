@@ -55,10 +55,10 @@ export function mountHotkeyPanel(ctx: HotkeyPanelContext): { render: () => void;
     const emotes = ctx.emotes().map(([id, l]) => opt(`emote:${id}`, `▶ ${l}`)).join('');
     const exprs = ctx.expressions().map((n) => opt(`expr:${n}`, `◐ ${n.toUpperCase()}`)).join('');
     let extra = '';
-    if (!sel.startsWith('emote:') && !sel.startsWith('expr:') && sel !== 'reset' && sel !== 'picker') extra = opt(sel, sel);
+    if (!sel.startsWith('emote:') && !sel.startsWith('expr:') && sel !== 'reset' && sel !== 'picker' && sel !== 'camera') extra = opt(sel, sel);
     else if (sel.startsWith('expr:') && !ctx.expressions().includes(sel.slice(5))) extra = opt(sel, `◐ ${sel.slice(5).toUpperCase()} (NOT ON MODEL)`);
     else if (sel.startsWith('emote:') && !ctx.emotes().some(([id]) => `emote:${id}` === sel)) extra = opt(sel, `▶ ${sel.slice(6)} (MISSING)`);
-    return `${extra}<optgroup label="EMOTES">${emotes}</optgroup><optgroup label="EXPRESSIONS">${exprs}</optgroup>${opt('reset', '■ RESET')}${opt('picker', '▣ PICKER')}`;
+    return `${extra}<optgroup label="EMOTES">${emotes}</optgroup><optgroup label="EXPRESSIONS">${exprs}</optgroup>${opt('reset', '■ RESET')}${opt('picker', '▣ PICKER')}${opt('camera', '● CAMERA ON/OFF')}`;
   }
 
   function render(): void {
@@ -95,7 +95,7 @@ export function mountHotkeyPanel(ctx: HotkeyPanelContext): { render: () => void;
         let action: Action;
         if (v.startsWith('emote:')) action = { kind: 'emote', clip: v.slice(6) };
         else if (v.startsWith('expr:')) action = { kind: 'expression', name: v.slice(5), mode: isExpr ? (b.action as { mode: ExpressionMode }).mode : 'toggle', fadeIn: 0.15, fadeOut: 0.3 };
-        else action = { kind: v as 'reset' | 'picker' };
+        else action = { kind: v as 'reset' | 'picker' | 'camera' };
         save(ctx.bindings().map((x) => (x.id === b.id ? { ...x, action } : x)));
       });
       row.querySelector<HTMLSelectElement>('.mode')!.addEventListener('change', (e) => {

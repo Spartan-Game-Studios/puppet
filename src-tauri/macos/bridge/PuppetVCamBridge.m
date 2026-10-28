@@ -7,7 +7,10 @@
 //    report where that stands: needs approval in System Settings, needs the
 //    app in /Applications, activated, failed (with the OSSystemExtension
 //    error code).
-// 2. Feed frames to the extension: find the "Puppet Virtual Camera" CMIO
+// 2. Announce that Puppet is alive (pvc_presence): a Darwin notification
+//    heartbeat the extension watches. It adds the camera device while beats
+//    arrive and removes it on "off" or when they stop (quit, crash).
+// 3. Feed frames to the extension: find the "Puppet Virtual Camera" CMIO
 //    device, take its sink stream (direction = output), and enqueue BGRA
 //    CMSampleBuffers into the sink's CMSimpleQueue. The extension forwards
 //    them to its source stream, which is what Zoom / Meet / Discord read.
@@ -20,6 +23,7 @@
 #import <CoreMediaIO/CMIOHardware.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
+#include <notify.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -27,6 +31,8 @@
 // Must match DEVICE_UUID / DEVICE_NAME in camera-extension/Provider.swift.
 #define PVC_DEVICE_UUID @"6A3B1E0C-4F7D-4E8A-9C21-5B0D7E2F9A41"
 #define PVC_DEVICE_NAME @"Puppet Virtual Camera"
+// Must match PRESENCE_NOTIFY in camera-extension/Provider.swift.
+#define PVC_PRESENCE_NOTIFY "com.spartangamestudios.puppet.camera.presence"
 
 enum {
     PVC_REQ_IDLE = 0,
@@ -48,6 +54,11 @@ typedef struct {
     int32_t streaming;       // sink stream started
     int32_t enabled;         // from a properties request: extension enabled (-1 unknown)
     char message[512];
+    int32_t props_answered;  // a properties request has answered at least once
+    int32_t awaiting_approval; // from properties: installed, waiting for the user
+    int32_t uninstalling;    // from properties: removal pending (reboot)
+    char installed_version[64]; // CFBundleVersion of the enabled (else newest) installed copy
+    char bundled_version[64];   // CFBundleVersion of the copy inside this app
 } pvc_status;
 
 // ---------------------------------------------------------------- activation
@@ -69,6 +80,12 @@ static int32_t g_enabled = -1;
 static NSString *g_msg = @"";
 static PVCRequestDelegate *g_delegate;
 static OSSystemExtensionRequest *g_props_request;
+static int32_t g_props_answered = 0;
+static int32_t g_awaiting = 0;
+static int32_t g_uninstalling = 0;
+static NSString *g_installed_version = @"";
+static double g_props_sent_at = 0;
+static int32_t g_props_pending = 0;
 static BOOL g_deactivating = NO;
 
 static void set_state(int32_t s, int64_t code, NSString *msg) {
@@ -95,6 +112,17 @@ static void set_state(int32_t s, int64_t code, NSString *msg) {
 - (void)request:(OSSystemExtensionRequest *)request didFinishWithResult:(OSSystemExtensionRequestResult)result {
     if (request == g_props_request) return;
     BOOL deact = g_deactivating;
+    @synchronized(g_lock) {
+        g_props_sent_at = 0; // re-read versions on the next poll
+        g_props_pending = 0;
+        if (deact) {
+            // macOS may never answer a properties request once nothing is installed.
+            g_props_answered = 0;
+            g_enabled = -1;
+            g_awaiting = 0;
+            g_installed_version = @"";
+        }
+    }
     if (result == OSSystemExtensionRequestWillCompleteAfterReboot)
         set_state(PVC_REQ_NEEDS_REBOOT, 0, @"Restart the Mac to finish");
     else
@@ -107,6 +135,7 @@ static void set_state(int32_t s, int64_t code, NSString *msg) {
         // already, so the panel can say "not signed" before the user tries to
         // install. Other errors only go to the status line.
         @synchronized(g_lock) {
+            g_props_pending = 0;
             if (g_req == PVC_REQ_IDLE) {
                 long c = (long)error.code;
                 if (c == 2 || c == 8 || c == 9 || c == 10) {
@@ -120,17 +149,34 @@ static void set_state(int32_t s, int64_t code, NSString *msg) {
     }
     NSString *m = [NSString stringWithFormat:@"%@ (%@ %ld)", error.localizedDescription, error.domain, (long)error.code];
     set_state(PVC_REQ_FAILED, error.code, m);
+    @synchronized(g_lock) { g_props_sent_at = 0; }
 }
 
 - (void)request:(OSSystemExtensionRequest *)request foundProperties:(NSArray<OSSystemExtensionProperties *> *)properties API_AVAILABLE(macos(12.0)) {
     int32_t en = 0;
-    BOOL awaiting = NO;
+    BOOL awaiting = NO, uninstalling = NO;
+    NSString *ver = @"";
+    // Several copies can be listed during an update; the enabled one is what runs.
     for (OSSystemExtensionProperties *p in properties) {
-        if (p.isEnabled) en = 1;
+        if (p.isUninstalling) {
+            uninstalling = YES;
+            continue;
+        }
+        if (p.isEnabled) {
+            en = 1;
+            ver = p.bundleVersion ?: @"";
+        } else if (!en) {
+            ver = p.bundleVersion ?: @"";
+        }
         if (p.isAwaitingUserApproval) awaiting = YES;
     }
     @synchronized(g_lock) {
+        g_props_pending = 0;
         g_enabled = en;
+        g_props_answered = 1;
+        g_awaiting = awaiting;
+        g_uninstalling = uninstalling && !en;
+        g_installed_version = ver;
         if (awaiting && g_req == PVC_REQ_IDLE) {
             g_req = PVC_REQ_NEEDS_APPROVAL;
             g_msg = @"Waiting for approval in System Settings";
@@ -169,11 +215,36 @@ void pvc_deactivate(void) {
 /// Ask (without installing anything) whether the extension is enabled or awaiting approval.
 void pvc_query_properties(void) {
     ensure_init();
+    @synchronized(g_lock) {
+        // At most one request every 4 s (the panel polls every 3 s), and while
+        // one is unanswered (macOS 26 never answers when nothing is installed)
+        // only every 30 s.
+        double now = CFAbsoluteTimeGetCurrent();
+        if (now - g_props_sent_at < (g_props_pending ? 30 : 4)) return;
+        g_props_sent_at = now;
+        g_props_pending = 1;
+    }
     if (@available(macOS 12.0, *)) {
         OSSystemExtensionRequest *r = [OSSystemExtensionRequest propertiesRequestForExtension:PVC_EXTENSION_ID queue:pvc_queue()];
         r.delegate = g_delegate;
         g_props_request = r;
         [[OSSystemExtensionManager sharedManager] submitRequest:r];
+    }
+}
+
+// ---------------------------------------------------------------- presence
+
+/// on = 1: one heartbeat (call about once a second while the camera output is
+/// on). on = 0: tell the extension to remove the device now.
+void pvc_presence(int32_t on) {
+    ensure_init();
+    static int token = NOTIFY_TOKEN_INVALID;
+    static uint64_t beat = 0;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ notify_register_check(PVC_PRESENCE_NOTIFY, &token); });
+    @synchronized(g_lock) {
+        if (token != NOTIFY_TOKEN_INVALID) notify_set_state(token, on ? ++beat : 0);
+        notify_post(PVC_PRESENCE_NOTIFY);
     }
 }
 
@@ -383,5 +454,13 @@ void pvc_get_status(pvc_status *out, int32_t probe_device) {
         out->streaming = g_queue != NULL;
         out->enabled = g_enabled;
         strlcpy(out->message, g_msg.UTF8String ?: "", sizeof(out->message));
+        out->props_answered = g_props_answered;
+        out->awaiting_approval = g_awaiting;
+        out->uninstalling = g_uninstalling;
+        strlcpy(out->installed_version, g_installed_version.UTF8String ?: "", sizeof(out->installed_version));
+    }
+    if (out->extension_embedded) {
+        NSString *v = [NSBundle bundleWithPath:ext].infoDictionary[@"CFBundleVersion"];
+        strlcpy(out->bundled_version, v.UTF8String ?: "", sizeof(out->bundled_version));
     }
 }

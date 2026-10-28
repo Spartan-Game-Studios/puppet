@@ -158,6 +158,39 @@ impl SinkStatus {
     }
 }
 
+/// Where an installable camera driver (the macOS camera extension) stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtState {
+    /// Can't be installed from this build (dev build, no extension inside).
+    Unavailable,
+    NotInstalled,
+    /// An install or removal request is in flight.
+    Working,
+    AwaitingApproval,
+    Active,
+    /// Installed, but a different version than the one inside this app.
+    NeedsUpdate,
+    NeedsReboot,
+    /// Removal finishes after a restart.
+    Uninstalling,
+    Failed,
+}
+
+/// Status of the camera extension, for the 06 VIRTUAL CAM panel's EXT line
+/// and its INSTALL / UPDATE / UNINSTALL / OPEN SETTINGS buttons.
+#[derive(Debug, Clone, Serialize)]
+pub struct ExtensionStatus {
+    pub state: ExtState,
+    pub detail: String,
+    pub installed_version: Option<String>,
+    pub bundled_version: Option<String>,
+    /// Label of the install button ("INSTALL" / "UPDATE" / "RETRY"), when it applies.
+    pub install: Option<String>,
+    pub can_uninstall: bool,
+    pub open_settings: bool,
+}
+
 /// A virtual camera backend. One implementation per OS, plus file/null sinks
 /// for testing. All methods are called from one thread at a time.
 pub trait VirtualCamSink: Send {
@@ -169,6 +202,23 @@ pub trait VirtualCamSink: Send {
     /// user). Default: nothing to do.
     fn setup(&mut self) -> Result<(), String> {
         Err(format!("{}: nothing to set up", self.name()))
+    }
+    /// Status of an installable camera driver (macOS camera extension). None:
+    /// this sink has nothing to install or remove.
+    fn extension(&mut self) -> Option<ExtensionStatus> {
+        None
+    }
+    /// Request install / update of the driver (may prompt the user).
+    fn install_extension(&mut self) -> Result<(), String> {
+        Err(format!("{}: nothing to install", self.name()))
+    }
+    /// Request removal of the driver (may prompt the user).
+    fn uninstall_extension(&mut self) -> Result<(), String> {
+        Err(format!("{}: nothing to uninstall", self.name()))
+    }
+    /// Open the OS page where the driver is approved.
+    fn open_settings(&mut self) -> Result<(), String> {
+        Err(format!("{}: no settings page", self.name()))
     }
     /// Choose a device (Linux). Default: ignored.
     fn select_device(&mut self, _device: Option<String>) {}
@@ -305,6 +355,22 @@ impl VcamHandle {
 
     pub fn setup(&self) -> Result<(), String> {
         self.shared.sink.lock().unwrap().setup()
+    }
+
+    pub fn extension(&self) -> Option<ExtensionStatus> {
+        self.shared.sink.lock().unwrap().extension()
+    }
+
+    pub fn install_extension(&self) -> Result<(), String> {
+        self.shared.sink.lock().unwrap().install_extension()
+    }
+
+    pub fn uninstall_extension(&self) -> Result<(), String> {
+        self.shared.sink.lock().unwrap().uninstall_extension()
+    }
+
+    pub fn open_settings(&self) -> Result<(), String> {
+        self.shared.sink.lock().unwrap().open_settings()
     }
 
     pub fn select_device(&self, device: Option<String>) {

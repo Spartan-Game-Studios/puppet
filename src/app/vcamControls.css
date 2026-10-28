@@ -1,0 +1,11 @@
+/* Virtual camera controls (src/app/vcamControls.ts). Uses the shared tokens
+   and .btn / .row / .check / .note from styles.css. */
+.vcam-controls { display: flex; flex-direction: column; gap: 8px; }
+.vc-switch .vc-onoff { min-width: 30px; padding: 1px 4px; border: var(--thin); text-align: center; font-size: 10px; font-weight: 800; }
+.vc-switch .vc-onoff::after { content: 'OFF'; color: var(--mute); }
+.vc-switch input:checked ~ .vc-onoff { background: var(--accent); border-color: var(--ink); }
+.vc-switch input:checked ~ .vc-onoff::after { content: 'ON'; color: var(--ink); }
+.vc-ext { display: flex; flex-direction: column; gap: 8px; }
+.vc-ext.hidden { display: none; }
+.vc-ext .btn.accent { background: var(--accent); }
+.vc-ext .vc-uninstall.on { background: var(--accent); color: var(--ink); }

@@ -183,6 +183,45 @@ export async function vcamSetup(): Promise<void> {
   if (isTauri) await invoke('vcam_setup');
 }
 
+/** Mirrors `vcam::ExtState` in src-tauri/src/vcam/mod.rs. */
+export type VcamExtState =
+  | 'unavailable'
+  | 'not_installed'
+  | 'working'
+  | 'awaiting_approval'
+  | 'active'
+  | 'needs_update'
+  | 'needs_reboot'
+  | 'uninstalling'
+  | 'failed';
+
+/** Mirrors `vcam::ExtensionStatus`: the macOS camera extension (null on other OSes). */
+export interface VcamExtStatus {
+  state: VcamExtState;
+  detail: string;
+  installed_version: string | null;
+  bundled_version: string | null;
+  install: string | null;
+  can_uninstall: boolean;
+  open_settings: boolean;
+}
+
+export async function vcamExtStatus(): Promise<VcamExtStatus | null> {
+  return isTauri ? invoke<VcamExtStatus | null>('vcam_ext_status') : null;
+}
+
+export async function vcamExtInstall(): Promise<void> {
+  if (isTauri) await invoke('vcam_ext_install');
+}
+
+export async function vcamExtUninstall(): Promise<void> {
+  if (isTauri) await invoke('vcam_ext_uninstall');
+}
+
+export async function vcamExtOpenSettings(): Promise<void> {
+  if (isTauri) await invoke('vcam_ext_open_settings');
+}
+
 export async function vcamSelectDevice(device: string | null): Promise<void> {
   if (isTauri) await invoke('vcam_select_device', { device });
 }
