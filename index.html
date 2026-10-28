@@ -9,8 +9,10 @@
     <div id="app" class="app">
       <header class="bar top">
         <div class="brand">PUPPET<span class="ver">V0.1</span></div>
+        <button id="btn-home" class="btn home-btn" title="Model library (home)"><span class="home-to">HOME <kbd>L</kbd></span><span class="stage-to">STAGE <kbd>ESC</kbd></span></button>
         <button id="btn-open" class="btn" title="Open a .vrm file">OPEN VRM <kbd>O</kbd></button>
         <div class="cell"><span class="lbl">MODEL</span><span id="model-name" class="val">NONE</span></div>
+        <button id="btn-model-info" class="btn lic-btn hidden" title="Model info and licence (I)"><span id="model-lic" class="lic">-</span><kbd>I</kbd></button>
         <div class="cell"><span class="lbl">EXPR</span><span id="sync-mode" class="val">-</span></div>
         <div class="cell grow"><span class="lbl">STATUS</span><span id="status" class="val">BOOTING</span></div>
         <button id="btn-capture" class="btn accent" title="Hide all UI for OBS window capture">CAPTURE VIEW <kbd>H</kbd></button>
@@ -180,6 +182,15 @@
           <figcaption>CAM <span id="preview-info"></span></figcaption>
         </figure>
         <div class="capture-hint" id="capture-hint">CAPTURE VIEW: <kbd>H</kbd> / <kbd>ESC</kbd> TO EXIT</div>
+        <aside class="model-info hidden" id="model-info" aria-label="Model info">
+          <h2><span class="idx">i</span>MODEL INFO<button class="x" id="btn-model-info-close" title="Close (I)">×</button></h2>
+          <div class="mi-body" id="model-info-body"></div>
+        </aside>
+        <div class="lic-notice hidden" id="lic-notice" role="status">
+          <span class="lic warn" id="lic-notice-badge">AUTHOR ONLY</span>
+          <p id="lic-notice-text"></p>
+          <div class="row btns"><button class="btn" id="btn-lic-notice-info">LICENCE <kbd>I</kbd></button><button class="btn accent" id="btn-lic-notice-ok">GOT IT</button></div>
+        </div>
       </main>
 
       <aside class="panel right">
@@ -217,6 +228,68 @@
         </section>
       </aside>
 
+      <!-- 00 LIBRARY: the home screen (src/app/home.ts). Cards come from #tpl-card. -->
+      <section class="home" id="home" aria-label="Model library">
+        <div class="home-bar">
+          <h2 class="home-title"><span class="idx">00</span>LIBRARY<span class="home-count" id="home-count"></span></h2>
+          <div class="seg home-filter" id="home-filter" role="radiogroup" aria-label="Filter">
+            <button data-value="all">ALL<span class="n" id="home-n-all"></span></button>
+            <button data-value="favourites">★ FAVOURITES<span class="n" id="home-n-fav"></span></button>
+          </div>
+          <label class="home-search"><span class="lbl">SEARCH</span><input id="home-search" type="text" spellcheck="false" autocomplete="off" placeholder="NAME OR AUTHOR" /><kbd>/</kbd></label>
+          <label class="home-sort"><span class="lbl">SORT</span>
+            <select id="home-sort">
+              <option value="used">LAST USED</option>
+              <option value="name">NAME</option>
+              <option value="added">DATE ADDED</option>
+            </select>
+          </label>
+          <button id="btn-import" class="btn accent" title="Import .vrm files into the library (or drop them here)">IMPORT .VRM <kbd>I</kbd></button>
+        </div>
+        <div class="home-migrate hidden" id="home-migrate">
+          <span class="lbl">FROM BEFORE THE LIBRARY</span>
+          <span class="val" id="home-migrate-name"></span>
+          <button class="btn accent" id="btn-migrate-yes">IMPORT IT</button>
+          <button class="btn ghost" id="btn-migrate-no">NO THANKS</button>
+        </div>
+        <div class="home-scroll" id="home-scroll">
+          <div class="home-grid" id="home-grid" role="grid" aria-label="Models"></div>
+          <div class="home-nomatch hidden" id="home-nomatch">NO MODELS MATCH. <button class="btn ghost" id="btn-home-clear">CLEAR FILTERS</button></div>
+          <div class="home-empty hidden" id="home-empty">
+            <div class="he-drop">
+              <strong>NO MODELS YET</strong>
+              <span><kbd>I</kbd> IMPORT, OR DROP ONE OR MORE .VRM FILES ANYWHERE ON THIS SCREEN.</span>
+              <span class="mute">PUPPET KEEPS ITS OWN COPY OF EACH MODEL, SO MOVING OR DELETING THE ORIGINAL IS FINE.</span>
+            </div>
+            <div class="he-where">
+              <h3>WHERE TO GET A MODEL</h3>
+              <ol>
+                <li><a href="https://hub.vroid.com/en" target="_blank" rel="noopener" data-link="vroid-hub">VROID HUB</a><span>THOUSANDS OF VRM MODELS. EACH SETS ITS OWN TERMS: LOOK FOR “AVATAR USE” AND DOWNLOAD ONLY THOSE THAT ALLOW IT.</span><code>hub.vroid.com</code></li>
+                <li><a href="https://www.opensourceavatars.com/" target="_blank" rel="noopener" data-link="open-source-avatars">OPEN SOURCE AVATARS</a><span>FREE CC0 (PUBLIC DOMAIN) VRM MODELS: USE THEM FOR ANYTHING, INCLUDING COMMERCIAL STREAMS.</span><code>opensourceavatars.com</code></li>
+                <li><a href="https://vroid.com/en/studio" target="_blank" rel="noopener" data-link="vroid-studio">VROID STUDIO</a><span>MAKE YOUR OWN ANIME-STYLE AVATAR FOR FREE, THEN EXPORT IT AS .VRM.</span><code>vroid.com/en/studio</code></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+        <div class="home-imports hidden" id="home-imports" aria-live="polite">
+          <h3>IMPORT<span id="home-import-sum"></span><button class="x" id="btn-imports-close" title="Close">×</button></h3>
+          <ol id="home-import-list"></ol>
+        </div>
+        <div class="home-dropzone" id="home-drop">DROP .VRM FILES TO IMPORT</div>
+        <footer class="home-keys">
+          <span><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> MOVE</span>
+          <span><kbd>ENTER</kbd> LOAD</span>
+          <span><kbd>S</kbd> STAR</span>
+          <span><kbd>L</kbd> LICENCE</span>
+          <span><kbd>F2</kbd> RENAME</span>
+          <span><kbd>DEL</kbd> REMOVE</span>
+          <span><kbd>/</kbd> SEARCH</span>
+          <span><kbd>I</kbd> IMPORT</span>
+          <span class="grow"></span>
+          <span id="home-esc"><kbd>ESC</kbd> STAGE</span>
+        </footer>
+      </section>
+
       <footer class="bar bottom" id="debug">
         <span><b>RENDER</b> <i id="d-render">-</i></span>
         <span><b>TRACK</b> <i id="d-track">-</i></span>
@@ -228,6 +301,42 @@
         <span><kbd>D</kbd> DEBUG</span>
       </footer>
     </div>
+    <template id="tpl-card">
+      <article class="card" role="gridcell" tabindex="-1">
+        <div class="thumb">
+          <img alt="" draggable="false" />
+          <span class="no-thumb">NO THUMBNAIL</span>
+          <span class="spec"></span>
+          <span class="on-stage">ON STAGE</span>
+          <button class="star" aria-pressed="false" title="Favourite (S)">★</button>
+        </div>
+        <div class="card-body">
+          <div class="name"></div>
+          <div class="author"></div>
+          <div class="badges"><span class="lic"></span><span class="b ps"></span><span class="b spring"></span><span class="b poly"></span><span class="b size"></span></div>
+        </div>
+        <div class="card-foot">
+          <span class="used"></span>
+          <button class="act lic-toggle" title="Licence (L)">LICENCE</button>
+          <button class="act more" title="More">•••</button>
+        </div>
+        <div class="drawer lic-drawer"><h4>LICENCE<button class="x close-drawer" title="Close">×</button></h4><div class="lic-body"></div></div>
+        <div class="drawer menu">
+          <h4>MODEL<button class="x close-drawer" title="Close">×</button></h4>
+          <button class="act" data-act="load">LOAD ONTO STAGE <kbd>ENTER</kbd></button>
+          <button class="act" data-act="rename">RENAME <kbd>F2</kbd></button>
+          <button class="act" data-act="thumb">RE-RENDER THUMBNAIL</button>
+          <button class="act" data-act="reveal">SHOW IN FOLDER</button>
+          <button class="act danger" data-act="remove">REMOVE FROM LIBRARY <kbd>DEL</kbd></button>
+        </div>
+      </article>
+    </template>
+    <dialog class="modal" id="home-confirm">
+      <h2><span class="idx">!</span>REMOVE FROM LIBRARY</h2>
+      <p id="home-confirm-text"></p>
+      <p class="mute">THIS DELETES PUPPET'S COPY ONLY. THE FILE YOU IMPORTED FROM IS NOT TOUCHED.</p>
+      <div class="row btns"><button class="btn" id="btn-confirm-cancel" autofocus>CANCEL</button><button class="btn accent" id="btn-confirm-ok">REMOVE</button></div>
+    </dialog>
     <video id="video" muted playsinline></video>
     <script type="module" src="/src/main.ts"></script>
   </body>

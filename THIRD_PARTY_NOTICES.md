@@ -65,6 +65,7 @@ The built-in 3D environments ship **no asset files**. Every scene, texture and s
 
 ## Algorithms
 
+- VRM meta: field names and the 0.x → 1.0 licence mapping follow the VRM specification (<https://github.com/vrm-c/vrm-specification>, MIT) and its published migration rules; the model library adds no new dependencies.
 - One-euro filter: Géry Casiez, Nicolas Roussel, Daniel Vogel, "1€ Filter: A Simple Speed-based Low-pass Filter for Noisy Input in Interactive Systems", CHI 2012. Implemented from the paper.
 - VMC protocol: <https://protocol.vmc.info/> (message layout only).
 - Colour temperature: blackbody sRGB values at 1000 K steps, approximated from Mitchell Charity's blackbody colour data ("What color is a blackbody?", vendian.org), interpolated and luminance-normalised in `src/scene/environment/look.ts`.

@@ -9,6 +9,8 @@
  *   ?mode=face|upper|hands         override the tracking mode
  *   ?capture=1                     start in capture view
  *   ?vcam=1&vcamres=1920x1080      start the virtual camera output
+ *   ?home=0|1                      skip / force the HOME library screen at start
+ *                                  (default: shown unless ?model= or ?capture=1)
  */
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/700.css';
@@ -49,6 +51,7 @@ import { VCAM_RESOLUTIONS, type VcamResolution } from './vcam/frame';
 import { VirtualCamOutput } from './vcam/output';
 import { loadSettings, saveSettings, type Settings } from './app/settings';
 import { bindEnvironmentUi } from './app/environmentUi';
+import { mountHome } from './app/home';
 import type { PhysicsMode } from './physics/stableSprings';
 
 const params = new URLSearchParams(location.search);
@@ -156,7 +159,7 @@ tracker.onResult = (r) => {
 };
 
 // ---------------------------------------------------------------- model loading
-async function loadModel(buf: ArrayBuffer, label: string, path: string | null): Promise<void> {
+async function loadModel(buf: ArrayBuffer, label: string, path: string | null): Promise<boolean> {
   setStatus(`LOADING ${label}`);
   try {
     const { avatar: a, hash } = await loadAvatar(buf, settings.physics);
@@ -180,8 +183,11 @@ async function loadModel(buf: ArrayBuffer, label: string, path: string | null): 
     buildBlendshapeList();
     buildPhysicsUI();
     setStatus(`MODEL OK: ${a.physics.chains.length} CHAINS, ${a.physics.jointCount} JOINTS`);
+    home.modelLoaded(hash, buf, label, path); // library: header name, licence, import if new
+    return true;
   } catch (e) {
     setStatus(`MODEL LOAD FAILED: ${(e as Error).message}`, true);
+    return false;
   }
 }
 
@@ -821,14 +827,25 @@ function setDebug(on: boolean): void {
   persist();
 }
 
+// ---------------------------------------------------------------- home (model library, src/app/home.ts)
+const home = await mountHome({
+  loadModel,
+  setStatus,
+  lastModelPath: settings.lastModelPath,
+  onShow: () => requestAnimationFrame(() => viewer.resize()),
+});
+
 // ---------------------------------------------------------------- keyboard
 window.addEventListener('keydown', (e) => {
   const tag = (e.target as HTMLElement).tagName;
   if (tag === 'INPUT' && (e.target as HTMLInputElement).type !== 'checkbox' && (e.target as HTMLInputElement).type !== 'range') return;
   if (tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (home.handleKey(e)) return;
   const k = e.key.toLowerCase();
   const capture = document.body.classList.contains('capture');
   if (k === 'escape' && capture) setCapture(false);
+  else if (k === 'escape' || k === 'l') home.show(true);
+  else if (k === 'i') home.toggleModelInfo();
   else if (k === 'h') setCapture(!capture);
   else if (k === 'o') openModelDialog();
   else if (k === 'c') calibrate();
@@ -859,11 +876,15 @@ window.addEventListener('keydown', (e) => {
 const drop = $('drop');
 await onNativeDrop(
   async (paths) => {
+    if (home.visible) return home.importPaths(paths);
     const p = paths.find((x) => /\.vrm$/i.test(x));
     if (p) await loadModel(await readPath(p), baseName(p), p);
     else if (!(await envUi.dropPaths(paths))) setStatus('DROP A .VRM (OR A .GLB / .HDR ENVIRONMENT)', true);
   },
-  (on) => drop.classList.toggle('on', on),
+  (on) => {
+    drop.classList.toggle('on', on && !home.visible);
+    home.setDropHover(on);
+  },
 );
 if (!isTauri) {
   window.addEventListener('dragover', (e) => {
@@ -877,6 +898,7 @@ if (!isTauri) {
     e.preventDefault();
     drop.classList.remove('on');
     const files = Array.from(e.dataTransfer?.files ?? []);
+    if (home.visible) return home.importFiles(files);
     const f = files.find((x) => /\.vrm$/i.test(x.name));
     if (f) await loadModel(await f.arrayBuffer(), f.name, null);
     else await envUi.dropFiles(files);
@@ -983,12 +1005,11 @@ if (modelUrl) {
   readPath(modelUrl)
     .then((b) => loadModel(b, baseName(modelUrl), null))
     .catch((e) => setStatus(`MODEL: ${e.message}`, true));
-} else if (isTauri && settings.lastModelPath) {
-  const p = settings.lastModelPath;
-  readPath(p)
-    .then((b) => loadModel(b, baseName(p), p))
-    .catch(() => setStatus('LAST MODEL NOT FOUND, OPEN ONE', true));
 }
+// HOME is the first screen (it lists the library, last used first) unless a
+// model or capture view was asked for. The old "last model" setting is offered
+// for import there once.
+home.show(params.has('home') ? params.get('home') === '1' : !modelUrl && params.get('capture') !== '1');
 
 tracker
   .init()
@@ -1014,6 +1035,7 @@ Object.assign(window, {
     },
     record,
     calibrate,
+    home,
     vcam,
     env: envUi,
     frame: (f: Framing) => {

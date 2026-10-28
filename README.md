@@ -28,8 +28,9 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
   - smoothing and a speed limit on the tracked torso before physics sees it.
 
   There is a global OFF / STIFF / NORMAL switch (`8` `9` `0`), a per-chain table (on/off, stiffness/drag/gravity multipliers) and per-collider toggles. Overrides are saved per model, keyed by the SHA-256 of the file. See [Physics test](#physics-stability-test) for measurements.
+- **Model library (HOME).** The first screen at launch; `L` or `Esc` from the stage returns to it. See [Model library](#model-library).
 - **App UX.**
-  - Open a VRM from a file dialog (`O`) or by dropping it on the window; the last model reopens at launch.
+  - Open a VRM from a file dialog (`O`) or by dropping it on the window; it is added to the library too.
   - Pick the camera, resolution and tracking rate.
   - Toggle the tracking preview inset (`T`) with the landmark overlay.
   - Background: solid colour (chroma key presets), transparent, an image, or a lit **3D environment** (`E`, see below).
@@ -39,7 +40,34 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
 
 ### Keys
 
-`O` open · `E` 3D environment on/off · `H` capture view · `Esc` leave capture view · `C` calibrate neutral · `M` mirror · `T` preview · `V` VMC on/off · `W` virtual camera on/off · `1` `2` `3` tracking mode · `8` `9` `0` physics off/stiff/normal · `R` settle physics · `F` `P` face/physics tab · `D` debug bar
+Stage: `L` / `Esc` home · `I` model info and licence · `O` open · `E` 3D environment on/off · `H` capture view · `Esc` leave capture view · `C` calibrate neutral · `M` mirror · `T` preview · `V` VMC on/off · `W` virtual camera on/off · `1` `2` `3` tracking mode · `8` `9` `0` physics off/stiff/normal · `R` settle physics · `F` `P` face/physics tab · `D` debug bar
+
+Home: `←` `↑` `↓` `→` move · `Enter` load · `S` favourite · `L` licence · `F2` rename · `Del` remove · `/` search · `I` import · `Esc` back to the stage
+
+## Model library
+
+HOME shows every imported model as a card: a bust thumbnail rendered at import, the name and author, VRM 0.x / 1.0, `PERFECT SYNC n/52` or `PRESETS n/13`, spring-bone chains, triangles, file size, a licence badge, a favourite star and when it was last used. Filter ALL / FAVOURITES (favourites always sort first in ALL), search by name or author, sort by last used, name or date added. Each card also has RENAME, RE-RENDER THUMBNAIL, SHOW IN FOLDER and REMOVE FROM LIBRARY (asks first, and deletes only Puppet's copy).
+
+Import with **IMPORT .VRM** (`I`, several files at once) or by dropping `.vrm` files on HOME; each file shows its progress and its own error ("NOT A VRM ..."). Opening a model from the stage (`O`, drop) imports it as well. Models are deduplicated by SHA-256.
+
+Storage (desktop):
+
+```
+<app data>/library/library.json          favourites, custom names, added / last-used times (atomic write)
+<app data>/library/<sha256>/model.vrm    Puppet's own copy, so moving the original is fine
+<app data>/library/<sha256>/thumb.png    512×512 bust thumbnail
+<app data>/library/<sha256>/meta.json    measured info and the parsed VRM meta (written last)
+```
+
+`<app data>` is e.g. `~/Library/Application Support/com.spartangamestudios.puppet` on macOS. `PUPPET_LIBRARY_DIR` (or `PUPPET_SETTINGS_DIR`, as `<dir>/library`) moves it for tests. The Rust commands (`src-tauri/src/library.rs`) only accept 64-hex-character ids and the three file names above, so nothing outside the library can be read, written or deleted through them. In a plain browser (`pnpm dev`) the library lives in IndexedDB instead. The pre-library "last model" setting is offered for import once.
+
+### Licences
+
+Every VRM carries its author's terms in its metadata. Puppet reads them (VRM 1.0 and 0.x, `src/library/vrmMeta.ts`) and shows them in plain language in the card's LICENCE drawer and in the stage's MODEL INFO panel (`I`). The card badge summarises them: **AUTHOR ONLY** / **LICENSED ONLY** (only the author, or people they licensed, may perform as the model), **CC0**, **COMMERCIAL OK** (companies too), **SOLO COMMERCIAL** (individuals may earn money), **PERSONAL** (non-profit only) or **NO TERMS**. Loading an AUTHOR ONLY or LICENSED ONLY model shows a one-time notice. Puppet never refuses to load a model: this is information, not DRM.
+
+VRM 0.x fields map to 1.0 as the VRM consortium's migration does (`allowedUserName` → `avatarPermission`, `commercialUssageName` Allow → `personalProfit`); 0.x credit / redistribution / modification terms come from the licence name (CC0, CC_BY, ...) or a VRoid Hub licence URL. Literal `"undefined"` strings, which one exporter writes, count as empty.
+
+`PUPPET_MODELS="a.vrm:b.vrm:c.vrm" PUPPET_URL=http://localhost:5173 node scripts/library-test.mjs out/` drives the whole library UI in headless Chrome (IndexedDB storage) and saves screenshots.
 
 ### 3D environments
 
@@ -74,8 +102,8 @@ Requires Node 22+ and pnpm, Rust (stable), and the [Tauri 2 prerequisites](https
 pnpm install
 pnpm tauri dev      # run the desktop app
 pnpm tauri build    # release bundle: .app + .dmg on macOS, .msi/.exe on Windows, .deb/.rpm/.AppImage on Linux
-pnpm test           # unit tests (blendshape mapping, one-euro filter, solver, VMC conversion, virtual camera frames)
-cargo test --manifest-path src-tauri/Cargo.toml   # VMC OSC encoding, UDP loopback, virtual camera conversion and sinks
+pnpm test           # unit tests (blendshape mapping, one-euro filter, solver, VMC conversion, virtual camera frames, VRM meta / licences, library index)
+cargo test --manifest-path src-tauri/Cargo.toml   # VMC OSC encoding, UDP loopback, virtual camera conversion and sinks, library path validation and storage
 ```
 
 `pnpm dev` alone serves the UI in a normal browser at <http://localhost:5173>. Everything except VMC output (a browser can't send UDP) and native file paths works there.

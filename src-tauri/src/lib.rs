@@ -1,7 +1,9 @@
 //! Puppet: Tauri shell. The app itself (rendering, tracking, solving) is the
 //! web frontend; Rust provides file access, settings persistence, the VMC
-//! sender, the virtual camera output and camera permission handling.
+//! sender, the virtual camera output, the model library (library.rs) and
+//! camera permission handling.
 
+mod library;
 mod vcam;
 mod vmc;
 
@@ -192,7 +194,17 @@ pub fn run() {
             vcam_select_device,
             vcam_start,
             vcam_stop,
-            vcam_frame
+            vcam_frame,
+            library::library_location,
+            library::library_list,
+            library::library_import_path,
+            library::library_write,
+            library::library_read,
+            library::library_delete,
+            library::library_index_load,
+            library::library_index_save,
+            library::library_reveal,
+            library::library_open_link
         ])
         .run(tauri::generate_context!())
         .expect("error while running Puppet");
