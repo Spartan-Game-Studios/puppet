@@ -16,6 +16,10 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
 - **Upper body and hands.** PoseLandmarker world landmarks drive the spine, chest, shoulders and arms. HandLandmarker drives all finger bones. Choose FACE (`1`), +BODY (`2`) or +HANDS (`3`). Legs stay in an idle stance.
   - The solver is Puppet's own: direction vectors against the model's measured rest directions, with an elbow-hinge-aware upper-arm twist and part of the wrist twist moved into the forearm. Hands are found by cropping around each pose wrist, so small webcam hands are still seen. Untracked arms ease back to an idle pose.
 - **VMC protocol output** over OSC/UDP from the Rust side (`rosc`). Messages: `/VMC/Ext/OK`, `/VMC/Ext/T`, `/VMC/Ext/Root/Pos`, `/VMC/Ext/Bone/Pos` (all humanoid bones, Unity coordinates), `/VMC/Ext/Blend/Val` and `/VMC/Ext/Blend/Apply`. Host and port are configurable (default `127.0.0.1:39539`). Bundles are split under 1200 bytes so they also cross a real network.
+- **Virtual camera output.** Puppet shows up as a webcam, **Puppet Virtual Camera**, in Zoom, Meet, Discord, FaceTime and OBS (**05 VIRTUAL CAM**, `W`). It sends the capture view at 1280×720 or 1920×1080, 30 fps. Cameras have no alpha, so the CLEAR background is sent as the chosen colour (green by default). See [Virtual camera](#virtual-camera).
+  - macOS 12.3+: a CoreMediaIO Camera Extension inside Puppet.app (needs a Developer ID–signed build; see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)).
+  - Windows 10/11: a DirectShow camera built from [softcam](https://github.com/tshino/softcam) (MIT); one admin prompt to register it.
+  - Linux: a v4l2loopback device you create with `modprobe`.
 - **Stable physics.** three-vrm's spring bones with stabilisers:
   - a fixed-timestep solver (60 Hz × 1–4 substeps) decoupled from frame rate, with the accumulator clamped so a stall never replays as a burst;
   - a max tail speed per step;
@@ -35,7 +39,7 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
 
 ### Keys
 
-`O` open · `H` capture view · `Esc` leave capture view · `C` calibrate neutral · `M` mirror · `T` preview · `V` VMC on/off · `1` `2` `3` tracking mode · `8` `9` `0` physics off/stiff/normal · `R` settle physics · `F` `P` face/physics tab · `D` debug bar
+`O` open · `H` capture view · `Esc` leave capture view · `C` calibrate neutral · `M` mirror · `T` preview · `V` VMC on/off · `W` virtual camera on/off · `1` `2` `3` tracking mode · `8` `9` `0` physics off/stiff/normal · `R` settle physics · `F` `P` face/physics tab · `D` debug bar
 
 ## Install, run, build
 
@@ -45,21 +49,39 @@ Requires Node 22+ and pnpm, Rust (stable), and the [Tauri 2 prerequisites](https
 pnpm install
 pnpm tauri dev      # run the desktop app
 pnpm tauri build    # release bundle: .app + .dmg on macOS, .msi/.exe on Windows, .deb/.rpm/.AppImage on Linux
-pnpm test           # unit tests (blendshape mapping, one-euro filter, solver, VMC conversion)
-cargo test --manifest-path src-tauri/Cargo.toml   # VMC OSC encoding + UDP loopback tests
+pnpm test           # unit tests (blendshape mapping, one-euro filter, solver, VMC conversion, virtual camera frames)
+cargo test --manifest-path src-tauri/Cargo.toml   # VMC OSC encoding, UDP loopback, virtual camera conversion and sinks
 ```
 
 `pnpm dev` alone serves the UI in a normal browser at <http://localhost:5173>. Everything except VMC output (a browser can't send UDP) and native file paths works there.
 
 **MediaPipe models are downloaded at build time, not vendored.** `scripts/fetch-models.mjs` runs before every `dev`/`build`. It downloads the four `.task` files (Apache-2.0, published by Google) from Google's official storage (`storage.googleapis.com/mediapipe-models/...`, versioned URLs) into `public/mediapipe/models/`, checks each one against a pinned SHA-256, and copies the tasks-vision WASM runtime out of `node_modules`. The release bundle contains them. The first build needs internet access.
 
-Builds are unsigned. On macOS, right-click the app and choose **Open** the first time, or run `xattr -dr com.apple.quarantine /Applications/Puppet.app`.
+Builds are unsigned unless the Apple signing secrets are configured (see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)). On macOS, right-click the app and choose **Open** the first time, or run `xattr -dr com.apple.quarantine /Applications/Puppet.app`.
+
+Platform extras for the virtual camera: on macOS, `pnpm tauri build` also builds the Swift camera extension (`src-tauri/macos/build-camera-extension.sh`, needs Xcode); on Windows, `pnpm tauri dev` / `build` first build `softcam.dll` (`scripts/build-softcam.ps1`, needs git and Visual Studio 2022+ with C++, which Tauri needs anyway).
 
 ### Avatars
 
 Puppet ships no avatar. Use your own `.vrm` (VRM 0.x or 1.0), for example one exported from [VRoid Studio](https://vroid.com/en/studio), or any model whose licence allows your use. Check the model's own VRM licence metadata. `*.vrm` is git-ignored throughout this repo; please don't commit models.
 
-## OBS → Virtual Camera → Discord / Zoom
+## Virtual camera
+
+1. Pick a background in **03 BACKGROUND** (CLEAR is sent as the chosen colour).
+2. In **05 VIRTUAL CAM**, do the one-time setup the panel asks for:
+   - **macOS:** Puppet must be in /Applications. Click **INSTALL CAMERA**, then approve it in System Settings → General → Login Items & Extensions → Camera Extensions (macOS 13–14: Privacy & Security → Allow). This needs a signed build; unsigned builds say so and point to the OBS route.
+   - **Windows:** click **REGISTER CAMERA** and accept the admin prompt.
+   - **Linux:** create a loopback device once (the panel shows this command, click to copy):
+     ```sh
+     sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="Puppet" exclusive_caps=1
+     ```
+3. Tick **SEND TO VIRTUAL CAMERA** (`W`) and pick **Puppet Virtual Camera** (Linux: **Puppet**) as the camera in Zoom, Meet, Discord or OBS.
+
+Details, the Apple Developer portal setup for signed builds, and how it works: [docs/virtual-camera.md](docs/virtual-camera.md).
+
+## OBS → Virtual Camera → Discord / Zoom (zero-install route)
+
+This works on every OS without installing a camera driver. Use it when the native virtual camera isn't available (for example an unsigned macOS build).
 
 1. In Puppet, pick a background:
    - **COLOUR** green (`#00ff00`) is the most reliable;
@@ -99,6 +121,9 @@ The app accepts URL parameters in the browser and, for the desktop app, the same
 | `tracker=main` | run MediaPipe on the main thread instead of workers |
 | `record=1` | keep a per-result log in `window.__puppet.record` |
 | `debuglog=1` | print a stats line every 2 s (stdout in the desktop app) |
+| `vcam=1`, `vcamres=1280x720\|1920x1080`, `vcamsend=0` | start the virtual camera output; `vcamsend=0` grabs frames without sending them |
+
+Desktop-only environment variables: `PUPPET_VCAM_SINK=file:/abs/out.yuyv` (write virtual camera frames to a file plus a JSON summary instead of the OS camera) or `=null`, `PUPPET_VCAM_SELFTEST=status|setup`, and `PUPPET_SETTINGS_DIR` (use a scratch settings folder). See [docs/virtual-camera.md](docs/virtual-camera.md#testing-without-a-camera).
 
 For example:
 
@@ -112,6 +137,7 @@ The scripts in `scripts/` drive headless Chrome through Playwright, using your i
 - `PUPPET_MODEL=avatar.vrm node scripts/track-clip.mjs out/ shots/` plays that clip through the real app pipeline (`?source=file`). It reports detection rates, fps, latency and the correlation of each tracked channel with the truth, then screenshots key moments.
 - `PUPPET_MODEL=avatar.vrm node scripts/physics-test.mjs` runs the physics stability test below.
 - `PUPPET_MODEL=avatar.vrm node scripts/screenshot.mjs ui.png` screenshots the UI.
+- `PUPPET_MODEL=avatar.vrm node scripts/vcam-test.mjs out/` checks the virtual camera frame source in headless Chrome (size, BGRA order, background composite, 30 fps), and `scripts/vcam-desktop-test.mjs` runs a built desktop app with the file sink and measures CPU with the output on and off.
 
 Footage rendered from a model inherits that model's licence. Keep it out of the repo unless the model is redistributable.
 
@@ -149,12 +175,17 @@ Results on a VRM 1.0 avatar with a 20-chain skirt (120 skirt joints, 223 joints 
 - **Single-eye winks** register weakly with MediaPipe on the test footage. Both-eye blinks track well.
 - **Legs** are an idle stance only (v1). There is no hip translation or walking.
 - **Pose model** changes (LITE/FULL) apply on the next launch.
+- **Virtual camera.**
+  - macOS needs a Developer ID–signed build with the system-extension entitlement; unsigned builds (including CI artifacts) can't install the camera. The extension, its activation and the CMIO sink path have been built and checked as far as an unsigned build allows (activation stops at "missing entitlement"); the signed install and a real Zoom/Meet session are untested.
+  - Windows (softcam) and Linux (v4l2loopback) build and pass unit tests in CI but have not been run on real machines.
+  - The camera gets a new frame only when Puppet renders one, so its rate is capped by the app's render rate. Puppet keeps rendering while its window is hidden or covered (`backgroundThrottling` is off), but a heavily loaded machine lowers both.
+  - 30 fps only. Windows: 64-bit camera apps only (no 32-bit DLL).
 - The **inertia** stabiliser assumes no VRM spring `center`; chains with a center are simulated in center space by three-vrm already.
 
 ## Licences and credits
 
 Puppet is MIT licensed (see `LICENSE`). Third-party components and their licences are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Built on [three.js](https://threejs.org) (MIT), [@pixiv/three-vrm](https://github.com/pixiv/three-vrm) (MIT), [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe) (Apache-2.0, models Apache-2.0), [Tauri](https://tauri.app) (MIT/Apache-2.0), [rosc](https://github.com/klingtnet/rosc) (MIT/Apache-2.0) and [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (OFL-1.1). The one-euro filter follows Casiez, Roussel and Vogel (CHI 2012).
+Built on [three.js](https://threejs.org) (MIT), [@pixiv/three-vrm](https://github.com/pixiv/three-vrm) (MIT), [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe) (Apache-2.0, models Apache-2.0), [Tauri](https://tauri.app) (MIT/Apache-2.0), [rosc](https://github.com/klingtnet/rosc) (MIT/Apache-2.0), [softcam](https://github.com/tshino/softcam) (MIT, Windows virtual camera) and [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (OFL-1.1). The one-euro filter follows Casiez, Roussel and Vogel (CHI 2012).
 
 Puppet's code is written from these libraries and their documentation. It contains no code from other VTuber applications.

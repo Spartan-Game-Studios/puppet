@@ -24,6 +24,19 @@ is under a permissive licence; transitive notes are at the end.
 | [rosc](https://crates.io/crates/rosc) | MIT OR Apache-2.0 |
 | [serde](https://crates.io/crates/serde), serde_json | MIT OR Apache-2.0 |
 | [webkit2gtk](https://crates.io/crates/webkit2gtk) (Linux only) | MIT |
+| [libc](https://crates.io/crates/libc) (Linux only: V4L2 ioctls for the virtual camera) | MIT OR Apache-2.0 |
+| [libloading](https://crates.io/crates/libloading) (Windows only: loads softcam.dll) | ISC |
+| [cc](https://crates.io/crates/cc) (build time, macOS: compiles the Objective-C camera bridge) | MIT OR Apache-2.0 |
+
+## Shipped in the app (virtual camera)
+
+| Component | Version | Licence | Notes |
+|---|---|---|---|
+| [softcam](https://github.com/tshino/softcam) | v1.8.1 (`afb424c`) | MIT, Copyright (c) 2020 tshino | Windows only. Built by `scripts/build-softcam.ps1` from the pinned commit, with Puppet's own filter name, CLSID and shared-memory names patched in; shipped as `softcam.dll` with its licence as `LICENSE-softcam.txt`. Loaded at runtime, not linked. |
+| DirectShow Base Classes (part of softcam, from [Windows-classic-samples](https://github.com/microsoft/Windows-classic-samples)) | as in softcam | MIT, Copyright (c) Microsoft Corporation | compiled into `softcam.dll` |
+| Puppet camera extension (`src-tauri/macos/camera-extension/`) and bridge (`src-tauri/macos/bridge/`) | | MIT (Puppet's own code) | macOS only; uses Apple system frameworks (CoreMediaIO, CoreMedia, CoreVideo, Accelerate, SystemExtensions) |
+
+Linux uses the user-installed [v4l2loopback](https://github.com/umlaeute/v4l2loopback) kernel module (GPL-2.0) only through the standard V4L2 device interface (`open`, `ioctl`, `write` on `/dev/videoN`). No v4l2loopback code is linked into or shipped with Puppet.
 
 Transitive Rust dependencies (about 250 crates, pulled in by Tauri) are almost
 all MIT / Apache-2.0 / BSD / ISC / Zlib / Unicode-3.0 / Unlicense. Run
