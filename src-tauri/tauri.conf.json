@@ -20,7 +20,8 @@
         "minWidth": 960,
         "minHeight": 600,
         "transparent": true,
-        "dragDropEnabled": true
+        "dragDropEnabled": true,
+        "backgroundThrottling": "disabled"
       }
     ],
     "security": {

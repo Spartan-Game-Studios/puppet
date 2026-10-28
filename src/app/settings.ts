@@ -3,6 +3,7 @@ import { defaultGainCurves, type GainCurve } from '../core/blendshapes';
 import { DEFAULT_PHYSICS, type PhysicsOverrides, type PhysicsSettings } from '../physics/stableSprings';
 import { EMPTY_CALIBRATION, type Calibration } from '../tracking/faceProcessor';
 import type { BodyMode } from '../tracking/protocol';
+import type { VcamResolution } from '../vcam/frame';
 import { loadSettingsRaw, saveSettingsRaw } from './platform';
 
 export type Resolution = '640x480' | '1280x720' | '1920x1080';
@@ -25,6 +26,8 @@ export interface Settings {
   calibration: Calibration;
   background: { kind: BackgroundKind; color: string; imagePath: string | null };
   vmc: { enabled: boolean; host: string; port: number };
+  /** Virtual camera output (05 VIRTUAL CAM). `device`: Linux /dev/videoN, null = first found. */
+  vcam: { enabled: boolean; resolution: VcamResolution; device: string | null };
   physics: PhysicsSettings;
   /** Per-model physics overrides, keyed by the model file's SHA-256. */
   physicsOverrides: Record<string, PhysicsOverrides>;
@@ -49,6 +52,7 @@ export function defaultSettings(): Settings {
     calibration: structuredClone(EMPTY_CALIBRATION),
     background: { kind: 'color', color: '#00ff00', imagePath: null },
     vmc: { enabled: false, host: '127.0.0.1', port: 39539 },
+    vcam: { enabled: false, resolution: '1280x720', device: null },
     physics: { ...DEFAULT_PHYSICS },
     physicsOverrides: {},
     ui: { tab: 'face', debug: true },

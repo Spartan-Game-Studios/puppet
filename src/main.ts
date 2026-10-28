@@ -8,6 +8,7 @@
  *   ?tracker=main                  run MediaPipe on the main thread
  *   ?mode=face|upper|hands         override the tracking mode
  *   ?capture=1                     start in capture view
+ *   ?vcam=1&vcamres=1920x1080      start the virtual camera output
  */
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/700.css';
@@ -38,7 +39,14 @@ import {
   vmcConfigure,
   vmcSend,
   vmcStats,
+  vcamSelectDevice,
+  vcamSetup,
+  vcamStats,
+  vcamStatus,
+  type VcamStatus,
 } from './app/platform';
+import { VCAM_RESOLUTIONS, type VcamResolution } from './vcam/frame';
+import { VirtualCamOutput } from './vcam/output';
 import { loadSettings, saveSettings, type Settings } from './app/settings';
 import type { PhysicsMode } from './physics/stableSprings';
 
@@ -52,10 +60,15 @@ const urlMode = params.get('mode') as BodyMode | null;
 if (urlMode && ['face', 'upper', 'hands'].includes(urlMode)) settings.mode = urlMode;
 if (params.has('mirror')) settings.mirror = params.get('mirror') === '1';
 if (params.has('vmc')) settings.vmc.enabled = params.get('vmc') === '1';
+if (params.has('vcam')) settings.vcam.enabled = params.get('vcam') === '1';
+const urlVcamRes = params.get('vcamres') as VcamResolution | null;
+if (urlVcamRes && urlVcamRes in VCAM_RESOLUTIONS) settings.vcam.resolution = urlVcamRes;
 const persist = () => saveSettings(settings);
 
 // ---------------------------------------------------------------- core objects
 const viewer = new Viewer($('stage'));
+const vcam = new VirtualCamOutput(viewer);
+vcam.send = params.get('vcamsend') !== '0';
 const source = new VideoSource($<HTMLVideoElement>('video'));
 const face = new FaceProcessor();
 face.mirror = settings.mirror;
@@ -242,6 +255,8 @@ async function applyBackground(): Promise<void> {
     }
   }
   viewer.setBackground(b.kind, b.color, b.kind === 'image' ? bgUrl : null);
+  // Cameras have no alpha: CLEAR is sent composited over the chosen colour.
+  vcam.setBackground(b.color);
   segSet('bg-kind', b.kind);
   document.querySelectorAll<HTMLButtonElement>('#swatches button').forEach((s) => s.classList.toggle('on', b.kind === 'color' && s.dataset.color === b.color));
   $<HTMLInputElement>('bg-color').value = b.color;
@@ -306,6 +321,7 @@ function refreshInputs(): void {
   $<HTMLInputElement>('mirror').checked = settings.mirror;
   $<HTMLInputElement>('preview').checked = settings.preview;
   $<HTMLInputElement>('vmc-enabled').checked = settings.vmc.enabled;
+  $<HTMLInputElement>('vcam-enabled').checked = settings.vcam.enabled;
   segSet('mode', settings.mode);
   segSet('phys-mode', settings.physics.mode);
 }
@@ -475,6 +491,132 @@ function sendVmc(): void {
     .catch((e) => setStatus(`VMC: ${e}`, true))
     .finally(() => (vmcBusy = false));
 }
+
+// ---------------------------------------------------------------- virtual camera UI
+let vcamStatusLast: VcamStatus | null = null;
+let vcamBusy = false;
+
+async function applyVcam(): Promise<void> {
+  if (vcamBusy) return;
+  vcamBusy = true;
+  try {
+    if (settings.vcam.enabled) {
+      const [w, h] = VCAM_RESOLUTIONS[settings.vcam.resolution] ?? VCAM_RESOLUTIONS['1280x720'];
+      vcam.setBackground(settings.background.color);
+      await vcamSelectDevice(settings.vcam.device);
+      await vcam.start(w, h);
+    } else if (vcam.running) {
+      await vcam.stop();
+    }
+  } catch (e) {
+    // Could not open the camera: turn the toggle back off and say why.
+    settings.vcam.enabled = false;
+    persist();
+    refreshInputs();
+    if (vcam.running) await vcam.stop().catch(() => {});
+    setStatus(`VIRTUAL CAM: ${e}`, true);
+  } finally {
+    vcamBusy = false;
+  }
+  refreshVcamStatus();
+}
+
+function setVcam(on: boolean): void {
+  settings.vcam.enabled = on;
+  persist();
+  refreshInputs();
+  applyVcam();
+}
+
+async function refreshVcamStatus(): Promise<void> {
+  const st = await vcamStatus().catch((e) => ({ ...(vcamStatusLast ?? ({} as VcamStatus)), state: 'error', detail: String(e) }) as VcamStatus);
+  vcamStatusLast = st;
+  const el = $('vcam-state');
+  el.textContent = st.detail || st.state.toUpperCase();
+  el.title = st.detail;
+  el.classList.toggle('state-run', st.state === 'running');
+  el.classList.toggle('status-err', st.state === 'error');
+  $('vcam-hint').textContent = st.hint ?? '';
+  const cmd = $('vcam-cmd');
+  cmd.textContent = st.command ?? '';
+  cmd.classList.toggle('hidden', !st.command);
+  const btn = $('btn-vcam-setup');
+  btn.textContent = st.action ?? '';
+  btn.classList.toggle('hidden', !st.action);
+  // The OBS route is the answer whenever the native camera can't be used.
+  $('vcam-obs').classList.toggle('mute', st.state === 'ready' || st.state === 'running');
+  const row = $('vcam-device-row');
+  row.classList.toggle('hidden', st.devices.length === 0);
+  const sel = $<HTMLSelectElement>('vcam-device');
+  const opts = st.devices.join('|');
+  if (sel.dataset.opts !== opts) {
+    sel.dataset.opts = opts;
+    sel.innerHTML = '';
+    for (const d of st.devices) sel.append(new Option(d, d));
+  }
+  if (st.device) sel.value = st.device;
+}
+
+checkBind('vcam-enabled', () => settings.vcam.enabled, (v) => setVcam(v));
+selectBind('vcam-res', () => settings.vcam.resolution, (v) => {
+  settings.vcam.resolution = v as VcamResolution;
+  persist();
+  if (settings.vcam.enabled) applyVcam();
+});
+$<HTMLSelectElement>('vcam-device').addEventListener('change', async (e) => {
+  settings.vcam.device = (e.target as HTMLSelectElement).value || null;
+  persist();
+  await vcamSelectDevice(settings.vcam.device);
+  if (vcam.running) {
+    await vcam.stop();
+    await applyVcam();
+  }
+  refreshVcamStatus();
+});
+$('btn-vcam-setup').addEventListener('click', async () => {
+  const btn = $<HTMLButtonElement>('btn-vcam-setup');
+  btn.disabled = true;
+  try {
+    await vcamSetup();
+  } catch (e) {
+    setStatus(`VIRTUAL CAM: ${e}`, true);
+  } finally {
+    btn.disabled = false;
+  }
+  // Activation (macOS) finishes asynchronously; poll a little faster for a while.
+  for (let i = 0; i < 15; i++) setTimeout(refreshVcamStatus, 1000 * (i + 1));
+  refreshVcamStatus();
+});
+$('btn-vcam-refresh').addEventListener('click', () => refreshVcamStatus());
+$('vcam-cmd').addEventListener('click', async () => {
+  const cmd = $('vcam-cmd');
+  try {
+    await navigator.clipboard.writeText(cmd.textContent ?? '');
+    cmd.classList.add('copied');
+    setTimeout(() => cmd.classList.remove('copied'), 600);
+  } catch {
+    /* clipboard unavailable: the text is selectable */
+  }
+});
+vcam.onError = (e) => setStatus(`VIRTUAL CAM: ${e}`, true);
+
+async function pollVcam(): Promise<void> {
+  const el = $('vcam-stats');
+  if (!vcam.running) {
+    el.textContent = 'OFF';
+    return;
+  }
+  const r = await vcamStats().catch(() => null);
+  const j = vcam.stats;
+  const [w, h] = [vcam.grabber.width, vcam.grabber.height];
+  el.textContent = r
+    ? `${Math.round(r.fps_out)} FPS ${w}×${h} ${r.format ?? ''}${r.dropped + j.busy ? ` ${r.dropped + j.busy} DROP` : ''}${r.write_errors ? ` ${r.write_errors} ERR` : ''}`
+    : `${j.fps} FPS ${w}×${h} (NOT SENT)`;
+}
+setInterval(pollVcam, 1000);
+setInterval(() => {
+  if (!document.body.classList.contains('capture')) refreshVcamStatus();
+}, 3000);
 
 // ---------------------------------------------------------------- tabs
 function setTab(t: 'face' | 'physics'): void {
@@ -680,7 +822,8 @@ window.addEventListener('keydown', (e) => {
     refreshInputs();
     persist();
     applyVmc();
-  } else if (k === 'd') setDebug(!settings.ui.debug);
+  } else if (k === 'w') setVcam(!settings.vcam.enabled);
+  else if (k === 'd') setDebug(!settings.ui.debug);
   else if (k === 'f') setTab('face');
   else if (k === 'p') setTab('physics');
   else if (k === 'r') avatar?.physics.reset();
@@ -735,6 +878,7 @@ function tick(now: number): void {
   const t0f = performance.now();
   avatar?.update(dt);
   viewer.render();
+  vcam.tick(now);
   frameMs += 0.1 * (performance.now() - t0f - frameMs);
   frameCount++;
 
@@ -771,9 +915,21 @@ if (params.get('debuglog') === '1') {
   setInterval(() => {
     const s = tracker.stats;
     debugLog(
-      `render ${renderTimes.length}fps frame ${frameMs.toFixed(1)}ms | face ${s.face.fps}fps lat ${s.face.latency.toFixed(0)}ms inf ${s.face.infer.toFixed(1)}ms | body ${s.body.fps}fps lat ${s.body.latency.toFixed(0)}ms pose ${s.body.pose.toFixed(1)} hands ${s.body.hands.toFixed(1)}ms | ${s.where} ${s.delegate} | ${$('status').textContent} | ${$('sync-mode').textContent} | vmc ${$('vmc-stats').textContent}`,
+      `render ${renderTimes.length}fps frame ${frameMs.toFixed(1)}ms | ${vcamLogLine()} | face ${s.face.fps}fps lat ${s.face.latency.toFixed(0)}ms inf ${s.face.infer.toFixed(1)}ms | body ${s.body.fps}fps lat ${s.body.latency.toFixed(0)}ms pose ${s.body.pose.toFixed(1)} hands ${s.body.hands.toFixed(1)}ms | ${s.where} ${s.delegate} | ${$('status').textContent} | ${$('sync-mode').textContent} | vmc ${$('vmc-stats').textContent}`,
     );
   }, 2000);
+}
+
+let vcamRust: Awaited<ReturnType<typeof vcamStats>> = null;
+function vcamLogLine(): string {
+  if (!vcam.running) return 'vcam off';
+  vcamStats().then((r) => (vcamRust = r)).catch(() => {});
+  const j = vcam.stats;
+  const r = vcamRust;
+  const js = `vcam ${vcam.grabber.width}x${vcam.grabber.height} sent ${j.sent} ${j.fps}fps busy ${j.busy} err ${j.errors} render ${j.render.toFixed(2)}ms readback ${j.readback.toFixed(2)}ms ipc ${j.ipc.toFixed(2)}ms total ${j.total.toFixed(2)}ms`;
+  return r
+    ? `${js} | rust in ${r.received} ${r.fps_in}fps out ${r.written} ${r.fps_out}fps drop ${r.dropped} rej ${r.rejected} ${r.format} copy ${r.copy_ms.toFixed(2)}ms write ${r.write_ms.toFixed(2)}ms maxgap ${r.max_gap_ms.toFixed(0)}ms${r.last_error ? ` lasterr ${r.last_error}` : ''}`
+    : js;
 }
 
 async function pollVmc(): Promise<void> {
@@ -797,6 +953,10 @@ buildBlendshapeList();
 if (params.get('capture') === '1') setCapture(true);
 requestAnimationFrame(tick);
 applyVmc();
+$<HTMLSelectElement>('vcam-res').value = settings.vcam.resolution;
+refreshVcamStatus().then(() => {
+  if (settings.vcam.enabled) applyVcam();
+});
 
 const modelUrl = params.get('model');
 if (modelUrl) {
@@ -834,6 +994,7 @@ Object.assign(window, {
     },
     record,
     calibrate,
+    vcam,
     frame: (f: Framing) => {
       currentFraming = f;
       segSet('framing', f);

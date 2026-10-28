@@ -121,3 +121,83 @@ export async function mediaUrl(src: string): Promise<string> {
   const type = src.endsWith('.webm') ? 'video/webm' : 'video/mp4';
   return URL.createObjectURL(new Blob([buf], { type }));
 }
+
+// ---------------------------------------------------------------- virtual camera
+
+export type VcamState = 'unavailable' | 'needs_setup' | 'needs_approval' | 'ready' | 'running' | 'error';
+
+/** Mirrors `vcam::SinkStatus` in src-tauri/src/vcam/mod.rs. */
+export interface VcamStatus {
+  sink: string;
+  state: VcamState;
+  detail: string;
+  hint: string | null;
+  command: string | null;
+  action: string | null;
+  devices: string[];
+  device: string | null;
+  format: 'bgra' | 'yuyv' | 'bgr24' | null;
+}
+
+/** Mirrors `vcam::VcamStats`. */
+export interface VcamRustStats {
+  running: boolean;
+  width: number;
+  height: number;
+  format: string | null;
+  received: number;
+  written: number;
+  dropped: number;
+  rejected: number;
+  write_errors: number;
+  last_error: string | null;
+  bytes: number;
+  fps_in: number;
+  fps_out: number;
+  copy_ms: number;
+  write_ms: number;
+  max_gap_ms: number;
+}
+
+const BROWSER_VCAM: VcamStatus = {
+  sink: 'browser',
+  state: 'unavailable',
+  detail: 'DESKTOP APP ONLY',
+  hint: 'The virtual camera needs the desktop app. In a browser, use the OBS route below.',
+  command: null,
+  action: null,
+  devices: [],
+  device: null,
+  format: null,
+};
+
+export async function vcamStatus(): Promise<VcamStatus> {
+  return isTauri ? invoke<VcamStatus>('vcam_status') : BROWSER_VCAM;
+}
+
+export async function vcamStats(): Promise<VcamRustStats | null> {
+  return isTauri ? invoke<VcamRustStats>('vcam_stats') : null;
+}
+
+export async function vcamSetup(): Promise<void> {
+  if (isTauri) await invoke('vcam_setup');
+}
+
+export async function vcamSelectDevice(device: string | null): Promise<void> {
+  if (isTauri) await invoke('vcam_select_device', { device });
+}
+
+export async function vcamStart(width: number, height: number, fps: number): Promise<void> {
+  if (isTauri) await invoke('vcam_start', { width, height, fps });
+}
+
+export async function vcamStop(): Promise<void> {
+  if (isTauri) await invoke('vcam_stop');
+}
+
+/** One frame as a raw binary IPC body (header + BGRA); no JSON, no base64. */
+export async function vcamFrame(bytes: Uint8Array): Promise<void> {
+  if (!isTauri) return;
+  const { invoke: inv } = await import('@tauri-apps/api/core');
+  await inv('vcam_frame', bytes);
+}
