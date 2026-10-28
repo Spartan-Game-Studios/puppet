@@ -1,5 +1,6 @@
 // Minimal VMC/OSC listener for checking Puppet's output.
-//   node scripts/vmc-listen.mjs [port=39539] [seconds=5]
+//   node scripts/vmc-listen.mjs [port=39539] [seconds=5] [blends]
+// With `blends`, also lists every /VMC/Ext/Blend/Val name and its peak value.
 // Prints message counts per address and a few sample values.
 import dgram from 'node:dgram';
 
@@ -8,6 +9,7 @@ const seconds = Number(process.argv[3] ?? 5);
 const counts = new Map();
 const samples = new Map();
 let datagrams = 0;
+const blendPeak = new Map();
 
 const str = (b, o) => {
   let e = o;
@@ -34,6 +36,7 @@ function message(b, o) {
     }
   }
   counts.set(addr, (counts.get(addr) ?? 0) + 1);
+  if (addr === '/VMC/Ext/Blend/Val') blendPeak.set(args[0], Math.max(blendPeak.get(args[0]) ?? 0, args[1]));
   samples.set(addr + (typeof args[0] === 'string' ? ` ${args[0]}` : ''), args);
 }
 
@@ -69,4 +72,6 @@ setTimeout(() => {
   ]) {
     if (samples.has(k)) console.log(k, JSON.stringify(samples.get(k)));
   }
+  if (process.argv[4] === 'blends')
+    console.log(`blends (${blendPeak.size}, peak): ${[...blendPeak].map(([n, v]) => `${n}=${v.toFixed(2)}`).join(' ')}`);
 }, seconds * 1000);

@@ -97,6 +97,7 @@
           <label class="check"><input type="checkbox" id="vmc-enabled" /><span>SEND VMC (OSC/UDP)</span><kbd>V</kbd></label>
           <label class="row"><span class="lbl">HOST</span><input id="vmc-host" type="text" spellcheck="false" /></label>
           <label class="row"><span class="lbl">PORT</span><input id="vmc-port" type="number" min="1" max="65535" /></label>
+          <label class="check" title="Blink, A/I/U/E/O, Joy... derived from the ARKit values, for receivers that only read presets"><input type="checkbox" id="vmc-presets" /><span>ALSO SEND VRM PRESETS</span></label>
           <div class="row"><span class="lbl">TX</span><span id="vmc-stats" class="val">OFF</span></div>
         </section>
 
@@ -171,6 +172,10 @@
           </div>
           <p class="note mute" id="vcam-obs">NO NATIVE CAMERA? <kbd>H</kbd> CAPTURE VIEW → OBS WINDOW CAPTURE → START VIRTUAL CAMERA. CAMERAS HAVE NO ALPHA: CLEAR IS SENT AS THE CHOSEN COLOUR.</p>
         </section>
+        <!-- 07 MOTION, 08 HOTKEYS, 09 LIP SYNC: built by src/anim/features.ts -->
+        <section class="block" id="motion-block"></section>
+        <section class="block" id="hotkeys-block"></section>
+        <section class="block" id="lipsync-block"></section>
       </aside>
 
       <main class="stage" id="stage">

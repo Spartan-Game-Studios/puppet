@@ -7,12 +7,13 @@ is under a permissive licence; transitive notes are at the end.
 
 | Component | Version | Licence | Notes |
 |---|---|---|---|
-| [three.js](https://github.com/mrdoob/three.js) | 0.186.1 | MIT | rendering; also from `three/examples/jsm`: `GLTFLoader`, `OrbitControls`, and for 3D environments `HDRLoader`, `EXRLoader` (with its bundled `fflate`, MIT), `LightProbeGenerator`, `BufferGeometryUtils`, `FullScreenQuad` (`postprocessing/Pass.js`) |
+| [three.js](https://github.com/mrdoob/three.js) | 0.186.1 | MIT | rendering; also from `three/examples/jsm`: `GLTFLoader`, `OrbitControls`, `FBXLoader` (animation clip import; uses three's bundled `fflate`, MIT), and for 3D environments `HDRLoader`, `EXRLoader` (with its bundled `fflate`, MIT), `LightProbeGenerator`, `BufferGeometryUtils`, `FullScreenQuad` (`postprocessing/Pass.js`) |
 | [@pixiv/three-vrm](https://github.com/pixiv/three-vrm) (+ `three-vrm-core`, `-springbone`, `-materials-mtoon`, `-materials-v0compat`, `-materials-hdr-emissive-multiplier`, `-node-constraint`, `types-*`) | 3.5.5 | MIT | VRM 0.x / 1.0 loading, humanoid, expressions, lookAt, spring bones |
 | [@mediapipe/tasks-vision](https://www.npmjs.com/package/@mediapipe/tasks-vision) | 1.1.0 | Apache-2.0 | Face / Pose / Hand landmarkers, WASM runtime (copied from the package at build time) |
 | MediaPipe models: `face_landmarker.task`, `pose_landmarker_lite.task`, `pose_landmarker_full.task`, `hand_landmarker.task` | float16 v1 | Apache-2.0 | downloaded at build time from `storage.googleapis.com/mediapipe-models/`, SHA-256 pinned in `scripts/fetch-models.mjs`; not stored in git |
 | [@tauri-apps/api](https://github.com/tauri-apps/tauri) | 2.x | Apache-2.0 OR MIT | |
 | [@tauri-apps/plugin-dialog](https://github.com/tauri-apps/plugins-workspace) | 2.x | MIT OR Apache-2.0 | |
+| [@tauri-apps/plugin-global-shortcut](https://github.com/tauri-apps/plugins-workspace) | 2.x | MIT OR Apache-2.0 | system-wide hotkeys |
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) via [@fontsource/jetbrains-mono](https://fontsource.org/fonts/jetbrains-mono) | 5.x | SIL OFL 1.1 (font) | bundled font files |
 
 ## Shipped in the app (Rust shell)
@@ -21,6 +22,7 @@ is under a permissive licence; transitive notes are at the end.
 |---|---|
 | [tauri](https://crates.io/crates/tauri), tauri-build | Apache-2.0 OR MIT |
 | [tauri-plugin-dialog](https://crates.io/crates/tauri-plugin-dialog) | Apache-2.0 OR MIT |
+| [tauri-plugin-global-shortcut](https://crates.io/crates/tauri-plugin-global-shortcut) and its [global-hotkey](https://crates.io/crates/global-hotkey) | Apache-2.0 OR MIT |
 | [rosc](https://crates.io/crates/rosc) | MIT OR Apache-2.0 |
 | [serde](https://crates.io/crates/serde), serde_json | MIT OR Apache-2.0 |
 | [webkit2gtk](https://crates.io/crates/webkit2gtk) (Linux only) | MIT |
@@ -59,6 +61,15 @@ MPL-2.0 is file-level copyleft. Using these crates unmodified (their source is o
 | @types/three | MIT |
 | Playwright | Apache-2.0 |
 
+## Animation clips
+
+| Asset | Licence | Notes |
+|---|---|---|
+| `public/clips/ual.glb`: 12 clips from the [Universal Animation Library](https://quaternius.com) and Universal Animation Library 2 by Quaternius (`Idle_Loop`, `Idle_LookAround_Loop`, `Idle_Talking_Loop`, `Idle_FoldArms_Loop`, `Yes`, `Idle_No_Loop`, `Celebration`, `Dance_Loop`, `Sitting_Idle_Loop`, `Counter_Angry`, `Crying`, `Drink`) | CC0 1.0 (both packs' `License.txt`) | skeleton and bone tracks only, made by `scripts/build-builtin-clips.mjs`; the source names are in each animation's `extras.source` |
+| WAVE, CLAP, BOW, POINT, SHRUG, THINK (`src/anim/authored.ts`) | MIT (Puppet's own) | keyframed poses |
+
+Retargeting (`src/anim/retarget.ts`) is Puppet's own code. The idea of mapping a clip onto a VRM's normalized bones through world-space rest rotations is the one three-vrm's `loadMixamoAnimation` example shows (MIT); no code was copied from it. Users' imported clips (Mixamo or other) stay on their machine and are never bundled.
+
 ## Environment assets
 
 The built-in 3D environments ship **no asset files**. Every scene, texture and sky is generated at runtime from code in `src/scene/environment/` (geometry, GLSL shaders, value noise painted into canvas textures). Custom `.glb`/`.gltf`/`.hdr`/`.exr` files are the user's own and are never bundled.
@@ -68,6 +79,7 @@ The built-in 3D environments ship **no asset files**. Every scene, texture and s
 - VRM meta: field names and the 0.x → 1.0 licence mapping follow the VRM specification (<https://github.com/vrm-c/vrm-specification>, MIT) and its published migration rules; the model library adds no new dependencies.
 - One-euro filter: Géry Casiez, Nicolas Roussel, Daniel Vogel, "1€ Filter: A Simple Speed-based Low-pass Filter for Noisy Input in Interactive Systems", CHI 2012. Implemented from the paper.
 - VMC protocol: <https://protocol.vmc.info/> (message layout only).
+- Lip sync: formant (F1/F2) vowel matching with LPC-style pre-emphasis is textbook speech analysis; vowel formant averages after Peterson & Barney (1952) and Japanese vowel measurements. Implemented from scratch in `src/audio/visemes.ts`.
 - Colour temperature: blackbody sRGB values at 1000 K steps, approximated from Mitchell Charity's blackbody colour data ("What color is a blackbody?", vendian.org), interpolated and luminance-normalised in `src/scene/environment/look.ts`.
 - Value noise and the mulberry32 PRNG in `src/scene/environment/parts.ts` are standard public-domain techniques, written from scratch.
 

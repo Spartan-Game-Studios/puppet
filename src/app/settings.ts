@@ -6,6 +6,10 @@ import type { BodyMode } from '../tracking/protocol';
 import type { VcamResolution } from '../vcam/frame';
 import { defaultEnvironmentSettings, sanitizeEnvironment, type EnvironmentSettings } from '../scene/environment/look';
 import { loadSettingsRaw, saveSettingsRaw } from './platform';
+import { DEFAULT_ANIM, type AnimSettings } from '../anim/player';
+import type { ClipOptions } from '../anim/catalog';
+import { defaultBindings, type Binding } from '../input/bindings';
+import { DEFAULT_LIPSYNC, type LipSyncSettings } from '../audio/lipsync';
 
 export type Resolution = '640x480' | '1280x720' | '1920x1080';
 export type BackgroundKind = 'color' | 'transparent' | 'image' | 'environment';
@@ -26,7 +30,8 @@ export interface Settings {
   gains: Record<string, GainCurve>;
   calibration: Calibration;
   background: { kind: BackgroundKind; color: string; imagePath: string | null };
-  vmc: { enabled: boolean; host: string; port: number };
+  /** `presets`: also send the 13 VRM 0.x preset clips derived from ARKit (src/vmc/presets.ts). */
+  vmc: { enabled: boolean; host: string; port: number; presets: boolean };
   /** Virtual camera output (06 VIRTUAL CAM). `device`: Linux /dev/videoN, null = first found. */
   vcam: { enabled: boolean; resolution: VcamResolution; device: string | null };
   physics: PhysicsSettings;
@@ -35,6 +40,12 @@ export interface Settings {
   /** 3D environment (background kind 'environment'): scene, quality, per-scene look. */
   environment: EnvironmentSettings;
   ui: { tab: 'face' | 'physics'; debug: boolean };
+  /** 07 MOTION: idle clip and per-clip options (src/anim). */
+  anim: AnimSettings & { clipOptions: Record<string, ClipOptions> };
+  /** 08 HOTKEYS (src/input). Bindings with `model` set belong to that model. */
+  hotkeys: { bindings: Binding[]; global: boolean };
+  /** 09 LIP SYNC (src/audio). */
+  lipsync: LipSyncSettings;
 }
 
 export function defaultSettings(): Settings {
@@ -54,12 +65,15 @@ export function defaultSettings(): Settings {
     gains: defaultGainCurves(),
     calibration: structuredClone(EMPTY_CALIBRATION),
     background: { kind: 'color', color: '#00ff00', imagePath: null },
-    vmc: { enabled: false, host: '127.0.0.1', port: 39539 },
+    vmc: { enabled: false, host: '127.0.0.1', port: 39539, presets: true },
     vcam: { enabled: false, resolution: '1280x720', device: null },
     physics: { ...DEFAULT_PHYSICS },
     physicsOverrides: {},
     environment: defaultEnvironmentSettings(),
     ui: { tab: 'face', debug: true },
+    anim: { ...DEFAULT_ANIM, clipOptions: {} },
+    hotkeys: { bindings: defaultBindings(), global: false },
+    lipsync: { ...DEFAULT_LIPSYNC },
   };
 }
 

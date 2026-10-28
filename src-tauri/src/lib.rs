@@ -1,8 +1,10 @@
 //! Puppet: Tauri shell. The app itself (rendering, tracking, solving) is the
 //! web frontend; Rust provides file access, settings persistence, the VMC
-//! sender, the virtual camera output, the model library (library.rs) and
+//! sender, the virtual camera output, the model library (library.rs), the
+//! imported animation clips (clips.rs), global hotkeys (plugin) and
 //! camera permission handling.
 
+mod clips;
 mod library;
 mod vcam;
 mod vmc;
@@ -140,12 +142,16 @@ fn vcam_frame(state: State<'_, VcamState>, request: tauri::ipc::Request<'_>) -> 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // Emote / expression hotkeys that work while Puppet is in the background.
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(VmcState::default())
         // getUserMedia: grant the camera to our own webview without a second
         // in-webview prompt. The OS still asks (macOS TCC via
         // NSCameraUsageDescription in Info.plist; Windows privacy settings).
         .on_permission_request(|_webview, kind| match kind {
             PermissionKind::Camera => PermissionResponse::Allow,
+            // Mic lip sync (off by default; only asked for when the user picks a mic).
+            PermissionKind::Microphone => PermissionResponse::Allow,
             _ => PermissionResponse::Default,
         })
         .setup(|app| {
@@ -204,7 +210,14 @@ pub fn run() {
             library::library_index_load,
             library::library_index_save,
             library::library_reveal,
-            library::library_open_link
+            library::library_open_link,
+            clips::clips_location,
+            clips::clips_import_path,
+            clips::clips_write,
+            clips::clips_read,
+            clips::clips_delete,
+            clips::clips_index_load,
+            clips::clips_index_save
         ])
         .run(tauri::generate_context!())
         .expect("error while running Puppet");

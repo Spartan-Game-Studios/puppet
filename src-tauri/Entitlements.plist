@@ -5,5 +5,8 @@
   <!-- Needed for camera access under the hardened runtime (signed builds). -->
   <key>com.apple.security.device.camera</key>
   <true/>
+  <!-- Mic lip sync (optional) under the hardened runtime. -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
 </dict>
 </plist>
