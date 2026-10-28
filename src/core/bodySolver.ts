@@ -166,14 +166,24 @@ export interface SolveOptions {
   maxTorsoAngle: number;
   /** Max torso twist about the spine, radians. */
   maxTorsoTwist: number;
-  /** Rebuild arm and shoulder depth from the 2D image and tracked bone lengths. */
+  /** Rebuild forearm and shoulder-line depth from the 2D image and tracked bone lengths. */
   depthFromLengths: boolean;
-  /** Finger smoothing, 0 (raw) .. 1 (heavy); same scale as the face smoothing. */
+  /** Finger and hand-orientation smoothing, 0 (raw) .. 1 (heavy); same scale as the face smoothing. */
   smoothing: number;
   /** Share of the arm's elevation the clavicle takes (scapulohumeral rhythm). */
   shoulderRhythm: number;
   /** Max shrug (clavicle elevation from a raised shoulder), radians. */
   maxShrug: number;
+  /**
+   * Limb hysteresis: seconds its confidence must stay past a threshold to
+   * switch on / off. Kept short (two frames on, three off): the separate
+   * on/off thresholds already stop flicker, and every wait here shows as lag.
+   */
+  limbOnDelay: number;
+  limbOffDelay: number;
+  /** Limb weight ramp toward on / off, per second. */
+  limbFadeIn: number;
+  limbFadeOut: number;
 }
 
 export const DEFAULT_SOLVE: SolveOptions = {
@@ -187,6 +197,10 @@ export const DEFAULT_SOLVE: SolveOptions = {
   smoothing: 0.5,
   shoulderRhythm: 0.17,
   maxShrug: 0.3,
+  limbOnDelay: 0.05,
+  limbOffDelay: 0.08,
+  limbFadeIn: 15,
+  limbFadeOut: 8,
 };
 
 /** Local rotations per normalized bone, plus confidences and blend weights. */
@@ -335,9 +349,12 @@ interface SideState {
   handFrames: number;
   handWeight: number;
   fingers: OneEuroVector;
+  /** The hand's orientation (quaternion), smoothed like the fingers. */
+  hand: OneEuroVector;
+  lastHand: Quaternion | null;
   lastFingers: number[] | null;
   shrugBase: number | null;
-  lengths: { upper: BoneLength; fore: BoneLength };
+  lengths: { fore: BoneLength };
 }
 
 const newSide = (): SideState => ({
@@ -350,9 +367,11 @@ const newSide = (): SideState => ({
   handFrames: 0,
   handWeight: 0,
   fingers: new OneEuroVector(FINGER_VALUES),
+  hand: new OneEuroVector(4),
+  lastHand: null,
   lastFingers: null,
   shrugBase: null,
-  lengths: { upper: new BoneLength(), fore: new BoneLength() },
+  lengths: { fore: new BoneLength() },
 });
 
 export class BodySolver {
@@ -525,7 +544,11 @@ export class BodySolver {
         const mpSh = world(side, 'Shoulder');
         const mpEl = world(side, 'Elbow');
         const mpWr = world(side, 'Wrist');
-        const el = rebuild(sh, idx(side, 'Shoulder'), idx(side, 'Elbow'), mpSh, mpEl, st.lengths.upper);
+        // The upper arm keeps MediaPipe's depth: it mostly hangs or swings near
+        // the image plane, where its projection is close to its full length and
+        // a slightly long length estimate turns into a false forward tilt (and
+        // jitter). The forearm, which points at the camera far more, is rebuilt.
+        const el = sh.clone().add(mpEl.clone().sub(mpSh));
         const wr = rebuild(el, idx(side, 'Elbow'), idx(side, 'Wrist'), mpEl, mpWr, st.lengths.fore);
         // Untrusted forearm: ease toward a relaxed, slightly bent continuation of the upper arm.
         const fw = st.fore.weight;
@@ -561,12 +584,14 @@ export class BodySolver {
       if (!st.handActive) {
         if (temporal && t - st.handSeen > 0.3) {
           st.fingers.reset();
+          st.hand.reset();
+          st.lastHand = null;
           st.lastFingers = null;
         }
       }
       if (solvable) {
         const w = h!.worldLandmarks.map((l) => toAvatar(l, mirror));
-        this.solveHandFromPoints(side, bones, chestWorld, w[0], w[9], w[5], w[17], 1);
+        this.solveHandFromPoints(side, bones, chestWorld, w[0], w[9], w[5], w[17], 1, temporal ? t : undefined);
         this.solveFingers(side, bones, chestWorld, w, temporal ? t : undefined);
       } else if (st.handWeight > 0 && st.lastFingers) {
         // Fading out: hold the last finger pose while the weight ramps down.
@@ -601,11 +626,11 @@ export class BodySolver {
     }
     const want = g.on ? conf >= 0.4 : conf >= 0.65;
     if (want === g.on) g.since = t;
-    else if (t - g.since >= (g.on ? 0.15 : 0.12)) {
+    else if (t - g.since >= (g.on ? this.opts.limbOffDelay : this.opts.limbOnDelay)) {
       g.on = want;
       g.since = t;
     }
-    g.weight = approach(g.weight, g.on ? 1 : 0, dt * 4);
+    g.weight = approach(g.weight, g.on ? 1 : 0, dt * (g.on ? this.opts.limbFadeIn : this.opts.limbFadeOut));
     return g.on;
   }
 
@@ -737,6 +762,8 @@ export class BodySolver {
     index: Vector3,
     pinky: Vector3,
     weight: number,
+    /** With a time, the hand's orientation is smoothed (one-euro, the finger settings). */
+    time?: number,
   ): void {
     const s = side === 'left' ? 1 : -1;
     const handRest = this.restDir(`${side}Hand`, new Vector3(s, 0, 0));
@@ -751,6 +778,15 @@ export class BodySolver {
     else this.forearmBase.set(side, lower.clone());
     // At rest the index knuckle is forward (+Z) of the pinky for either hand.
     const handWorld = basisRotation(handRest, FWD, fingers, across);
+    if (time !== undefined) {
+      const st = this.side[side];
+      // Keep the quaternion in the same hemisphere as the last one so the filter doesn't average q and -q.
+      if (st.lastHand && handWorld.dot(st.lastHand) < 0) handWorld.set(-handWorld.x, -handWorld.y, -handWorld.z, -handWorld.w);
+      st.hand.setParams(smoothingToParams(this.opts.smoothing * 0.8));
+      const f = st.hand.filter([handWorld.x, handWorld.y, handWorld.z, handWorld.w], time);
+      handWorld.set(f[0], f[1], f[2], f[3]).normalize();
+      st.lastHand = handWorld.clone();
+    }
     const chain = [`${side}Shoulder`, `${side}UpperArm`, `${side}LowerArm`];
     const lowerWorld = this.worldOf(bones, chestWorld, chain);
     let local = lowerWorld.clone().invert().multiply(handWorld);
