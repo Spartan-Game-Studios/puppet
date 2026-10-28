@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBundleCommand": "bash src-tauri/macos/build-camera-extension.sh"
+  },
+  "bundle": {
+    "macOS": {
+      "files": {
+        "Library/SystemExtensions/com.spartangamestudios.puppet.camera.systemextension": "macos/build/com.spartangamestudios.puppet.camera.systemextension"
+      }
+    }
+  }
+}

@@ -13,3 +13,8 @@ harness/out/
 # Never commit avatar files: test models are personal-use content.
 *.vrm
 *.VRM
+
+# Virtual camera build outputs (src-tauri/macos/build-camera-extension.sh,
+# scripts/build-softcam.ps1)
+src-tauri/macos/build/
+src-tauri/vendor/
