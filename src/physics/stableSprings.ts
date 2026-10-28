@@ -1,5 +1,13 @@
 /**
- * Stabilised spring-bone physics on top of three-vrm's VRMSpringBoneManager.
+ * Spring-bone physics for VRM hair, cloth and accessories.
+ *
+ * Two solvers behind one interface:
+ *  - 'cloth' (default): src/physics/cloth/ — a PBD bone-cloth solver that
+ *    links neighbouring chains into cloth, collides whole segments with
+ *    swept capsules, and adds body colliders fitted to the mesh.
+ *  - 'legacy': three-vrm's own VRMSpringBoneManager, stabilised as below.
+ *
+ * Legacy: stabilised spring-bone physics on top of three-vrm's VRMSpringBoneManager.
  *
  * three-vrm's solver is a verlet step whose stiffness and gravity terms scale
  * with the frame delta. Fed straight from requestAnimationFrame, a 100 ms
@@ -24,11 +32,19 @@
 import { Matrix4, Object3D, Vector3 } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
 import type { VRMSpringBoneJoint, VRMSpringBoneColliderGroup, VRMSpringBoneCollider } from '@pixiv/three-vrm';
+import { ClothRig, DEFAULT_GROUP, type GroupOverride, type RigCollider } from './cloth/rig';
+import { fitBodyColliders, type BodyCapsule } from './cloth/bodyColliders';
+import type { ClothGroup } from './cloth/groups';
 
 export type PhysicsMode = 'off' | 'stiff' | 'normal';
+export type PhysicsSolver = 'cloth' | 'legacy';
 
 export interface PhysicsSettings {
   mode: PhysicsMode;
+  /** 'cloth' = bone-cloth solver; 'legacy' = three-vrm's spring bones (stabilised). */
+  solver: PhysicsSolver;
+  /** Cloth solver: add colliders generated from the body (hips, legs, torso, arms). */
+  bodyColliders: boolean;
   /** Fixed-step + clamps. Off = three-vrm's plain per-frame update (for comparison). */
   stabilise: boolean;
   /** Fixed steps per second (before substeps). */
@@ -46,6 +62,8 @@ export interface PhysicsSettings {
 
 export const DEFAULT_PHYSICS: PhysicsSettings = {
   mode: 'normal',
+  solver: 'cloth',
+  bodyColliders: true,
   stabilise: true,
   rate: 60,
   substeps: 2,
@@ -67,6 +85,10 @@ export const DEFAULT_CHAIN: ChainOverride = { enabled: true, stiffness: 1, drag:
 export interface PhysicsOverrides {
   chains: Record<string, ChainOverride>;
   colliders: Record<string, boolean>;
+  /** Cloth groups (by group name): links on/off and stiffness. */
+  groups?: Record<string, GroupOverride>;
+  /** Grouping overrides: chain name -> group name, 'none' (single strand) or 'auto'. */
+  assign?: Record<string, string>;
 }
 
 interface JointBase {
@@ -82,7 +104,10 @@ interface Chain {
 
 interface ColliderRef {
   name: string;
-  collider: VRMSpringBoneCollider;
+  /** VRM collider (absent for generated body colliders). */
+  collider?: VRMSpringBoneCollider;
+  /** Generated from the body (cloth solver only). */
+  body?: BodyCapsule;
 }
 
 const MODE_MUL: Record<PhysicsMode, { stiffness: number; looseness: number; gravity: number }> = {
@@ -109,7 +134,9 @@ export class StableSprings {
   settings: PhysicsSettings;
   readonly chains: Chain[] = [];
   readonly colliders: ColliderRef[] = [];
-  private overrides: PhysicsOverrides = { chains: {}, colliders: {} };
+  private overrides: PhysicsOverrides = { chains: {}, colliders: {}, groups: {}, assign: {} };
+  /** The cloth solver rig (null if the model has no spring bones). */
+  readonly rig: ClothRig | null = null;
   private base = new Map<VRMSpringBoneJoint, JointBase>();
   private groupColliders = new Map<VRMSpringBoneColliderGroup, VRMSpringBoneCollider[]>();
   private hits = new Set<VRMSpringBoneJoint>();
@@ -187,6 +214,67 @@ export class StableSprings {
         this.colliders.push({ name, collider: c });
       }
     }
+
+    // Cloth solver: generated body colliders + the rig.
+    const humanoid = new Map<Object3D, string>();
+    for (const [name, b] of Object.entries(vrm.humanoid?.humanBones ?? {})) {
+      const node = (b as { node?: Object3D } | undefined)?.node;
+      if (node) humanoid.set(node, name);
+    }
+    let body: BodyCapsule[] = [];
+    try {
+      if (vrm.humanoid) body = fitBodyColliders(vrm, new Set(joints.map((j) => j.bone)));
+    } catch (e) {
+      console.warn('[physics] body collider fit failed', e);
+    }
+    for (const b of body) this.colliders.push({ name: b.name, body: b });
+    const rigColliders: RigCollider[] = this.colliders.map((c) =>
+      c.collider
+        ? { name: c.name, source: 'vrm', vrm: c.collider, host: c.collider }
+        : { name: c.name, source: 'body', body: c.body, host: c.body!.bone },
+    );
+    if (joints.length) {
+      this.rig = new ClothRig(this.chains, rigColliders, humanoid);
+      this.rig.groupOriginal = (g) => this.groupColliders.get(g as VRMSpringBoneColliderGroup) ?? g.colliders;
+    }
+    this.applyAll();
+  }
+
+  /**
+   * Call once with the body in its idle pose: rest-shape overlaps with the
+   * body in this pose are not treated as collisions (see ClothRig.addRestPose).
+   */
+  captureIdlePose(): void {
+    if (!this.rig) return;
+    this.vrm.scene.updateMatrixWorld(true);
+    this.rig.addRestPose();
+    this.applyAll();
+  }
+
+  /** Cloth groups detected (or assigned) for this model. */
+  get groups(): ClothGroup[] {
+    return this.rig?.groups ?? [];
+  }
+
+  groupOverride(name: string): GroupOverride {
+    return { ...DEFAULT_GROUP, ...(this.overrides.groups?.[name] ?? {}) };
+  }
+
+  setGroup(name: string, o: Partial<GroupOverride>): void {
+    this.overrides.groups = { ...(this.overrides.groups ?? {}), [name]: { ...this.groupOverride(name), ...o } };
+    this.applyAll();
+  }
+
+  /** Chain grouping override: 'auto', 'none' or a group name. */
+  chainAssign(name: string): string {
+    return this.overrides.assign?.[name] ?? 'auto';
+  }
+
+  setChainAssign(name: string, group: string): void {
+    const a = { ...(this.overrides.assign ?? {}) };
+    if (group === 'auto') delete a[name];
+    else a[name] = group;
+    this.overrides.assign = a;
     this.applyAll();
   }
 
@@ -195,9 +283,11 @@ export class StableSprings {
   }
 
   setSettings(s: Partial<PhysicsSettings>): void {
-    const prevMode = this.settings.mode;
+    const prev = this.settings;
     this.settings = { ...this.settings, ...s };
-    if (s.mode && s.mode !== prevMode) this.applyAll();
+    if (s.mode && s.mode !== prev.mode) this.applyAll();
+    if ((s.bodyColliders != null && s.bodyColliders !== prev.bodyColliders) || (s.solver && s.solver !== prev.solver)) this.applyAll();
+    if (s.solver && s.solver !== prev.solver) this.reset();
   }
 
   getOverrides(): PhysicsOverrides {
@@ -205,7 +295,12 @@ export class StableSprings {
   }
 
   setOverrides(o: PhysicsOverrides): void {
-    this.overrides = { chains: { ...(o.chains ?? {}) }, colliders: { ...(o.colliders ?? {}) } };
+    this.overrides = {
+      chains: { ...(o.chains ?? {}) },
+      colliders: { ...(o.colliders ?? {}) },
+      groups: { ...(o.groups ?? {}) },
+      assign: { ...(o.assign ?? {}) },
+    };
     this.applyAll();
   }
 
@@ -253,6 +348,18 @@ export class StableSprings {
     }
     const off = new Set(this.colliders.filter((c) => !this.colliderEnabled(c.name)).map((c) => c.collider));
     for (const [g, orig] of this.groupColliders) g.colliders = orig.filter((c) => !off.has(c));
+    this.rig?.configure({
+      stiff: this.settings.mode === 'stiff',
+      bodyColliders: this.settings.bodyColliders,
+      chainEnabled: (n) => this.chainOverride(n).enabled,
+      colliderEnabled: (n) => this.colliderEnabled(n),
+      group: (n) => this.groupOverride(n),
+      assign: this.overrides.assign ?? {},
+    });
+  }
+
+  private get useCloth(): boolean {
+    return this.settings.solver === 'cloth' && this.settings.stabilise && !!this.rig;
   }
 
   /** Snap every chain back to rest (e.g. after loading or teleporting). */
@@ -260,6 +367,7 @@ export class StableSprings {
     this.vrm.springBoneManager?.reset();
     this.acc = 0;
     this.hasPrevAnchor = false;
+    this.rig?.invalidate();
   }
 
   /** Advance physics by a frame delta (seconds). Call after the pose is applied. */
@@ -268,7 +376,10 @@ export class StableSprings {
     this.lastSteps = 0;
     if (!mgr) return;
     if (this.settings.mode === 'off') {
-      if (!this.wasOff) mgr.reset();
+      if (!this.wasOff) {
+        mgr.reset();
+        this.rig?.writeRest();
+      }
       this.wasOff = true;
       return;
     }
@@ -279,6 +390,10 @@ export class StableSprings {
     if (!this.settings.stabilise) {
       mgr.update(frameDelta);
       this.lastSteps = 1;
+      return;
+    }
+    if (this.useCloth) {
+      this.updateCloth(frameDelta);
       return;
     }
     const h = 1 / (this.settings.rate * this.settings.substeps);
@@ -293,6 +408,44 @@ export class StableSprings {
     if (steps >= maxSteps) this.acc = 0;
     this.lastSteps = steps;
   }
+
+  /** Cloth solver frame: fixed steps between the last stepped pose and this frame's. */
+  private updateCloth(frameDelta: number): void {
+    const rig = this.rig!;
+    const t0 = performance.now();
+    const h = 1 / (this.settings.rate * this.settings.substeps);
+    this.acc += Math.min(Math.max(frameDelta, 0), this.settings.maxFrameDelta);
+    const maxSteps = Math.ceil(this.settings.maxFrameDelta / h) + 1;
+    let steps = Math.floor(this.acc / h + 1e-9);
+    if (steps > maxSteps) {
+      steps = maxSteps;
+      this.acc = 0;
+    } else this.acc -= steps * h;
+    this.lastSteps = steps;
+    if (steps === 0) return;
+
+    rig.syncParams();
+    rig.solver.opts.maxSpeed = this.settings.maxSpeed;
+    rig.solver.opts.collisionDamping = this.settings.collisionDamping;
+    rig.capture();
+    // Inertia: carry the cloth with part of the body's own motion since the last step.
+    if (this.anchor && this.settings.inertia < 1) {
+      this.anchor.updateWorldMatrix(true, false);
+      const now = this.anchor.matrixWorld;
+      if (this.hasPrevAnchor) {
+        _m.copy(this.prevAnchor).invert().premultiply(now);
+        rig.carry(_m, 1 - this.settings.inertia);
+      }
+      this.prevAnchor.copy(now);
+      this.hasPrevAnchor = true;
+    }
+    rig.run(steps, h);
+    rig.writeBack();
+    this.lastMs = performance.now() - t0;
+  }
+
+  /** CPU time of the last cloth update, ms (debug readout). */
+  lastMs = 0;
 
   private step(h: number, firstOfFrame: boolean): void {
     const mgr = this.vrm.springBoneManager!;

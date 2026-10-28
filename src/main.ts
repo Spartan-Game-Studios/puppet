@@ -53,6 +53,7 @@ import { loadSettings, saveSettings, type Settings } from './app/settings';
 import { bindEnvironmentUi } from './app/environmentUi';
 import { mountHome } from './app/home';
 import type { PhysicsMode } from './physics/stableSprings';
+import { buildClothUI } from './app/clothUi';
 
 const params = new URLSearchParams(location.search);
 for (const [k, v] of new URLSearchParams(await devQuery())) params.set(k, v);
@@ -759,6 +760,15 @@ $('btn-phys-clear').addEventListener('click', () => {
 });
 
 function buildPhysicsUI(): void {
+  buildClothUI($('cloth-ui'), avatar?.physics ?? null, {
+    settings: () => settings.physics,
+    setSetting: (p) => {
+      Object.assign(settings.physics, p);
+      avatar?.physics.setSettings(p);
+      saveSettings(settings);
+    },
+    saveOverrides: savePhysicsOverrides,
+  });
   const list = $('chain-list');
   const cols = $('collider-list');
   list.innerHTML = '';

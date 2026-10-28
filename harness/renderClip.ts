@@ -22,6 +22,7 @@ import {
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils, type VRM } from '@pixiv/three-vrm';
+import { widenSkinIndices } from '../src/scene/avatar';
 
 export const FPS = 30;
 export const DURATION = 14;
@@ -154,6 +155,7 @@ async function main() {
   const gltf = await loader.loadAsync(url);
   const vrm = gltf.userData.vrm as VRM;
   VRMUtils.removeUnnecessaryVertices(gltf.scene);
+  widenSkinIndices(gltf.scene);
   VRMUtils.combineSkeletons(gltf.scene);
   VRMUtils.rotateVRM0(vrm);
   vrm.scene.traverse((o) => (o.frustumCulled = false));
