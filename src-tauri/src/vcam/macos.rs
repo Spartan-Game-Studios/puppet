@@ -88,6 +88,11 @@ fn read_state(probe_device: bool) -> BridgeState {
     }
 }
 
+/// Opens System Settings at Login Items & Extensions (macOS 13+). macOS has no
+/// in-app approval prompt for system extensions; this is the closest we can get.
+const SETTINGS_URL: &str = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension";
+const OPEN_SETTINGS: &str = "OPEN SETTINGS";
+
 const APPROVE_HINT: &str = "Open System Settings > General > Login Items & Extensions > Camera Extensions and switch PUPPET on (macOS 13-14: System Settings > Privacy & Security, click Allow). Then come back here.";
 const OBS_HINT: &str = "Until then, use the OBS route: Capture view (H), OBS Window Capture, Start Virtual Camera.";
 
@@ -106,7 +111,7 @@ pub fn describe(b: &BridgeState) -> SinkStatus {
     } else {
         match b.request_state {
             REQ_PENDING => s(SinkState::NeedsSetup, "INSTALLING CAMERA EXTENSION..."),
-            REQ_NEEDS_APPROVAL => s(SinkState::NeedsApproval, "APPROVE THE CAMERA IN SYSTEM SETTINGS").hint(APPROVE_HINT),
+            REQ_NEEDS_APPROVAL => s(SinkState::NeedsApproval, "APPROVE THE CAMERA IN SYSTEM SETTINGS").hint(APPROVE_HINT).action(OPEN_SETTINGS),
             REQ_NEEDS_REBOOT => s(SinkState::NeedsSetup, "RESTART YOUR MAC TO FINISH INSTALLING"),
             REQ_ACTIVATED => s(SinkState::NeedsSetup, "ACTIVATED, WAITING FOR THE CAMERA DEVICE")
                 .hint("If it does not appear within a few seconds, quit and reopen Puppet.")
@@ -134,12 +139,12 @@ fn failure(b: &BridgeState) -> SinkStatus {
             .hint("macOS installs camera extensions only from apps in the Applications folder. Move Puppet.app there, reopen it, click INSTALL CAMERA.")
             .action("INSTALL CAMERA"),
         // MissingEntitlement, CodeSignatureInvalid, ValidationFailed, ForbiddenBySystemPolicy
-        2 | 8 | 9 | 10 => s(SinkState::Unavailable, "THIS BUILD IS NOT SIGNED FOR CAMERA EXTENSIONS")
-            .hint(format!("Camera extensions need a Developer ID-signed build (see docs/virtual-camera.md). {OBS_HINT}")),
+        2 | 8 | 9 | 10 => s(SinkState::Unavailable, "THIS BUILD IS NOT SIGNED AND NOTARIZED FOR CAMERA EXTENSIONS")
+            .hint(format!("Camera extensions need a Developer ID-signed, notarized build (see docs/virtual-camera.md). {OBS_HINT}")),
         // RequestCanceled
         11 => s(SinkState::NeedsSetup, "INSTALL CANCELLED").action("INSTALL CAMERA"),
         // AuthorizationRequired
-        13 => s(SinkState::NeedsApproval, "APPROVE THE CAMERA IN SYSTEM SETTINGS").hint(APPROVE_HINT).action("INSTALL CAMERA"),
+        13 => s(SinkState::NeedsApproval, "APPROVE THE CAMERA IN SYSTEM SETTINGS").hint(APPROVE_HINT).action(OPEN_SETTINGS),
         _ => s(SinkState::Error, "CAMERA INSTALL FAILED").hint(OBS_HINT).action("RETRY"),
     }
 }
@@ -183,6 +188,14 @@ impl VirtualCamSink for CmioSink {
     }
 
     fn setup(&mut self) -> Result<(), String> {
+        // Waiting for approval: the button opens System Settings instead of re-requesting.
+        if describe(&read_state(true)).state == SinkState::NeedsApproval {
+            return std::process::Command::new("/usr/bin/open")
+                .arg(SETTINGS_URL)
+                .status()
+                .map_err(|e| format!("could not open System Settings: {e}"))
+                .and_then(|st| if st.success() { Ok(()) } else { Err("could not open System Settings".into()) });
+        }
         // SAFETY: plain FFI call; the result arrives asynchronously in the status.
         unsafe { pvc_activate() };
         Ok(())
@@ -254,7 +267,13 @@ mod tests {
         b.request_state = REQ_NEEDS_APPROVAL;
         let s = describe(&b);
         assert_eq!(s.state, SinkState::NeedsApproval);
+        assert_eq!(s.action.as_deref(), Some(OPEN_SETTINGS));
         assert!(s.hint.unwrap().contains("System Settings"));
+
+        let mut b = base();
+        b.request_state = REQ_FAILED;
+        b.error_code = 13;
+        assert_eq!(describe(&b).action.as_deref(), Some(OPEN_SETTINGS));
 
         let mut b = base();
         b.request_state = REQ_FAILED;
