@@ -175,7 +175,7 @@ function makeScenarios(recorded: RecordedPose | null): Record<string, Scenario> 
         };
       },
     },
-    // Arms up overhead, swung forward and back, then dropped to the sides fast.
+    // Arms raised high, swung forward and back, then flicked up and dropped fast.
     arms: {
       name: 'arms',
       motionEnd: 6.5,
@@ -185,7 +185,8 @@ function makeScenarios(recorded: RecordedPose | null): Record<string, Scenario> 
         const bones: Drive['bones'] = {};
         for (const [side, s] of [['left', 1], ['right', -1]] as const) {
           const up = win(t, 0.5, 3.2, 0.7);
-          const raise = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), s * 1.3 * up);
+          // From hanging (-72 deg) to ~50 deg above horizontal.
+          const raise = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), s * 2.1 * up);
           const swingA = 65 * D2R * Math.sin(2 * Math.PI * 1.0 * (t - 3.2) + (s > 0 ? 0 : Math.PI)) * win(t, 3.2, 5.6, 0.3);
           const swing = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), swingA);
           // Fast drop at 5.6-5.85: a quick raise to 70 degrees then down.
@@ -489,9 +490,9 @@ async function runOne(buf: ArrayBuffer, recorded: RecordedPose | null, o: RunOpt
     // Three-quarter view from the front-left: the whole body (skirt and legs),
     // or head to hips for the hair scenarios.
     const upper = o.scenario === 'head' || o.scenario === 'recorded';
-    const dist = (upper ? 1.15 : 2.15) * height;
+    const dist = (upper ? 1.15 : 2.5) * height;
     const az = (upper ? 40 : 55) * D2R;
-    const target = upper ? new Vector3(0, (head.y + hips.y) / 2 + 0.05 * height, 0) : new Vector3(0, hips.y * 0.62, 0);
+    const target = upper ? new Vector3(0, (head.y + hips.y) / 2 + 0.05 * height, 0) : new Vector3(0, hips.y * 0.92, 0);
     camera.position.set(Math.sin(az) * dist, target.y + 0.12 * height, Math.cos(az) * dist);
     camera.lookAt(target);
   }

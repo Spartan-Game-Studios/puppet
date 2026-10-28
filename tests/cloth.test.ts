@@ -257,6 +257,20 @@ describe('detectGroups', () => {
     }
   });
 
+  it('keeps hair either side of the face apart (twin braids) but links a fringe', () => {
+    const strand = (name: string, x: number): ChainInfo => ({
+      name,
+      anchor: 'head',
+      points: [0, 1, 2, 3].map((k) => [x, 1.5 - 0.1 * k, 0.08] as [number, number, number]),
+    });
+    expect(detectGroups([strand('braid_L', 0.07), strand('braid_R', -0.07)])).toHaveLength(0);
+    const fringe = [-0.04, -0.015, 0.01, 0.035].map((x, i) => strand(`fringe_${i}`, x));
+    const g = detectGroups(fringe);
+    expect(g).toHaveLength(1);
+    expect(g[0].kind).toBe('hair');
+    expect(g[0].chains).toHaveLength(4);
+  });
+
   it('honours forced assignment', () => {
     const chains = ring(8, 0.15, 4);
     const g = detectGroups(chains, { maxAngle: Math.PI / 3, assign: { [chains[0].name]: 'none', [chains[1].name]: 'none' } });

@@ -324,6 +324,7 @@ export class ClothRig {
     this.computeRestCaps();
     this.restInfos = this.chainInfos();
     this.restX = Float64Array.from(this.solver.x);
+    this.capNowRest = Float64Array.from(this.capNow);
     this.kinds = this.restInfos.map((c) => {
       const a = c.points[0];
       const b = c.points[c.points.length - 1];
@@ -401,7 +402,21 @@ export class ClothRig {
       const a = cfg.assign[c.name] ?? cfg.assign[c.chain ?? c.name];
       if (a) assign[c.name] = a;
     }
-    this.groups = detectGroups(infos, { maxAngle: (60 * Math.PI) / 180, assign });
+    // Chains either side of the head or neck aren't one sheet (front braids).
+    const seg = new Float64Array(2);
+    const between = this.colliders
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => c.body && /head|neck/.test(c.name));
+    const blocked = (a: [number, number, number], b: [number, number, number]) =>
+      between.some(({ c, i }) => {
+        const o = 6 * i;
+        const k = this.capNowRest;
+        closestSegSeg(a[0], a[1], a[2], b[0], b[1], b[2], k[o], k[o + 1], k[o + 2], k[o + 3], k[o + 4], k[o + 5], seg);
+        const px = a[0] + (b[0] - a[0]) * seg[0], py = a[1] + (b[1] - a[1]) * seg[0], pz = a[2] + (b[2] - a[2]) * seg[0];
+        const qx = k[o] + (k[o + 3] - k[o]) * seg[1], qy = k[o + 1] + (k[o + 4] - k[o + 1]) * seg[1], qz = k[o + 2] + (k[o + 5] - k[o + 2]) * seg[1];
+        return Math.hypot(px - qx, py - qy, pz - qz) < c.body!.core;
+      });
+    this.groups = detectGroups(infos, { maxAngle: (60 * Math.PI) / 180, assign, blocked });
     const stiffDiv = cfg.stiff ? 10 : 1;
     const links: LinkDef[] = [];
     const chainKind = [...this.kinds];
@@ -481,6 +496,8 @@ export class ClothRig {
   private restInfos: ChainInfo[] = [];
   /** Particle positions at rest (as at load). */
   private restX = new Float64Array(0);
+  /** Collider endpoints at rest (as at load). */
+  private capNowRest = new Float64Array(0);
   /** Chain rest shapes (as at load). */
   chainInfosRest(): ChainInfo[] {
     return this.restInfos;

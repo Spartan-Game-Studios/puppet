@@ -21,9 +21,10 @@ interface Condition {
 
 const CONDITIONS: Condition[] = [
   { name: 'off: raw three-vrm update(frameDelta), raw root', physics: { stabilise: false }, smoothRoot: false },
-  { name: 'fixed step + substeps only', physics: { stabilise: true, maxSpeed: 1e9, collisionDamping: 0, inertia: 1 }, smoothRoot: false },
-  { name: 'fixed step + clamps + collision damping', physics: { stabilise: true, inertia: 1 }, smoothRoot: false },
-  { name: 'all stabilisers (+ root smoothing + inertia 0.6)', physics: { stabilise: true }, smoothRoot: true },
+  { name: 'fixed step + substeps only', physics: { solver: 'legacy', stabilise: true, maxSpeed: 1e9, collisionDamping: 0, inertia: 1 }, smoothRoot: false },
+  { name: 'fixed step + clamps + collision damping', physics: { solver: 'legacy', stabilise: true, inertia: 1 }, smoothRoot: false },
+  { name: 'all stabilisers (+ root smoothing + inertia 0.6)', physics: { solver: 'legacy', stabilise: true }, smoothRoot: true },
+  { name: 'cloth solver (+ root smoothing + inertia 0.6)', physics: { solver: 'cloth', stabilise: true }, smoothRoot: true },
 ];
 
 function rng(seed: number) {

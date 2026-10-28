@@ -110,8 +110,14 @@ export function orderChains(chains: ChainInfo[], idx: number[]): { order: number
   }
   const th = 0.5 * Math.atan2(2 * sxy, sxx - syy);
   const ex = Math.cos(th), ey = Math.sin(th);
-  // An arc (a cape round the shoulders) orders better by angle when it bends a lot.
-  const arc = idx.length >= 4 && maxGap > Math.PI / 2 && minR > 0.35 * meanR;
+  // An arc (a cape round the shoulders) orders better by angle when it bends
+  // a lot; a near-straight row (a fringe) by position along it.
+  const tr = sxx + syy;
+  const det = sxx * syy - sxy * sxy;
+  const disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - det));
+  const lmax = tr / 2 + disc, lmin = tr / 2 - disc;
+  const straight = lmax <= 0 || lmin / lmax < 0.15;
+  const arc = !straight && idx.length >= 4 && maxGap > Math.PI / 2 && minR > 0.35 * meanR;
   let order: number[];
   if (arc) {
     // Start just after the largest angular gap.
@@ -131,6 +137,11 @@ export interface GroupOptions {
   maxAngle: number;
   /** Forced membership: chain name -> group name, or 'none' to keep it single. */
   assign?: Record<string, string>;
+  /**
+   * True when the straight line between two points passes through the body
+   * (e.g. two braids either side of the face): such chains are never linked.
+   */
+  blocked?: (a: [number, number, number], b: [number, number, number]) => boolean;
 }
 
 export const DEFAULT_GROUP_OPTIONS: GroupOptions = { maxAngle: (60 * Math.PI) / 180 };
@@ -177,7 +188,11 @@ export function detectGroups(chains: ChainInfo[], opts: GroupOptions = DEFAULT_G
       // not further apart than the chains are long (strands on opposite
       // sides of a head are not one sheet).
       const limit = Math.min(1.8 * Math.max(nearest[a], nearest[b]), Math.max(0.6 * Math.max(lens[a], lens[b]), 0.12));
-      if (d <= limit) parent[find(a)] = find(b);
+      // Hair either side of the face (twin braids, side locks) stays separate:
+      // a hair pair may only cross the body's midline (x = 0) when close.
+      const hair = chains[a].anchor === 'head' || chains[a].anchor === 'neck';
+      const across = key[a][0] * key[b][0] < 0 && Math.abs(key[a][0] - key[b][0]) > 0.06;
+      if (d <= limit && !(hair && across) && !opts.blocked?.(key[a], key[b])) parent[find(a)] = find(b);
     }
   }
   const comps = new Map<string, number[]>();
