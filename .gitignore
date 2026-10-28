@@ -7,7 +7,7 @@ dist/
 public/mediapipe/
 
 # Test footage and results rendered locally (may derive from personal models)
-test-assets/
+test-assets/*
 harness/out/
 
 # Never commit avatar files: test models are personal-use content.
@@ -18,3 +18,11 @@ harness/out/
 # scripts/build-softcam.ps1)
 src-tauri/macos/build/
 src-tauri/vendor/
+
+# ...except the CC0 test avatars committed as sweep fixtures (scripts/compat-sweep.mjs).
+# The others are fetched by scripts/fetch-test-avatars.mjs and stay ignored.
+!test-assets/cc0/
+test-assets/cc0/*
+!test-assets/cc0/LICENSES.md
+!test-assets/cc0/devil.vrm
+!test-assets/cc0/the-worm.vrm

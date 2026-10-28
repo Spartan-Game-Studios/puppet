@@ -1,6 +1,7 @@
 /** three.js stage: renderer, camera, lights, background. */
 import {
   AmbientLight,
+  Box3,
   Camera,
   Color,
   DirectionalLight,
@@ -17,6 +18,41 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Avatar } from './avatar';
 
 export type Framing = 'bust' | 'upper' | 'full';
+
+/**
+ * Size factor for the framing presets: 1 for anything human-sized (1.3-2.1 m
+ * tall), proportional outside that, so a 30 cm mascot or a 4 m giant is
+ * framed like a person rather than lost in the middle of the frame or cropped.
+ */
+export function framingScale(height: number): number {
+  if (!(height > 0)) return 1;
+  return height < 1.3 ? Math.max(0.05, height / 1.3) : height > 2.1 ? height / 2.1 : 1;
+}
+
+/** Camera target and position for a framing preset (camera on +Z looking at the avatar). */
+export function framingFor(f: Framing, head: Vector3, b: Box3, fovDeg: number): { target: Vector3; position: Vector3 } {
+  const s = framingScale(b.max.y - b.min.y);
+  const target = new Vector3(0, f === 'full' ? (b.min.y + b.max.y) / 2 : head.y - (f === 'bust' ? 0.12 : 0.3) * s, 0);
+  const human = (f === 'bust' ? 1.25 : f === 'upper' ? 2.1 : 4.2) * s;
+  // Human framing distances assume a face ~0.1 m in front of the head bone.
+  // If the model's front reaches within 0.3 m of that camera (a big or round
+  // avatar would swallow it), keep that gap from its actual front surface
+  // instead; FULL also fits the whole height.
+  let dist = b.max.z + 0.3 * s > human ? b.max.z + human - 0.1 * s : human;
+  const tanHalf = Math.tan(((fovDeg / 2) * Math.PI) / 180);
+  if (f === 'full') {
+    dist = Math.max(dist, b.max.z + (0.55 * (b.max.y - b.min.y)) / tanHalf);
+  } else {
+    // A head far bigger than a person's (a mascot that is all head, a 2 m
+    // ball) would fill the frame with one patch of surface: keep at least
+    // part of its width (45% bust, 70% upper) and half the span from the
+    // target to its top in view. A human never reaches these limits.
+    const width = b.max.x - b.min.x;
+    const frac = f === 'bust' ? 0.45 : 0.7;
+    dist = Math.max(dist, b.max.z + (frac * width) / 2 / tanHalf, b.max.z + (0.5 * (b.max.y - target.y)) / tanHalf);
+  }
+  return { target, position: new Vector3(0, target.y + 0.03 * s, dist) };
+}
 
 export class Viewer {
   readonly renderer: WebGLRenderer;
@@ -87,21 +123,15 @@ export class Viewer {
 
   frame(f: Framing): void {
     if (!this.avatar) return;
-    const head = this.avatar.headPosition();
-    const b = this.avatar.bounds;
-    const target = new Vector3(0, f === 'full' ? (b.min.y + b.max.y) / 2 : head.y - (f === 'bust' ? 0.12 : 0.3), 0);
-    const human = f === 'bust' ? 1.25 : f === 'upper' ? 2.1 : 4.2;
-    // Human framing distances assume a face ~0.1 m in front of the head bone.
-    // If the model's front reaches within 0.3 m of that camera (a big or round
-    // avatar would swallow it), keep that gap from its actual front surface
-    // instead; FULL also fits the whole height.
-    let dist = b.max.z + 0.3 > human ? b.max.z + human - 0.1 : human;
-    if (f === 'full') {
-      const halfFov = ((this.camera.fov / 2) * Math.PI) / 180;
-      dist = Math.max(dist, b.max.z + (0.55 * (b.max.y - b.min.y)) / Math.tan(halfFov));
-    }
+    const { target, position } = framingFor(f, this.avatar.headPosition(), this.avatar.bounds, this.camera.fov);
     this.controls.target.copy(target);
-    this.camera.position.set(0, target.y + 0.03, dist);
+    this.camera.position.copy(position);
+    // A tiny avatar puts the camera close: keep the near plane well in front of it.
+    const near = Math.min(0.05, Math.max(0.005, (position.z - this.avatar.bounds.max.z) * 0.25));
+    if (near !== this.camera.near) {
+      this.camera.near = near;
+      this.camera.updateProjectionMatrix();
+    }
     this.controls.update();
   }
 

@@ -35,6 +35,34 @@ jobs:
           workspaces: src-tauri
       - run: cargo test --manifest-path src-tauri/Cargo.toml
 
+  # VRM compatibility sweep on the committed CC0 fixtures (test-assets/cc0/),
+  # headless Chrome with software GL. Fails on any FAIL check; the HTML report
+  # is uploaded as an artifact. See README "Compatibility sweep".
+  compat:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Sweep the committed CC0 avatars
+        env:
+          PUPPET_NO_APP: '1'
+          PUPPET_STRICT: '1'
+          PUPPET_CI: '1'
+          PUPPET_CHROME_ARGS: --use-angle=swiftshader --disable-gpu
+        run: node scripts/compat-sweep.mjs harness/out/compat
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compat-report
+          path: harness/out/compat
+          if-no-files-found: ignore
+
   bundle:
     needs: test
     strategy:

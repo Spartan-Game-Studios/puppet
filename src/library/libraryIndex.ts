@@ -8,6 +8,7 @@
  *   <appData>/library/<sha256>/thumb.png      bust thumbnail
  *   <appData>/library/<sha256>/meta.json      ModelInfo (written last: marks the entry complete)
  */
+import type { ModelWarning } from '../scene/modelChecks';
 import type { VrmMeta, VrmSpec } from './vrmMeta';
 
 export const LIBRARY_FILES = ['model.vrm', 'thumb.png', 'meta.json'] as const;
@@ -26,6 +27,8 @@ export interface ModelStats {
   springJoints: number;
   /** Triangles across all meshes. */
   polygons: number;
+  /** Model checks at import (src/scene/modelChecks.ts). Absent for models imported before they existed. */
+  warnings?: ModelWarning[];
 }
 
 /** meta.json: what the importer measured. Immutable per file (the id is its hash). */

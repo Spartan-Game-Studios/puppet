@@ -12,7 +12,8 @@ import { pickVrmFiles, pickVrmPaths } from '../library/backend';
 import { Library, type Card, type ImportResult, type ImportSource, type ImportStep } from '../library/library';
 import { displayAuthor, displayName, formatBytes, formatCount, type LibraryQuery } from '../library/libraryIndex';
 import { readVrmMeta, summarizeLicence, type LicenceSummary, type VrmMeta } from '../library/vrmMeta';
-import { buildCard, renderLicence, syncLabel } from './homeView';
+import { buildCard, renderLicence, renderWarnings, syncLabel } from './homeView';
+import type { ModelWarning } from '../scene/modelChecks';
 
 export interface HomeDeps {
   /** Load bytes onto the stage (main.ts loadModel). Resolves true on success. */
@@ -29,7 +30,8 @@ export interface Home {
   readonly visible: boolean;
   show(on: boolean): void;
   /** main.ts: a model is now on the stage (from a card, O, a drop or ?model=). */
-  modelLoaded(hash: string, buf: ArrayBuffer, label: string, path: string | null): void;
+  /** `warnings`: rest-pose model checks from loadAvatar (shown in MODEL INFO). */
+  modelLoaded(hash: string, buf: ArrayBuffer, label: string, path: string | null, warnings?: ModelWarning[]): void;
   importPaths(paths: string[]): Promise<void>;
   importFiles(files: File[]): Promise<void>;
   setDropHover(on: boolean): void;
@@ -53,7 +55,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
   let visible = false;
   let focusId: string | null = null;
   let stageId: string | null = null;
-  let stageMeta: { meta: VrmMeta; summary: LicenceSummary; card: Card | null } | null = null;
+  let stageMeta: { meta: VrmMeta; summary: LicenceSummary; card: Card | null; warnings: ModelWarning[] } | null = null;
   let shown: Card[] = [];
   /** Which card has which drawer open ('lic' | 'menu'), kept across re-renders. */
   const drawers = new Map<string, 'lic' | 'menu'>();
@@ -478,7 +480,9 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     const lic = document.createElement('div');
     lic.className = 'lic-body';
     renderLicence(lic, summary, meta);
-    body.append(dl, lic);
+    body.append(dl);
+    if (stageMeta.warnings.length) body.append(renderWarnings(stageMeta.warnings));
+    body.append(lic);
   }
 
   function toggleModelInfo(force?: boolean): void {
@@ -577,7 +581,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
       return visible;
     },
     show,
-    modelLoaded(hash, buf, label, path) {
+    modelLoaded(hash, buf, label, path, warnings = []) {
       stageId = hash;
       let meta: VrmMeta | null = null;
       try {
@@ -592,7 +596,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
         return;
       }
       const summary = summarizeLicence(meta);
-      stageMeta = { meta, summary, card: library.cards.get(hash) ?? null };
+      stageMeta = { meta, summary, card: library.cards.get(hash) ?? null, warnings };
       hideNotice();
       refreshStageHeader();
       const existing = library.cards.get(hash);

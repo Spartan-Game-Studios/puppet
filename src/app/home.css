@@ -239,3 +239,12 @@ body.capture .model-info, body.capture .lic-notice { display: none; }
 .lic-notice p { margin: 0; font-size: 11px; font-weight: 800; line-height: 1.55; letter-spacing: 0.02em; }
 .lic-notice .row.btns { justify-content: flex-end; }
 .lic-notice .row.btns .btn { flex: 0 0 auto; }
+
+/* Model checks (src/scene/modelChecks.ts): authoring problems on the card and in MODEL INFO. */
+.card .card-warn { margin-top: 5px; font-size: 9px; font-weight: 800; letter-spacing: 0.03em; color: var(--accent, #c0392b); }
+.card .card-warn.hidden { display: none; }
+.mi-checks h3 { font-size: 10px; margin: 10px 0 4px; letter-spacing: 0.06em; }
+.mi-checks ul { list-style: none; margin: 0; padding: 0; }
+.mi-checks li { border: var(--thin); padding: 4px 6px; margin-bottom: 4px; }
+.mi-checks li b { display: block; font-size: 10px; color: var(--accent, #c0392b); }
+.mi-checks li span { display: block; font-size: 9px; color: var(--mute); margin-top: 2px; }
