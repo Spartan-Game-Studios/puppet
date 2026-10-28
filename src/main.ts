@@ -499,7 +499,7 @@ function sendVmc(): void {
     blends: [],
   };
   for (const name of a.humanBoneNames) {
-    const n = a.bone(name)!;
+    const n = a.localPose(name)!;
     frame.bones.push([unityBoneName(name), ...toUnity(n.position, n.quaternion)]);
   }
   for (const [n, v] of a.expressionValues) frame.blends.push([vmcBlendName(n), v]);

@@ -117,7 +117,7 @@ export class Avatar {
       const b = this.bones.get(child);
       if (a && b) {
         const d = pos(b).sub(pos(a));
-        if (d.lengthSq() > 1e-10) this.rest[bone] = d.normalize();
+        if (d.lengthSq() > 1e-10) this.rest[bone] = this.toSolverDir(d.normalize());
       }
     }
     // Finger tips have no child bone: reuse the previous segment's direction.
@@ -150,6 +150,27 @@ export class Avatar {
     return this.vrm.meta?.metaVersion === '0';
   }
 
+  /**
+   * The solver works in a space where the avatar faces +Z (VRM 1.0). A VRM 0.x
+   * model's normalized bones still face -Z (rotateVRM0 only turns the scene),
+   * so its rotations and directions are the solver's turned 180 degrees about
+   * Y: negate x and z. Self-inverse, so it converts both ways.
+   */
+  private toBone(q: Quaternion): Quaternion {
+    return this.isVrm0 ? new Quaternion(-q.x, q.y, -q.z, q.w) : q;
+  }
+
+  /** A normalized bone's local position and rotation in the +Z-facing space (for VMC). */
+  localPose(name: string): { position: Vector3; quaternion: Quaternion } | null {
+    const n = this.bones.get(name);
+    if (!n) return null;
+    return { position: this.toSolverDir(n.position.clone()), quaternion: this.toBone(n.quaternion.clone()) };
+  }
+
+  private toSolverDir(v: Vector3): Vector3 {
+    return this.isVrm0 ? v.set(-v.x, v.y, -v.z) : v;
+  }
+
   get humanBoneNames(): string[] {
     return [...this.bones.keys()];
   }
@@ -176,7 +197,7 @@ export class Avatar {
   }
 
   private applyBonesInstant(): void {
-    for (const [b, q] of this.targets) this.bones.get(b)?.quaternion.copy(q);
+    for (const [b, q] of this.targets) this.bones.get(b)?.quaternion.copy(this.toBone(q));
   }
 
   /** Feed a processed face frame. */
@@ -252,18 +273,19 @@ export class Avatar {
       if (b === 'neck' || b === 'head') continue;
       const node = this.bones.get(b);
       if (!node) continue;
+      const t = this.toBone(target);
       if (TORSO.has(b)) {
-        const q = node.quaternion.clone().slerp(target, k);
+        const q = node.quaternion.clone().slerp(t, k);
         node.quaternion.rotateTowards(q, d.maxTorsoSpeed * dt);
       } else {
-        node.quaternion.slerp(target, k);
+        node.quaternion.slerp(t, k);
       }
     }
 
     // Head relative to the (now updated) chest.
     let parentWorld = new Quaternion();
-    for (const [b] of this.chestChain) parentWorld.multiply(this.bones.get(b)!.quaternion);
-    const headLocal = parentWorld.invert().multiply(headWorld);
+    for (const [b] of this.chestChain) parentWorld.multiply(this.toBone(this.bones.get(b)!.quaternion));
+    const headLocal = this.toBone(parentWorld.invert().multiply(headWorld));
     const neck = this.bones.get('neck');
     const head = this.bones.get('head');
     const kh = 1 - Math.exp(-d.followRate * 1.5 * dt);
