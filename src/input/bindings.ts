@@ -36,7 +36,9 @@ export type Action =
   | { kind: 'emote'; clip: string }
   | { kind: 'expression'; name: string; mode: ExpressionMode; fadeIn: number; fadeOut: number }
   | { kind: 'reset' }
-  | { kind: 'picker' };
+  | { kind: 'picker' }
+  /** Turn the virtual camera output on / off (src/app/vcamControls.ts). */
+  | { kind: 'camera' };
 
 export interface Binding {
   id: string;
@@ -186,7 +188,7 @@ const emote = (clip: string): Action => ({ kind: 'emote', clip });
  * Starter set. Keys avoid every app shortcut: expressions on Alt(⌥)+1-6
  * (plain 1/2/3 are the tracking modes), emotes on F3-F10 (F2 renames on
  * HOME), the picker on G. Gamepad (standard mapping): face buttons emote,
- * d-pad expressions, RB picker, BACK reset.
+ * d-pad expressions, RB picker, BACK reset, START virtual camera on/off.
  */
 export function defaultBindings(): Binding[] {
   const list: Array<[Trigger, Action]> = [
@@ -216,6 +218,7 @@ export function defaultBindings(): Binding[] {
     [pad(4), emote('builtin:shrug')],
     [pad(5), { kind: 'picker' }],
     [pad(8), { kind: 'reset' }],
+    [pad(9), { kind: 'camera' }],
   ];
   return list.map(([trigger, action], i) => ({ id: `d${i}`, trigger, action }));
 }
@@ -224,6 +227,7 @@ export function describeAction(a: Action, clipLabel: (id: string) => string = (s
   if (a.kind === 'emote') return clipLabel(a.clip);
   if (a.kind === 'expression') return `${a.name.toUpperCase()} ${a.mode === 'momentary' ? 'HOLD' : a.mode === 'on' ? 'ON' : 'TOGGLE'}`;
   if (a.kind === 'reset') return 'RESET';
+  if (a.kind === 'camera') return 'CAMERA ON/OFF';
   return 'PICKER';
 }
 
@@ -233,6 +237,6 @@ export function sanitizeBindings(v: unknown): Binding[] | null {
   return v.filter(
     (b): b is Binding =>
       !!b && typeof b === 'object' && typeof (b as Binding).id === 'string' && !!(b as Binding).trigger && !!(b as Binding).action &&
-      ['key', 'pad', 'gesture'].includes((b as Binding).trigger.kind) && ['emote', 'expression', 'reset', 'picker'].includes((b as Binding).action.kind),
+      ['key', 'pad', 'gesture'].includes((b as Binding).trigger.kind) && ['emote', 'expression', 'reset', 'picker', 'camera'].includes((b as Binding).action.kind),
   );
 }

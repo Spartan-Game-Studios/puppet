@@ -22,6 +22,10 @@ BUNDLE="$OUT_DIR/$ID.systemextension"
 TEAM_ID="${APPLE_TEAM_ID:-0000000000}"
 IDENTITY="${APPLE_SIGNING_IDENTITY:--}"
 VERSION="$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$HERE/../tauri.conf.json" | head -1)"
+# Extension build number (CFBundleVersion). Bump camera-extension/BUILD on
+# every change to the extension: macOS only replaces an installed extension
+# whose CFBundleVersion differs, and the app shows NEEDS UPDATE on a mismatch.
+BUILD="$(tr -d '[:space:]' < "$SRC/BUILD")"
 MIN_OS="12.3"
 
 if [[ "$(uname)" != "Darwin" ]]; then
@@ -29,7 +33,7 @@ if [[ "$(uname)" != "Darwin" ]]; then
   exit 0
 fi
 
-echo "build-camera-extension: $ID $VERSION (team $TEAM_ID, identity ${IDENTITY})"
+echo "build-camera-extension: $ID $VERSION build $BUILD (team $TEAM_ID, identity ${IDENTITY})"
 rm -rf "$BUNDLE" "$OUT_DIR/obj"
 mkdir -p "$BUNDLE/Contents/MacOS" "$OUT_DIR/obj"
 
@@ -44,7 +48,7 @@ done
 xcrun lipo -create -output "$BUNDLE/Contents/MacOS/$ID" "$OUT_DIR/obj/$ID-arm64" "$OUT_DIR/obj/$ID-x86_64"
 
 # 2. Info.plist.
-sed -e "s/@TEAM_ID@/$TEAM_ID/g" -e "s/@VERSION@/$VERSION/g" "$SRC/Info.plist.in" > "$BUNDLE/Contents/Info.plist"
+sed -e "s/@TEAM_ID@/$TEAM_ID/g" -e "s/@VERSION@/$VERSION/g" -e "s/@BUILD@/$BUILD/g" "$SRC/Info.plist.in" > "$BUNDLE/Contents/Info.plist"
 plutil -lint "$BUNDLE/Contents/Info.plist" >/dev/null
 
 # 3. Entitlements (+ provisioning profile when signing for real).

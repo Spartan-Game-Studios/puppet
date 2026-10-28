@@ -14,6 +14,29 @@ use std::sync::Mutex;
 use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri::{AppHandle, Manager, State};
 
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn pbg_begin_activity();
+    fn pbg_keep_webview_running(webview: *mut std::ffi::c_void);
+}
+
+/// Keep tracking, rendering and sending while the window is minimized, hidden
+/// or covered (see macos/bridge/PuppetBackground.m; the frontend half is
+/// src/app/backgroundLoop.ts).
+fn keep_running_in_background(app: &tauri::App) {
+    #[cfg(target_os = "macos")]
+    {
+        // SAFETY: plain FFI call.
+        unsafe { pbg_begin_activity() };
+        if let Some(w) = app.get_webview_window("main") {
+            // with_webview runs the closure on the main thread.
+            let _ = w.with_webview(|wv| unsafe { pbg_keep_webview_running(wv.inner()) });
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
 #[derive(Default)]
 struct VmcState(Mutex<vmc::Sender>);
 
@@ -111,6 +134,31 @@ fn vcam_setup(state: State<'_, VcamState>) -> Result<(), String> {
     state.handle.setup()
 }
 
+/// The camera driver's install state (macOS camera extension); null elsewhere.
+#[tauri::command(async)]
+fn vcam_ext_status(state: State<'_, VcamState>) -> Option<vcam::ExtensionStatus> {
+    state.handle.extension()
+}
+
+/// Install or update the camera extension (macOS asks the user to approve).
+#[tauri::command(async)]
+fn vcam_ext_install(state: State<'_, VcamState>) -> Result<(), String> {
+    state.handle.install_extension()
+}
+
+/// Remove the camera extension (the panel confirms first; macOS may ask too).
+#[tauri::command(async)]
+fn vcam_ext_uninstall(state: State<'_, VcamState>) -> Result<(), String> {
+    state.cam.lock().map_err(|e| e.to_string())?.stop();
+    state.handle.uninstall_extension()
+}
+
+/// Open the System Settings page where the extension is approved.
+#[tauri::command(async)]
+fn vcam_ext_open_settings(state: State<'_, VcamState>) -> Result<(), String> {
+    state.handle.open_settings()
+}
+
 #[tauri::command(async)]
 fn vcam_select_device(state: State<'_, VcamState>, device: Option<String>) -> Result<(), String> {
     state.handle.select_device(device);
@@ -155,6 +203,7 @@ pub fn run() {
             _ => PermissionResponse::Default,
         })
         .setup(|app| {
+            keep_running_in_background(app);
             #[cfg(target_os = "linux")]
             if let Some(w) = app.get_webview_window("main") {
                 // WebKitGTK ships with media streams disabled.
@@ -177,6 +226,7 @@ pub fn run() {
                     }
                     for _ in 0..15 {
                         println!("[puppet] vcam selftest: {}", serde_json::to_string(&h.status()).unwrap_or_default());
+                        println!("[puppet] vcam selftest ext: {}", serde_json::to_string(&h.extension()).unwrap_or_default());
                         std::thread::sleep(std::time::Duration::from_secs(1));
                     }
                 });
@@ -198,6 +248,10 @@ pub fn run() {
             vcam_stats,
             vcam_setup,
             vcam_select_device,
+            vcam_ext_status,
+            vcam_ext_install,
+            vcam_ext_uninstall,
+            vcam_ext_open_settings,
             vcam_start,
             vcam_stop,
             vcam_frame,
@@ -219,6 +273,18 @@ pub fn run() {
             clips::clips_index_load,
             clips::clips_index_save
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Puppet");
+        .build(tauri::generate_context!())
+        .expect("error while building Puppet")
+        .run(|app, event| {
+            // Quitting: close the camera output, which also tells the macOS
+            // camera extension to take its device down right away (instead
+            // of after the heartbeat times out).
+            if let tauri::RunEvent::Exit = event {
+                if let Some(s) = app.try_state::<VcamState>() {
+                    if let Ok(mut cam) = s.cam.lock() {
+                        cam.stop();
+                    }
+                }
+            }
+        });
 }
