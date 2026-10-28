@@ -5,8 +5,8 @@
  *
  * Glows (sun, fireflies, neon, lamps) are painted with additive geometry
  * rather than a bloom pass: a full-resolution HDR composer measured ~4 ms at
- * 1080p on an M3 Pro and halved MediaPipe's GPU throughput, so the composer
- * only runs when depth of field is switched on.
+ * 1080p on an M3 Pro and halved MediaPipe's GPU throughput. The only post
+ * effect is depth of field (dof.ts), off by default.
  *
  * It plugs into the Viewer through `viewer.renderHook` only while active, and
  * restores everything it changed when deactivated, so the flat COLOUR / CLEAR
@@ -17,7 +17,6 @@ import {
   DirectionalLight,
   FogExp2,
   Group,
-  HalfFloatType,
   HemisphereLight,
   InstancedMesh,
   Mesh,
@@ -27,17 +26,12 @@ import {
   Texture,
   Vector2,
   Vector3,
-  WebGLRenderTarget,
   type Camera,
   type Material,
   type Object3D,
   type Scene,
   type WebGLRenderer,
 } from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Viewer } from '../viewer';
 import {
   DEFAULT_LOOK,
@@ -56,6 +50,7 @@ import { blobTexture, skyDome } from './parts';
 import { PRESET_BUILDERS, type BuiltEnv } from './presets';
 import { CUSTOM_RIG } from './rigs';
 import { ShadowProxy } from './shadowProxy';
+import { DepthOfField } from './dof';
 import type { Avatar } from '../avatar';
 import type { CustomScene, CustomSky } from './custom';
 
@@ -92,8 +87,7 @@ export class EnvironmentManager {
   private saved: { fog: Scene['fog']; background: Scene['background']; shadow: boolean; clear: Color; alpha: number } | null = null;
   private shadowAvatar: Avatar | null = null;
   private readonly proxy = new ShadowProxy();
-  private composer: EffectComposer | null = null;
-  private bokeh: BokehPass | null = null;
+  private dof: DepthOfField | null = null;
   private readonly t0 = performance.now();
   private frameNo = 0;
   /**
@@ -186,7 +180,7 @@ export class EnvironmentManager {
     }
     v.scene.environment = null;
     v.scene.backgroundIntensity = 1;
-    this.disposeComposer();
+    this.disposeDof();
   }
 
   setCustomScene(c: CustomScene | null): void {
@@ -237,7 +231,7 @@ export class EnvironmentManager {
       v.scene.environment = this.customSky?.environment ?? null;
     } else v.scene.environment = null;
     v.renderer.setClearColor(this.built.fog.color, 1);
-    this.disposeComposer();
+    this.disposeDof();
   }
 
   private teardownBuilt(): void {
@@ -308,7 +302,6 @@ export class EnvironmentManager {
       holder.position.set(placement.x, placement.y, placement.z);
       holder.rotation.y = (placement.rotY * Math.PI) / 180;
     }
-    this.disposeComposer(); // rebuilt lazily with the right passes
   }
 
   // ---------------------------------------------------------------- frame
@@ -319,36 +312,13 @@ export class EnvironmentManager {
     this.proxy.setAvatar(a);
   }
 
-  private ensureComposer(r: WebGLRenderer, scene: Scene, camera: Camera): EffectComposer | null {
-    if (this.state.quality !== 'high' || !this.state.look.dof) {
-      this.info.post = '-';
-      return null;
-    }
-    r.getDrawingBufferSize(this.size);
-    const w = Math.max(1, this.size.x);
-    const h = Math.max(1, this.size.y);
-    if (!this.composer) {
-      const rt = new WebGLRenderTarget(w, h, { type: HalfFloatType, samples: 4 });
-      const c = new EffectComposer(r, rt);
-      c.setPixelRatio(1);
-      c.addPass(new RenderPass(scene, camera));
-      this.bokeh = new BokehPass(scene, camera, { focus: 1.3, aperture: 0.006, maxblur: 0.006 });
-      c.addPass(this.bokeh);
-      c.addPass(new OutputPass());
-      this.composer = c;
-      this.info.post = 'DOF';
-    }
-    const c = this.composer;
-    if (c.renderTarget1.width !== w || c.renderTarget1.height !== h) c.setSize(w, h);
-    return c;
+  private wantDof(): boolean {
+    return this.state.quality === 'high' && this.state.look.dof;
   }
 
-  private disposeComposer(): void {
-    if (!this.composer) return;
-    this.composer.dispose();
-    this.bokeh?.dispose();
-    this.composer = null;
-    this.bokeh = null;
+  private disposeDof(): void {
+    this.dof?.dispose();
+    this.dof = null;
     this.info.post = '-';
   }
 
@@ -390,14 +360,15 @@ export class EnvironmentManager {
       cam.updateMatrixWorld();
     }
 
-    const comp = this.ensureComposer(r, scene, camera);
-    if (comp) {
-      if (this.bokeh && avatar) {
-        const head = avatar.headPosition();
-        (this.bokeh.uniforms as Record<string, { value: number }>).focus.value = cam.position.distanceTo(head);
-      }
-      comp.render(dt);
-    } else r.render(scene, camera);
+    if (this.wantDof()) {
+      this.dof ??= new DepthOfField();
+      this.info.post = 'DOF';
+      if (avatar) this.dof.focus = cam.position.distanceTo(avatar.headPosition()) + 0.15;
+      this.dof.render(r, scene, camera);
+    } else {
+      if (this.dof) this.disposeDof();
+      r.render(scene, camera);
+    }
     this.info.calls = r.info.render.calls;
     this.info.triangles = r.info.render.triangles;
 
