@@ -14,6 +14,7 @@
  * a mirror image of the user.
  */
 import { Quaternion, Vector3 } from 'three';
+import { OneEuroVector, smoothingToParams } from './oneEuro';
 
 export interface Landmark {
   x: number;
@@ -38,6 +39,14 @@ export interface BodyInput {
   poseWorld?: Landmark[];
   poseImage?: Landmark[];
   hands?: HandInput[];
+  /**
+   * Seconds. With a time the solver is temporal: filters, hysteresis on arms
+   * and hands entering/leaving, bone-length tracking. Without one each call
+   * stands alone (tests).
+   */
+  t?: number;
+  /** Image width / height; with `poseImage`, enables depth-from-bone-length. */
+  aspect?: number;
 }
 
 export type Side = 'left' | 'right';
@@ -47,6 +56,7 @@ export type RestDirs = Partial<Record<string, Vector3>>;
 
 export const POSE = {
   nose: 0,
+  leftEar: 7, rightEar: 8,
   leftShoulder: 11, rightShoulder: 12,
   leftElbow: 13, rightElbow: 14,
   leftWrist: 15, rightWrist: 16,
@@ -144,15 +154,26 @@ const smoothstep = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
+
 export interface SolveOptions {
   mirror: boolean;
   hands: boolean;
-  /** Minimum landmark visibility to trust an arm. */
+  /** Minimum landmark visibility to trust an arm (stateless solves). */
   minVisibility: number;
   /** Fraction of the forearm-to-hand twist moved into the forearm. */
   forearmTwist: number;
-  /** Max torso lean from the shoulder line, radians. */
+  /** Max torso lean (swing of the spine away from vertical), radians. */
   maxTorsoAngle: number;
+  /** Max torso twist about the spine, radians. */
+  maxTorsoTwist: number;
+  /** Rebuild arm and shoulder depth from the 2D image and tracked bone lengths. */
+  depthFromLengths: boolean;
+  /** Finger smoothing, 0 (raw) .. 1 (heavy); same scale as the face smoothing. */
+  smoothing: number;
+  /** Share of the arm's elevation the clavicle takes (scapulohumeral rhythm). */
+  shoulderRhythm: number;
+  /** Max shrug (clavicle elevation from a raised shoulder), radians. */
+  maxShrug: number;
 }
 
 export const DEFAULT_SOLVE: SolveOptions = {
@@ -160,14 +181,29 @@ export const DEFAULT_SOLVE: SolveOptions = {
   hands: true,
   minVisibility: 0.55,
   forearmTwist: 0.5,
-  maxTorsoAngle: 0.6,
+  maxTorsoAngle: 0.5,
+  maxTorsoTwist: 0.7,
+  depthFromLengths: true,
+  smoothing: 0.5,
+  shoulderRhythm: 0.17,
+  maxShrug: 0.3,
 };
 
-/** Local rotations per normalized bone, plus a confidence per side. */
+/** Local rotations per normalized bone, plus confidences and blend weights. */
 export interface BodySolution {
   bones: Map<string, Quaternion>;
+  /** Raw landmark confidence per side (min visibility along the arm). */
   armConfidence: { left: number; right: number };
   handConfidence: { left: number; right: number };
+  /**
+   * How much of the solved arm / hand to show over the idle pose, 0..1. With
+   * time (BodyInput.t) these ramp in and out with hysteresis, so a limb that
+   * leaves the frame settles to idle instead of snapping.
+   */
+  armWeight: { left: number; right: number };
+  handWeight: { left: number; right: number };
+  /** Torso lean and twist, radians (readout). */
+  torso: { lean: number; twist: number };
 }
 
 /**
@@ -185,6 +221,7 @@ export function idleArm(side: Side, rest: RestDirs, out: Map<string, Quaternion>
   const local = fore.clone().applyQuaternion(qUpper.clone().invert());
   out.set(`${side}LowerArm`, new Quaternion().setFromUnitVectors(lowerRest, local));
   out.set(`${side}Hand`, new Quaternion());
+  out.set(`${side}Shoulder`, new Quaternion());
 }
 
 /** Gently curled fingers for the idle hand. */
@@ -199,9 +236,134 @@ export function idleFingers(side: Side, out: Map<string, Quaternion>): void {
   }
 }
 
+/**
+ * Depth of a segment from its length and its image projection: MediaPipe's
+ * z is its noisiest axis, but a bone can't be longer than it is, so the
+ * projected length fixes how far it points into or out of the image. The sign
+ * still comes from MediaPipe (`dzHint`), faded to zero when that is too small
+ * to trust, which keeps an ambiguous limb in the image plane rather than
+ * flipping it.
+ */
+export function segmentDepth(dxy: number, dzHint: number, length: number): number {
+  const mag = Math.sqrt(Math.max(0, length * length - dxy * dxy));
+  const sign = Math.max(-1, Math.min(1, dzHint / Math.max(1e-6, 0.3 * length)));
+  return mag * sign;
+}
+
+/**
+ * Robust running length of one bone (metres): the larger of a high
+ * percentile of its image-projected length (a bone is never shorter than its
+ * projection) and 90% of the median 3D length MediaPipe reports.
+ */
+export class BoneLength {
+  private proj: number[] = [];
+  private full: number[] = [];
+  value = 0;
+  constructor(private readonly window = 240) {}
+  add(full: number, proj: number): number {
+    this.full.push(full);
+    this.proj.push(proj);
+    if (this.full.length > this.window) {
+      this.full.shift();
+      this.proj.shift();
+    }
+    const pct = (a: number[], p: number) => {
+      const s = [...a].sort((x, y) => x - y);
+      return s[Math.min(s.length - 1, Math.floor(p * s.length))];
+    };
+    this.value = Math.max(pct(this.proj, 0.95), 0.9 * pct(this.full, 0.5));
+    return this.value;
+  }
+  reset(): void {
+    this.proj.length = 0;
+    this.full.length = 0;
+    this.value = 0;
+  }
+}
+
+/** Number of filtered finger values per hand: 4 fingers x (spread, 3 bends), thumb quaternion, 2 thumb bends. */
+const FINGER_VALUES = 22;
+const FINGERS = ['Index', 'Middle', 'Ring', 'Little'] as const;
+const FINGER_LM: Record<(typeof FINGERS)[number], [number, number, number, number]> = {
+  Index: [5, 6, 7, 8],
+  Middle: [9, 10, 11, 12],
+  Ring: [13, 14, 15, 16],
+  Little: [17, 18, 19, 20],
+};
+const D2R = Math.PI / 180;
+/** Anatomical limits, radians: [min, max]. Negative = bending backwards. */
+export const JOINT_LIMITS = {
+  spread: [-25 * D2R, 25 * D2R],
+  mcp: [-25 * D2R, 95 * D2R],
+  pip: [-5 * D2R, 110 * D2R],
+  dip: [-5 * D2R, 90 * D2R],
+  thumbSwing: 70 * D2R,
+  thumbMcp: [-20 * D2R, 70 * D2R],
+  thumbIp: [-25 * D2R, 85 * D2R],
+  elbow: 150 * D2R,
+  /** Upper-arm twist away from the minimal swing from rest. */
+  humerusTwist: 115 * D2R,
+} as const;
+const clampTo = (x: number, [a, b]: readonly [number, number]) => Math.min(b, Math.max(a, x));
+const PALM = new Vector3(0, -1, 0);
+
+/** Hinge basis for a bone at rest: e1 its direction, e2 toward the palm, h the flex axis. */
+function hingeBasis(rest: Vector3) {
+  const e1 = rest.clone().normalize();
+  const e2 = PALM.clone().addScaledVector(e1, -PALM.dot(e1));
+  if (e2.lengthSq() < 1e-8) e2.set(0, 0, -1);
+  e2.normalize();
+  const h = new Vector3().crossVectors(e1, e2);
+  return { e1, e2, h };
+}
+
+/** On/off with hysteresis plus a weight that ramps toward it. */
+interface Gate {
+  on: boolean;
+  since: number;
+  weight: number;
+}
+const newGate = (): Gate => ({ on: false, since: 0, weight: 0 });
+
+interface SideState {
+  upper: Gate;
+  fore: Gate;
+  armWeight: number;
+  humerusTwist: number | null;
+  handActive: boolean;
+  handSeen: number;
+  handFrames: number;
+  handWeight: number;
+  fingers: OneEuroVector;
+  lastFingers: number[] | null;
+  shrugBase: number | null;
+  lengths: { upper: BoneLength; fore: BoneLength };
+}
+
+const newSide = (): SideState => ({
+  upper: newGate(),
+  fore: newGate(),
+  armWeight: 0,
+  humerusTwist: null,
+  handActive: false,
+  handSeen: -Infinity,
+  handFrames: 0,
+  handWeight: 0,
+  fingers: new OneEuroVector(FINGER_VALUES),
+  lastFingers: null,
+  shrugBase: null,
+  lengths: { upper: new BoneLength(), fore: new BoneLength() },
+});
+
 export class BodySolver {
   rest: RestDirs;
   opts: SolveOptions;
+  /** Bones the model has (clavicles are only solved if present). Null = assume none optional. */
+  available: Set<string> | null = null;
+  private side: Record<Side, SideState> = { left: newSide(), right: newSide() };
+  private shoulderLen = new BoneLength();
+  private scale: number | null = null;
+  private lastT: number | null = null;
 
   constructor(rest: RestDirs, opts: Partial<SolveOptions> = {}) {
     this.rest = rest;
@@ -212,6 +374,14 @@ export class BodySolver {
     return this.rest[bone] ?? fallback;
   }
 
+  /** Forget all temporal state (e.g. after a long tracking gap). */
+  reset(): void {
+    this.side = { left: newSide(), right: newSide() };
+    this.shoulderLen.reset();
+    this.scale = null;
+    this.lastT = null;
+  }
+
   /**
    * Solve. `chestChain` lists the torso bones the model actually has (e.g.
    * ['spine','chest','upperChest']) with the share of the torso rotation each
@@ -219,80 +389,224 @@ export class BodySolver {
    */
   solve(input: BodyInput, chestChain: Array<[string, number]>): BodySolution {
     const { mirror } = this.opts;
+    const temporal = input.t !== undefined;
+    const t = input.t ?? 0;
+    const dt = temporal && this.lastT !== null ? Math.min(0.5, Math.max(0, t - this.lastT)) : 0;
+    if (temporal && this.lastT !== null && t - this.lastT > 1) this.reset();
+    this.lastT = temporal ? t : null;
+    this.forearmBase.clear();
     const bones = new Map<string, Quaternion>();
-    const res: BodySolution = { bones, armConfidence: { left: 0, right: 0 }, handConfidence: { left: 0, right: 0 } };
+    const res: BodySolution = {
+      bones,
+      armConfidence: { left: 0, right: 0 },
+      handConfidence: { left: 0, right: 0 },
+      armWeight: { left: 0, right: 0 },
+      handWeight: { left: 0, right: 0 },
+      torso: { lean: 0, twist: 0 },
+    };
     const pw = input.poseWorld;
+    const assigned: Partial<Record<Side, HandInput>> = this.opts.hands && input.hands?.length ? this.assignHands(input) : {};
 
-    // Torso.
     let chestWorld = new Quaternion();
     if (pw && pw.length >= 25) {
       const idx = (side: Side, part: string) =>
         (POSE as Record<string, number>)[`${mirror ? (side === 'left' ? 'right' : 'left') : side}${part}`];
-      const p = (side: Side, part: string) => toAvatar(pw[idx(side, part)], mirror);
-      const vis = (side: Side, part: string) => pw[idx(side, part)].visibility ?? 1;
+      const world = (side: Side, part: string) => toAvatar(pw[idx(side, part)], mirror);
+      const img = input.poseImage;
+      const inImage = (side: Side, part: string) => {
+        if (!img) return 1;
+        const l = img[idx(side, part)];
+        // Points predicted outside the image are guesses.
+        const m = Math.min(l.x, 1 - l.x, l.y, 1 - l.y);
+        return smoothstep(-0.04, 0.03, m);
+      };
+      const vis = (side: Side, part: string) => (pw[idx(side, part)].visibility ?? 1) * inImage(side, part);
 
-      const lSh = p('left', 'Shoulder');
-      const rSh = p('right', 'Shoulder');
+      // Image-plane vector a->b in avatar metres, if the image and a scale are available.
+      const aspect = input.aspect ?? 0;
+      const useDepth = this.opts.depthFromLengths && !!img && aspect > 0;
+      const imgVec = (a: number, b: number, k: number) =>
+        new Vector3((mirror ? -1 : 1) * (img![b].x - img![a].x) * k, -((img![b].y - img![a].y) * k) / aspect, 0);
+      let k = 0;
+      if (useDepth) {
+        const ls = pw[POSE.leftShoulder];
+        const rs = pw[POSE.rightShoulder];
+        const worldXY = Math.hypot(ls.x - rs.x, ls.y - rs.y);
+        const imgXY = Math.hypot(img![POSE.leftShoulder].x - img![POSE.rightShoulder].x, (img![POSE.leftShoulder].y - img![POSE.rightShoulder].y) / aspect);
+        if (imgXY > 1e-4) {
+          const kNow = worldXY / imgXY;
+          this.scale = temporal && this.scale !== null ? this.scale + (1 - Math.exp(-dt / 0.5)) * (kNow - this.scale) : kNow;
+          k = this.scale;
+        }
+      }
+      /** Child point = parent + segment rebuilt from the image and the bone length. */
+      const rebuild = (parent: Vector3, a: number, b: number, mpA: Vector3, mpB: Vector3, len: BoneLength): Vector3 => {
+        const full = mpB.clone().sub(mpA);
+        if (!useDepth || k <= 0) return parent.clone().add(full);
+        const v = imgVec(a, b, k);
+        const dxy = Math.hypot(v.x, v.y);
+        if (!temporal) len.reset();
+        const L = len.add(full.length(), dxy);
+        v.z = segmentDepth(dxy, full.z, L);
+        return parent.clone().add(v);
+      };
+
+      let lSh = world('left', 'Shoulder');
+      let rSh = world('right', 'Shoulder');
       const shoulderOk = Math.min(vis('left', 'Shoulder'), vis('right', 'Shoulder')) > 0.5;
       if (shoulderOk) {
+        if (useDepth && k > 0) {
+          // Rebuild the shoulder line around its midpoint.
+          const mid = lSh.clone().add(rSh).multiplyScalar(0.5);
+          const across = rebuild(new Vector3(), idx('right', 'Shoulder'), idx('left', 'Shoulder'), rSh, lSh, this.shoulderLen);
+          lSh = mid.clone().addScaledVector(across, 0.5);
+          rSh = mid.clone().addScaledVector(across, -0.5);
+        }
         const across = lSh.clone().sub(rSh);
         const hipsOk = Math.min(vis('left', 'Hip'), vis('right', 'Hip')) > 0.5;
         let up = UP.clone();
         if (hipsOk) {
           const sMid = lSh.clone().add(rSh).multiplyScalar(0.5);
-          const hMid = p('left', 'Hip').add(p('right', 'Hip')).multiplyScalar(0.5);
+          const hMid = world('left', 'Hip').add(world('right', 'Hip')).multiplyScalar(0.5);
           up = sMid.sub(hMid).normalize();
         }
-        // Torso frame: y up the spine (exact), x across the shoulders.
+        // Torso frame: y up the spine (exact), x across the shoulders. Split
+        // into lean (swing of the spine) and twist (about it), each limited:
+        // depth noise mostly shows up as twist.
         const torso = basisRotation(UP, new Vector3(1, 0, 0), up, across);
-        // Limit the lean so noisy depth can't fold the avatar.
-        const angle = 2 * Math.acos(Math.min(1, Math.abs(torso.w)));
-        if (angle > this.opts.maxTorsoAngle) qpow(torso, this.opts.maxTorsoAngle / angle, torso);
-        chestWorld = torso;
+        const twist = twistAbout(torso, UP);
+        const swing = torso.clone().multiply(twist.clone().invert());
+        const lean = 2 * Math.acos(Math.min(1, Math.abs(swing.w)));
+        if (lean > this.opts.maxTorsoAngle) qpow(swing, this.opts.maxTorsoAngle / lean, swing);
+        let tw = 2 * Math.acos(Math.min(1, Math.abs(twist.w)));
+        if (tw > this.opts.maxTorsoTwist) {
+          qpow(twist, this.opts.maxTorsoTwist / tw, twist);
+          tw = this.opts.maxTorsoTwist;
+        }
+        res.torso = { lean: Math.min(lean, this.opts.maxTorsoAngle), twist: tw * Math.sign(twist.y * twist.w || 1) };
+        // Lean mostly low in the spine, twist mostly high (the chest turns more than the waist).
+        const n = chestChain.length;
+        const twistShares = n === 3 ? [0.2, 0.35, 0.45] : n === 2 ? [0.4, 0.6] : [1];
+        let acc = new Quaternion();
+        chestChain.forEach(([bone, share], i) => {
+          const q = qpow(swing, share).multiply(qpow(twist, twistShares[i] ?? share));
+          bones.set(bone, q);
+          acc = acc.multiply(q);
+        });
+        chestWorld = acc;
+      } else {
+        for (const [bone] of chestChain) bones.set(bone, new Quaternion());
       }
-
-      // Distribute the torso rotation over the chain.
-      let acc = new Quaternion();
-      for (const [bone, share] of chestChain) {
-        const q = qpow(chestWorld, share);
-        bones.set(bone, q);
-        acc = acc.multiply(q);
-      }
-      chestWorld = acc;
 
       for (const side of ['left', 'right'] as Side[]) {
-        const conf = Math.min(vis(side, 'Shoulder'), vis(side, 'Elbow'), vis(side, 'Wrist'));
-        res.armConfidence[side] = conf;
-        if (conf < this.opts.minVisibility) continue;
-        const sh = p(side, 'Shoulder');
-        const el = p(side, 'Elbow');
-        const wr = p(side, 'Wrist');
-        this.solveArm(side, chestWorld, sh, el, wr, bones);
-        // Hand orientation from the pose's own index/pinky points as a fallback.
-        if (!bones.has(`${side}Hand`)) {
-          const ix = p(side, 'Index');
-          const pk = p(side, 'Pinky');
-          this.solveHandFromPoints(side, bones, chestWorld, wr, ix.clone().add(pk).multiplyScalar(0.5), ix, pk, 0.5);
+        const st = this.side[side];
+        // The upper arm needs shoulder and elbow; the forearm also the wrist.
+        // An arm reaching out of the frame keeps its upper arm.
+        const upperConf = Math.min(vis(side, 'Shoulder'), vis(side, 'Elbow'));
+        let foreConf = Math.min(upperConf, vis(side, 'Wrist'));
+        // MediaPipe sometimes "sees" a wrist that isn't there: a hand hanging
+        // out of view gets placed at the chin. In hands mode, a wrist up by the
+        // face with no hand found at it for a while is not trusted enough to
+        // start following (a forearm already followed keeps going through
+        // short hand misses).
+        if (temporal && this.opts.hands && t - st.handSeen > 0.4 && img && this.nearFace(img, idx(side, 'Wrist'), aspect || 4 / 3)) {
+          foreConf *= 0.6;
         }
+        res.armConfidence[side] = foreConf;
+        const upperOn = this.gate(st.upper, upperConf, temporal, t, dt);
+        this.gate(st.fore, foreConf, temporal, t, dt);
+        st.armWeight = st.upper.weight;
+        res.armWeight[side] = st.upper.weight;
+        if (!upperOn && st.upper.weight <= 0) {
+          st.humerusTwist = null;
+          continue;
+        }
+        const sh = side === 'left' ? lSh : rSh;
+        const mpSh = world(side, 'Shoulder');
+        const mpEl = world(side, 'Elbow');
+        const mpWr = world(side, 'Wrist');
+        const el = rebuild(sh, idx(side, 'Shoulder'), idx(side, 'Elbow'), mpSh, mpEl, st.lengths.upper);
+        const wr = rebuild(el, idx(side, 'Elbow'), idx(side, 'Wrist'), mpEl, mpWr, st.lengths.fore);
+        // Untrusted forearm: ease toward a relaxed, slightly bent continuation of the upper arm.
+        const fw = st.fore.weight;
+        this.solveClavicle(side, chestWorld, sh, el, img, idx, aspect, temporal, dt, bones);
+        this.solveArm(side, chestWorld, sh, el, wr, bones, fw);
+        if (fw <= 0) continue;
+        // Hand orientation from the pose's own index/pinky points as a fallback.
+        const ix = world(side, 'Index').sub(mpWr).add(wr);
+        const pk = world(side, 'Pinky').sub(mpWr).add(wr);
+        this.solveHandFromPoints(side, bones, chestWorld, wr, ix.clone().add(pk).multiplyScalar(0.5), ix, pk, 0.5 * fw);
       }
     } else {
       for (const [bone] of chestChain) bones.set(bone, new Quaternion());
     }
 
     // Hands.
-    if (this.opts.hands && input.hands?.length) {
-      const assigned = this.assignHands(input);
-      for (const side of ['left', 'right'] as Side[]) {
-        const h = assigned[side];
-        if (!h || !bones.has(`${side}LowerArm`)) continue;
-        res.handConfidence[side] = h.score;
-        const w = h.worldLandmarks.map((l) => toAvatar(l, mirror));
-        const mid = w[9];
-        this.solveHandFromPoints(side, bones, chestWorld, w[0], mid, w[5], w[17], 1);
-        this.solveFingers(side, bones, chestWorld, w);
+    for (const side of ['left', 'right'] as Side[]) {
+      const st = this.side[side];
+      const h = assigned[side];
+      const solvable = !!h && bones.has(`${side}LowerArm`) && h.worldLandmarks.length >= 21;
+      if (solvable) {
+        res.handConfidence[side] = h!.score;
+        st.handSeen = t;
+        st.handFrames++;
+      } else {
+        st.handFrames = 0;
+      }
+      if (!temporal) st.handActive = solvable;
+      else if (!st.handActive && st.handFrames >= 2) st.handActive = true;
+      else if (st.handActive && t - st.handSeen > 0.25) st.handActive = false;
+      st.handWeight = temporal ? approach(st.handWeight, st.handActive ? 1 : 0, dt * 6) : st.handActive ? 1 : 0;
+      res.handWeight[side] = st.handWeight;
+      if (!st.handActive) {
+        if (temporal && t - st.handSeen > 0.3) {
+          st.fingers.reset();
+          st.lastFingers = null;
+        }
+      }
+      if (solvable) {
+        const w = h!.worldLandmarks.map((l) => toAvatar(l, mirror));
+        this.solveHandFromPoints(side, bones, chestWorld, w[0], w[9], w[5], w[17], 1);
+        this.solveFingers(side, bones, chestWorld, w, temporal ? t : undefined);
+      } else if (st.handWeight > 0 && st.lastFingers) {
+        // Fading out: hold the last finger pose while the weight ramps down.
+        this.applyFingers(side, st.lastFingers, bones);
       }
     }
     return res;
+  }
+
+  /** Whether an image point is in the face/neck region (above the shoulders, near the nose). */
+  private nearFace(img: Landmark[], i: number, aspect: number): boolean {
+    const p = img[i];
+    const ls = img[POSE.leftShoulder];
+    const rs = img[POSE.rightShoulder];
+    const nose = img[POSE.nose];
+    const width = Math.hypot(ls.x - rs.x, (ls.y - rs.y) / aspect);
+    if (width < 1e-3) return false;
+    const shoulderY = (ls.y + rs.y) / 2;
+    return (p.y - shoulderY) / aspect < 0.3 * width && Math.abs(p.x - nose.x) < 0.8 * width;
+  }
+
+  /**
+   * Hysteresis for a limb segment: switches on after `conf` has stayed at or
+   * above 0.65 for 0.12 s, off after it has stayed below 0.4 for 0.15 s; the
+   * weight ramps toward on/off at 4/s. Stateless solves use minVisibility.
+   */
+  private gate(g: Gate, conf: number, temporal: boolean, t: number, dt: number): boolean {
+    if (!temporal) {
+      g.on = conf >= this.opts.minVisibility;
+      g.weight = g.on ? 1 : 0;
+      return g.on;
+    }
+    const want = g.on ? conf >= 0.4 : conf >= 0.65;
+    if (want === g.on) g.since = t;
+    else if (t - g.since >= (g.on ? 0.15 : 0.12)) {
+      g.on = want;
+      g.since = t;
+    }
+    g.weight = approach(g.weight, g.on ? 1 : 0, dt * 4);
+    return g.on;
   }
 
   /** Match detected hands to the user's left/right (pre-mirror) using pose wrists, else the label. */
@@ -329,35 +643,85 @@ export class BodySolver {
     return q;
   }
 
-  solveArm(side: Side, chestWorld: Quaternion, sh: Vector3, el: Vector3, wr: Vector3, bones: Map<string, Quaternion>): void {
+  /**
+   * Clavicle: follows the arm's elevation (the shoulder girdle takes part of
+   * any raise above the side) plus a shrug, read as the shoulder rising toward
+   * the ear against a slowly adapting resting baseline.
+   */
+  private solveClavicle(
+    side: Side,
+    chestWorld: Quaternion,
+    sh: Vector3,
+    el: Vector3,
+    img: Landmark[] | undefined,
+    idx: (side: Side, part: string) => number,
+    aspect: number,
+    temporal: boolean,
+    dt: number,
+    bones: Map<string, Quaternion>,
+  ): void {
+    if (!this.available?.has(`${side}Shoulder`)) return;
     const s = side === 'left' ? 1 : -1;
-    const upperRest = this.restDir(`${side}UpperArm`, new Vector3(s, 0, 0));
-    const lowerRest = this.restDir(`${side}LowerArm`, new Vector3(s, 0, 0));
-    const shoulderLocal = bones.get(`${side}Shoulder`) ?? new Quaternion();
-    const parentWorld = chestWorld.clone().multiply(shoulderLocal);
-    const parentInv = parentWorld.clone().invert();
-
-    const dUpper = el.clone().sub(sh).normalize();
-    const dLower = wr.clone().sub(el).normalize();
-    const upperLocalDir = dUpper.clone().applyQuaternion(parentInv);
-    const lowerInParent = dLower.clone().applyQuaternion(parentInv);
-
-    // Minimal rotation, then a version that also puts the elbow hinge in the
-    // right plane; blend by how bent the arm is (a straight arm has no plane).
-    const qMin = new Quaternion().setFromUnitVectors(upperRest, upperLocalDir);
-    const perp = lowerInParent.clone().addScaledVector(upperLocalDir, -lowerInParent.dot(upperLocalDir));
-    const bend = smoothstep(0.08, 0.3, perp.length());
-    let qUpper = qMin;
-    if (bend > 0) {
-      // At rest (T-pose, palms down) the forearm folds toward +Z.
-      const qBend = basisRotation(upperRest, FWD, upperLocalDir, perp);
-      qUpper = qMin.clone().slerp(qBend, bend);
+    const u = el.clone().sub(sh).normalize().applyQuaternion(chestWorld.clone().invert());
+    // Abduction from hanging, radians; the girdle joins in past ~30 degrees.
+    const abduction = Math.acos(Math.max(-1, Math.min(1, -u.y)));
+    let elev = this.opts.shoulderRhythm * Math.max(0, abduction - Math.PI / 6);
+    const st = this.side[side];
+    if (temporal && img && aspect > 0) {
+      const ear = img[idx(side, 'Ear')];
+      const shI = img[idx(side, 'Shoulder')];
+      const shO = img[idx(side === 'left' ? 'right' : 'left', 'Shoulder')];
+      const width = Math.hypot(shI.x - shO.x, (shI.y - shO.y) / aspect);
+      if ((ear.visibility ?? 1) > 0.6 && width > 1e-3) {
+        const r = (shI.y - ear.y) / aspect / width;
+        // Resting ear-to-shoulder height: follows increases at once, decreases slowly.
+        st.shrugBase = st.shrugBase === null ? r : Math.max(r, st.shrugBase - 0.01 * dt);
+        elev += this.opts.maxShrug * smoothstep(0.03, 0.15, st.shrugBase - r);
+      }
     }
+    elev = Math.min(elev, 0.5);
+    bones.set(`${side}Shoulder`, new Quaternion().setFromAxisAngle(new Vector3(0, 0, s), elev));
+  }
+
+  /**
+   * Arm as shoulder ball joint + elbow hinge. The elbow only flexes (0 to
+   * 150 degrees, never backwards); the plane it bends in sets the upper arm's
+   * twist, which is limited and held when the arm is too straight to show it.
+   */
+  solveArm(side: Side, chestWorld: Quaternion, sh: Vector3, el: Vector3, wr: Vector3, bones: Map<string, Quaternion>, foreWeight = 1): void {
+    const s = side === 'left' ? 1 : -1;
+    const st = this.side[side];
+    const upperRest = this.restDir(`${side}UpperArm`, new Vector3(s, 0, 0)).clone().normalize();
+    const lowerRest = this.restDir(`${side}LowerArm`, new Vector3(s, 0, 0)).clone().normalize();
+    const shoulderLocal = bones.get(`${side}Shoulder`) ?? new Quaternion();
+    const parentInv = chestWorld.clone().multiply(shoulderLocal).invert();
+
+    const u = el.clone().sub(sh).normalize().applyQuaternion(parentInv);
+    const l = wr.clone().sub(el).normalize().applyQuaternion(parentInv);
+    const qMin = new Quaternion().setFromUnitVectors(upperRest, u);
+    // Bend plane reference: at rest (T-pose, palms down) the forearm folds toward +Z.
+    const fwdU = FWD.clone().addScaledVector(upperRest, -FWD.dot(upperRest)).normalize();
+    const ref = fwdU.clone().applyQuaternion(qMin);
+    const perp = l.clone().addScaledVector(u, -l.dot(u));
+    const bendSin = perp.length();
+    // An untrusted forearm relaxes toward a slight bend in the held plane.
+    const bend = foreWeight * Math.min(JOINT_LIMITS.elbow, Math.atan2(bendSin, l.dot(u))) + (1 - foreWeight) * 0.3;
+    const planeConf = foreWeight * smoothstep(0.1, 0.35, bendSin);
+    let psi = st.humerusTwist ?? 0;
+    if (planeConf > 0) {
+      perp.normalize();
+      const meas = Math.atan2(new Vector3().crossVectors(ref, perp).dot(u), ref.dot(perp));
+      if (st.humerusTwist === null) psi = meas * planeConf;
+      else psi += planeConf * wrapAngle(meas - psi);
+    } else if (st.humerusTwist === null) psi = 0;
+    psi = Math.max(-JOINT_LIMITS.humerusTwist, Math.min(JOINT_LIMITS.humerusTwist, psi));
+    st.humerusTwist = this.lastT === null ? null : psi;
+    const qUpper = qMin.multiply(new Quaternion().setFromAxisAngle(upperRest, psi));
     bones.set(`${side}UpperArm`, qUpper);
 
-    const upperWorldInv = parentWorld.clone().multiply(qUpper).invert();
-    const lowerLocalDir = dLower.clone().applyQuaternion(upperWorldInv);
-    bones.set(`${side}LowerArm`, new Quaternion().setFromUnitVectors(lowerRest, lowerLocalDir));
+    const fwdL = FWD.clone().addScaledVector(lowerRest, -FWD.dot(lowerRest)).normalize();
+    const hinge = new Vector3().crossVectors(lowerRest, fwdL).normalize();
+    bones.set(`${side}LowerArm`, new Quaternion().setFromAxisAngle(hinge, bend));
   }
 
   /**
@@ -379,6 +743,12 @@ export class BodySolver {
     const fingers = middle.clone().sub(wrist);
     const across = index.clone().sub(pinky);
     if (fingers.lengthSq() < 1e-10 || across.lengthSq() < 1e-10) return;
+    const lower = bones.get(`${side}LowerArm`);
+    if (!lower) return;
+    // Undo a previous call's forearm twist (the pose fallback runs first).
+    const baseLower = this.forearmBase.get(side);
+    if (baseLower) lower.copy(baseLower);
+    else this.forearmBase.set(side, lower.clone());
     // At rest the index knuckle is forward (+Z) of the pinky for either hand.
     const handWorld = basisRotation(handRest, FWD, fingers, across);
     const chain = [`${side}Shoulder`, `${side}UpperArm`, `${side}LowerArm`];
@@ -390,47 +760,119 @@ export class BodySolver {
     const ang = 2 * Math.acos(Math.min(1, Math.abs(local.w)));
     if (ang > 1.4) qpow(local, 1.4 / ang, local);
 
-    // Move a share of the twist into the forearm.
+    // Move a share of the twist into the forearm (pronation/supination), limited to 90 degrees there.
     const axis = handRest.clone().normalize();
     const twist = twistAbout(local, axis);
     const t = qpow(twist, this.opts.forearmTwist);
-    const lower = bones.get(`${side}LowerArm`);
-    if (lower) {
-      lower.multiply(t);
-      local = t.clone().invert().multiply(local);
-    }
+    const ta = 2 * Math.acos(Math.min(1, Math.abs(t.w)));
+    if (ta > Math.PI / 2) qpow(t, Math.PI / 2 / ta, t);
+    lower.multiply(t);
+    local = t.clone().invert().multiply(local);
     bones.set(`${side}Hand`, local);
   }
+  private forearmBase = new Map<Side, Quaternion>();
 
-  /** Finger bones from hand world landmarks (already in avatar space). */
-  solveFingers(side: Side, bones: Map<string, Quaternion>, chestWorld: Quaternion, w: Vector3[]): void {
-    const s = side === 'left' ? 1 : -1;
+  /**
+   * Finger bones from hand world landmarks (already in avatar space): each
+   * joint is measured as anatomical angles (spread and bend at the knuckle,
+   * bend only at the middle and end joints), clamped to its range, smoothed
+   * per joint, then rebuilt as rotations, so fingers can't bend sideways or
+   * backwards and noise in one joint doesn't twist the rest.
+   */
+  solveFingers(side: Side, bones: Map<string, Quaternion>, chestWorld: Quaternion, w: Vector3[], t?: number): void {
+    const st = this.side[side];
     const handWorld = this.worldOf(bones, chestWorld, [`${side}Shoulder`, `${side}UpperArm`, `${side}LowerArm`, `${side}Hand`]);
-    let parentWorld = handWorld.clone();
-    let prevRest = this.restDir(`${side}Hand`, new Vector3(s, 0, 0));
-    for (const [name, a, b] of FINGER_SEGMENTS) {
-      const bone = `${side}${name}`;
-      const first = name.endsWith('Proximal') && !name.startsWith('Thumb') || name === 'ThumbMetacarpal';
-      if (first) {
-        parentWorld = handWorld.clone();
-        prevRest = this.restDir(`${side}Hand`, new Vector3(s, 0, 0));
-      }
-      const rest = this.restDir(bone, prevRest);
-      const dir = w[b].clone().sub(w[a]);
-      if (dir.lengthSq() < 1e-12) continue;
-      const local = dir.normalize().applyQuaternion(parentWorld.clone().invert());
-      if (!name.startsWith('Thumb') && !name.endsWith('Proximal')) {
-        // Middle and end joints are hinges: drop the sideways component and
-        // stop them bending backwards.
-        local.z = 0;
-        if (local.y * 1 > 0.15) local.y = 0.15;
-        if (local.lengthSq() < 1e-8) continue;
-        local.normalize();
-      }
-      const q = new Quaternion().setFromUnitVectors(rest, local);
-      bones.set(bone, q);
-      parentWorld = parentWorld.clone().multiply(q);
-      prevRest = rest;
+    const handInv = handWorld.clone().invert();
+    const local = (a: number, b: number) => w[b].clone().sub(w[a]).applyQuaternion(handInv);
+    const vals = new Array<number>(FINGER_VALUES).fill(0);
+    FINGERS.forEach((f, i) => {
+      const [a, b, c, d] = FINGER_LM[f];
+      const p = hingeBasis(this.restDir(`${side}${f}Proximal`, new Vector3(side === 'left' ? 1 : -1, 0, 0)));
+      const dir1 = local(a, b).normalize();
+      const k = p.h.clone().negate();
+      let spread = Math.atan2(dir1.dot(k), dir1.dot(p.e1));
+      spread = clampTo(spread, JOINT_LIMITS.spread);
+      const inPlane = dir1.dot(p.e1) * Math.cos(spread) + dir1.dot(k) * Math.sin(spread);
+      const mcp = clampTo(Math.atan2(dir1.dot(p.e2), inPlane), JOINT_LIMITS.mcp);
+      const q1 = this.knuckle(p, spread, mcp);
+      // Middle and end joints, measured in the frame of the (constrained) parent.
+      const q1Inv = q1.clone().invert();
+      const bi = hingeBasis(this.restDir(`${side}${f}Intermediate`, p.e1));
+      const dir2 = local(b, c).normalize().applyQuaternion(q1Inv);
+      const pip = clampTo(Math.atan2(dir2.dot(bi.e2), dir2.dot(bi.e1)), JOINT_LIMITS.pip);
+      const q2Inv = new Quaternion().setFromAxisAngle(bi.h, pip).invert();
+      const bd = hingeBasis(this.restDir(`${side}${f}Distal`, bi.e1));
+      const dir3 = local(c, d).normalize().applyQuaternion(q1Inv).applyQuaternion(q2Inv);
+      let dip = clampTo(Math.atan2(dir3.dot(bd.e2), dir3.dot(bd.e1)), JOINT_LIMITS.dip);
+      // The end joint is the noisiest landmark: lean on its usual coupling to the middle joint.
+      dip = 0.6 * dip + 0.4 * 0.7 * pip;
+      vals.splice(4 * i, 4, spread, mcp, pip, dip);
+    });
+    // Thumb: the metacarpal's swing comes from its direction, its twist from
+    // the plane the rest of the thumb bends in (that is what opposition looks like).
+    const s = side === 'left' ? 1 : -1;
+    const metaRest = this.restDir(`${side}ThumbMetacarpal`, new Vector3(s, 0, 1).normalize()).clone().normalize();
+    const mb = hingeBasis(metaRest);
+    const d1 = local(1, 2).normalize();
+    const tipV = local(2, 4);
+    const bendPerp = tipV.clone().addScaledVector(d1, -tipV.dot(d1));
+    const planeConf = smoothstep(0.15, 0.35, bendPerp.length() / Math.max(1e-6, tipV.length()));
+    let qm = new Quaternion().setFromUnitVectors(metaRest, d1);
+    if (planeConf > 0) qm = qm.slerp(basisRotation(metaRest, mb.e2, d1, bendPerp), planeConf);
+    const sw = 2 * Math.acos(Math.min(1, Math.abs(qm.w)));
+    if (sw > JOINT_LIMITS.thumbSwing) qpow(qm, JOINT_LIMITS.thumbSwing / sw, qm);
+    const prev = st.lastFingers;
+    if (prev && qm.x * prev[16] + qm.y * prev[17] + qm.z * prev[18] + qm.w * prev[19] < 0) qm.set(-qm.x, -qm.y, -qm.z, -qm.w);
+    const qmInv = qm.clone().invert();
+    const tp = hingeBasis(this.restDir(`${side}ThumbProximal`, metaRest));
+    const dp = local(2, 3).normalize().applyQuaternion(qmInv);
+    const tmcp = clampTo(Math.atan2(dp.dot(tp.e2), dp.dot(tp.e1)), JOINT_LIMITS.thumbMcp);
+    const tpInv = new Quaternion().setFromAxisAngle(tp.h, tmcp).invert();
+    const td = hingeBasis(this.restDir(`${side}ThumbDistal`, tp.e1));
+    const dd = local(3, 4).normalize().applyQuaternion(qmInv).applyQuaternion(tpInv);
+    const tip = clampTo(Math.atan2(dd.dot(td.e2), dd.dot(td.e1)), JOINT_LIMITS.thumbIp);
+    vals.splice(16, 6, qm.x, qm.y, qm.z, qm.w, tmcp, tip);
+
+    let out = vals;
+    if (t !== undefined) {
+      const params = smoothingToParams(this.opts.smoothing * 0.8);
+      st.fingers.setParams(params);
+      out = st.fingers.filter(vals, t);
     }
+    st.lastFingers = out.slice();
+    this.applyFingers(side, out, bones);
   }
+
+  private knuckle(p: ReturnType<typeof hingeBasis>, spread: number, bend: number): Quaternion {
+    return new Quaternion().setFromAxisAngle(p.e2, spread).multiply(new Quaternion().setFromAxisAngle(p.h, bend));
+  }
+
+  /** Finger values (see solveFingers) -> bone rotations. */
+  private applyFingers(side: Side, v: number[], bones: Map<string, Quaternion>): void {
+    const s = side === 'left' ? 1 : -1;
+    FINGERS.forEach((f, i) => {
+      const p = hingeBasis(this.restDir(`${side}${f}Proximal`, new Vector3(s, 0, 0)));
+      const bi = hingeBasis(this.restDir(`${side}${f}Intermediate`, p.e1));
+      const bd = hingeBasis(this.restDir(`${side}${f}Distal`, bi.e1));
+      bones.set(`${side}${f}Proximal`, this.knuckle(p, v[4 * i], v[4 * i + 1]));
+      bones.set(`${side}${f}Intermediate`, new Quaternion().setFromAxisAngle(bi.h, v[4 * i + 2]));
+      bones.set(`${side}${f}Distal`, new Quaternion().setFromAxisAngle(bd.h, v[4 * i + 3]));
+    });
+    const metaRest = this.restDir(`${side}ThumbMetacarpal`, new Vector3(s, 0, 1).normalize());
+    const tp = hingeBasis(this.restDir(`${side}ThumbProximal`, metaRest));
+    const td = hingeBasis(this.restDir(`${side}ThumbDistal`, tp.e1));
+    bones.set(`${side}ThumbMetacarpal`, new Quaternion(v[16], v[17], v[18], v[19]).normalize());
+    bones.set(`${side}ThumbProximal`, new Quaternion().setFromAxisAngle(tp.h, v[20]));
+    bones.set(`${side}ThumbDistal`, new Quaternion().setFromAxisAngle(td.h, v[21]));
+  }
+}
+
+/** Move x toward target by at most `step`. */
+function approach(x: number, target: number, step: number): number {
+  return x < target ? Math.min(target, x + step) : Math.max(target, x - step);
+}
+
+/** Wrap to (-pi, pi]. */
+function wrapAngle(a: number): number {
+  return a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
 }

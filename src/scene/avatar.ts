@@ -20,8 +20,10 @@ import {
   REST_CHILD,
   qpow,
   type BodyInput,
+  type BodySolution,
   type RestDirs,
 } from '../core/bodySolver';
+import { probeRig, type RigProbe } from '../core/rigProbe';
 import { StableSprings, springNamesFromGltf, type PhysicsSettings } from '../physics/stableSprings';
 import type { FaceState } from '../tracking/faceProcessor';
 import type { BodyMode } from '../tracking/protocol';
@@ -35,6 +37,8 @@ export interface DriveOptions {
   followRate: number;
   /** Max torso/hips angular speed, rad/s (keeps tracking jumps out of physics). */
   maxTorsoSpeed: number;
+  /** Body/finger smoothing, 0..1 (the app's smoothing setting). */
+  smoothing: number;
 }
 
 export const DEFAULT_DRIVE: DriveOptions = {
@@ -44,6 +48,7 @@ export const DEFAULT_DRIVE: DriveOptions = {
   presetOptions: { emotions: true, emotionDeadzone: 0.25 },
   followRate: 16,
   maxTorsoSpeed: 4,
+  smoothing: 0.5,
 };
 
 const TORSO = new Set(['hips', 'spine', 'chest', 'upperChest']);
@@ -110,6 +115,44 @@ export async function loadAvatar(
   return { avatar, hash };
 }
 
+/** Rest directions (solver space) of the solved bones, measured from the model's normalized rig. */
+export function measureRestDirs(vrm: VRM): RestDirs {
+  const rest: RestDirs = {};
+  const h = vrm.humanoid;
+  const vrm0 = vrm.meta?.metaVersion === '0';
+  vrm.scene.updateMatrixWorld(true);
+  const rootInv = vrm.scene.matrixWorld.clone().invert();
+  const pos = (n: Object3D) => n.getWorldPosition(new Vector3()).applyMatrix4(rootInv);
+  for (const [bone, child] of Object.entries(REST_CHILD)) {
+    const a = h.getNormalizedBoneNode(bone as VRMHumanBoneName);
+    const b = h.getNormalizedBoneNode(child as VRMHumanBoneName);
+    if (a && b) {
+      const d = pos(b).sub(pos(a));
+      if (d.lengthSq() > 1e-10) {
+        d.normalize();
+        // VRM 0.x normalized bones face -Z: turn into the solver's +Z-facing space.
+        rest[bone] = vrm0 ? d.set(-d.x, d.y, -d.z) : d;
+      }
+    }
+  }
+  // Finger tips have no child bone: reuse the previous segment's direction.
+  for (const side of ['left', 'right']) {
+    for (const f of ['Thumb', 'Index', 'Middle', 'Ring', 'Little']) {
+      const prev = f === 'Thumb' ? `${side}ThumbProximal` : `${side}${f}Intermediate`;
+      const tip = `${side}${f}Distal`;
+      if (!rest[tip] && rest[prev]) rest[tip] = rest[prev]!.clone();
+    }
+  }
+  return rest;
+}
+
+/** A normalized bone's world rotation relative to the VRM root, in solver (+Z-facing) space. */
+export function solverWorldRotation(vrm: VRM, node: Object3D): Quaternion {
+  const root = vrm.scene.getWorldQuaternion(new Quaternion()).invert();
+  const q = root.multiply(node.getWorldQuaternion(new Quaternion()));
+  return vrm.meta?.metaVersion === '0' ? q.set(-q.x, q.y, -q.z, q.w) : q;
+}
+
 export class Avatar {
   readonly vrm: VRM;
   readonly physics: StableSprings;
@@ -150,30 +193,13 @@ export class Avatar {
       const n = h.getNormalizedBoneNode(name);
       if (n) this.bones.set(name, n);
     }
-    // Rest directions in avatar (VRM root) space.
-    const rootInv = vrm.scene.matrixWorld.clone().invert();
-    const pos = (n: Object3D) => n.getWorldPosition(new Vector3()).applyMatrix4(rootInv);
-    for (const [bone, child] of Object.entries(REST_CHILD)) {
-      const a = this.bones.get(bone);
-      const b = this.bones.get(child);
-      if (a && b) {
-        const d = pos(b).sub(pos(a));
-        if (d.lengthSq() > 1e-10) this.rest[bone] = this.toSolverDir(d.normalize());
-      }
-    }
-    // Finger tips have no child bone: reuse the previous segment's direction.
-    for (const side of ['left', 'right']) {
-      for (const f of ['Thumb', 'Index', 'Middle', 'Ring', 'Little']) {
-        const prev = f === 'Thumb' ? `${side}ThumbProximal` : `${side}${f}Intermediate`;
-        const tip = `${side}${f}Distal`;
-        if (!this.rest[tip] && this.rest[prev]) this.rest[tip] = this.rest[prev]!.clone();
-      }
-    }
+    Object.assign(this.rest, measureRestDirs(vrm));
 
     const chain = ['spine', 'chest', 'upperChest'].filter((b) => this.bones.has(b));
     const shares = chain.length === 3 ? [0.4, 0.35, 0.25] : chain.length === 2 ? [0.55, 0.45] : [1];
     this.chestChain = chain.map((b, i) => [b, shares[i]] as [string, number]);
     this.solver = new BodySolver(this.rest);
+    this.solver.available = new Set(this.bones.keys());
 
     this.physics = new StableSprings(vrm, physicsSettings, springNames);
     this.setIdle();
@@ -235,6 +261,23 @@ export class Avatar {
     return this.isVrm0 ? v.set(-v.x, v.y, -v.z) : v;
   }
 
+  /** World rotation of a bone in solver space (for the test probes). */
+  worldRotation(name: string): Quaternion | null {
+    const n = this.bones.get(name);
+    if (!n) return null;
+    this.vrm.scene.updateMatrixWorld(true);
+    return solverWorldRotation(this.vrm, n);
+  }
+
+  /** Arm directions and finger joint angles as currently shown (test harness). */
+  probe(): RigProbe {
+    this.vrm.scene.updateMatrixWorld(true);
+    return probeRig((b) => {
+      const n = this.bones.get(b);
+      return n ? solverWorldRotation(this.vrm, n) : null;
+    }, this.rest);
+  }
+
   get humanBoneNames(): string[] {
     return [...this.bones.keys()];
   }
@@ -281,30 +324,34 @@ export class Avatar {
   }
 
   /** Feed pose/hand landmarks (call only in upper/hands mode). */
-  setBody(input: BodyInput): void {
+  setBody(input: BodyInput): BodySolution {
     this.solver.opts.mirror = this.drive.mirror;
     this.solver.opts.hands = this.drive.mode === 'hands';
-    const sol = this.solver.solve(input, this.chestChain);
+    this.solver.opts.smoothing = this.drive.smoothing;
+    const sol = this.solver.solve({ ...input, t: input.t ?? this.time }, this.chestChain);
     this.bodySeenAt = this.time;
     const idle = new Map<string, Quaternion>();
     for (const side of ['left', 'right'] as const) {
       idleArm(side, this.rest, idle);
       idleFingers(side, idle);
     }
-    for (const [b, q] of sol.bones) if (this.bones.has(b)) this.targets.set(b, q);
-    for (const side of ['left', 'right'] as const) {
-      // Untracked arm: drift back to idle.
-      if (sol.armConfidence[side] < this.solver.opts.minVisibility) {
-        for (const b of [`${side}UpperArm`, `${side}LowerArm`, `${side}Hand`]) {
-          const q = idle.get(b);
-          if (q) this.targets.set(b, q);
-        }
-      }
-      if (this.drive.mode !== 'hands' || sol.handConfidence[side] === 0) {
-        for (const [b, q] of idle) if (b.startsWith(side) && /Thumb|Index|Middle|Ring|Little/.test(b)) this.targets.set(b, q);
-      }
+    for (const [b, q] of sol.bones) if (this.bones.has(b) && !idle.has(b)) this.targets.set(b, q);
+    // Arms and hands: blend solved over idle by their weights, so a limb that
+    // leaves the frame (or is only just found) eases in and out.
+    const isFinger = (b: string) => /Thumb|Index|Middle|Ring|Little/.test(b);
+    for (const [b, q] of idle) {
+      if (!this.bones.has(b)) continue;
+      const side = b.startsWith('left') ? 'left' : 'right';
+      const w = isFinger(b) ? (this.drive.mode === 'hands' ? sol.handWeight[side] : 0) : sol.armWeight[side];
+      const solved = sol.bones.get(b);
+      this.targets.set(b, solved && w > 0 ? q.clone().slerp(solved, w) : q);
     }
+    this.lastSolution = sol;
+    return sol;
   }
+
+  /** The last body solution (readout, tests). */
+  lastSolution: BodySolution | null = null;
 
   /** Per-frame update: move bones toward targets, apply face, run physics. */
   update(dt: number): void {

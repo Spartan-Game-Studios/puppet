@@ -1,12 +1,14 @@
 /**
  * Main-thread side of tracking: pulls frames from a <video> and ships them to
- * two workers, 'face' and 'body', which run in parallel. Each pipeline has at
- * most one frame in flight and is capped at `maxFps`. Results go to
- * `onResult` as they arrive (face and body independently). Falls back to
- * running MediaPipe on the main thread if workers can't start.
+ * three workers, 'face', 'body' (pose) and 'hands', which run in parallel.
+ * Each pipeline has at most one frame in flight and is capped at `maxFps`.
+ * Face and body results go to `onResult` as they arrive; hand results are
+ * attached to the next body result (the hands worker gets the latest pose as
+ * a hint for finding hands). Falls back to running MediaPipe on the main
+ * thread (pose then hands in one step) if workers can't start.
  */
-import type { BodyMode, FromWorker, Pipeline, TrackerResult } from './protocol';
-import { createLandmarkers, detect, type LandmarkerSet } from './landmarkers';
+import type { BodyMode, FromWorker, Pipeline, PoseResult, TrackerResult } from './protocol';
+import { createLandmarkers, detect, setPoseModel, type LandmarkerSet } from './landmarkers';
 
 export interface PipelineStats {
   fps: number;
@@ -19,6 +21,7 @@ export interface PipelineStats {
 export interface TrackerStats {
   face: PipelineStats;
   body: PipelineStats & { pose: number; hands: number };
+  hands: PipelineStats;
   delegate: string;
   where: 'worker' | 'main' | 'none';
 }
@@ -47,6 +50,7 @@ export class Tracker {
   stats: TrackerStats = {
     face: { fps: 0, latency: 0, infer: 0 },
     body: { fps: 0, latency: 0, infer: 0, pose: 0, hands: 0 },
+    hands: { fps: 0, latency: 0, infer: 0 },
     delegate: '-',
     where: 'none',
   };
@@ -56,8 +60,11 @@ export class Tracker {
   private lanes: Record<Pipeline, Lane> = {
     face: { pipeline: 'face', worker: null, busy: false, sentAt: 0, sentVideoTime: 0, nextDue: 0, times: [] },
     body: { pipeline: 'body', worker: null, busy: false, sentAt: 0, sentVideoTime: 0, nextDue: 0, times: [] },
+    hands: { pipeline: 'hands', worker: null, busy: false, sentAt: 0, sentVideoTime: 0, nextDue: 0, times: [] },
   };
   private main: LandmarkerSet | null = null;
+  private latestPose: PoseResult | null = null;
+  private latestHands: TrackerResult | null = null;
   private video: HTMLVideoElement | null = null;
   private lastT = 0;
   private raf = 0;
@@ -76,7 +83,7 @@ export class Tracker {
     if (!forceMain) {
       try {
         const delegates = await Promise.all(
-          (['face', 'body'] as Pipeline[]).map((p) => this.initWorker(p, wasmBase, modelBase)),
+          (['face', 'body', 'hands'] as Pipeline[]).map((p) => this.initWorker(p, wasmBase, modelBase)),
         );
         this.stats.delegate = delegates.join('+');
         this.stats.where = 'worker';
@@ -90,9 +97,9 @@ export class Tracker {
       }
     }
     try {
-      this.main = await createLandmarkers(['face', 'body'], wasmBase, modelBase, 'GPU', this.opts.poseModel);
+      this.main = await createLandmarkers(['face', 'body', 'hands'], wasmBase, modelBase, 'GPU', this.opts.poseModel);
     } catch {
-      this.main = await createLandmarkers(['face', 'body'], wasmBase, modelBase, 'CPU', this.opts.poseModel);
+      this.main = await createLandmarkers(['face', 'body', 'hands'], wasmBase, modelBase, 'CPU', this.opts.poseModel);
     }
     this.stats.delegate = this.main.delegate;
     this.stats.where = 'main';
@@ -128,6 +135,20 @@ export class Tracker {
       lane.busy = false;
       m.videoTime = lane.sentVideoTime;
       this.account(lane, m);
+      if (pipeline === 'hands') {
+        this.latestHands = m;
+        return;
+      }
+      if (pipeline === 'body') {
+        this.latestPose = m.pose ?? null;
+        const h = this.latestHands;
+        // Hands found on a frame at most ~2 frames older than this pose.
+        if (this.lanes.hands.worker && h && m.t - h.t < 80) {
+          m.hands = h.hands;
+          m.handsRan = h.handsRan;
+          m.timings.hands = h.timings.hands;
+        }
+      }
       this.onResult(m);
     } else if (m.type === 'error') {
       lane.busy = false;
@@ -138,16 +159,24 @@ export class Tracker {
   private account(lane: Lane, r: TrackerResult): void {
     const now = performance.now();
     const k = 0.1;
-    const s = lane.pipeline === 'face' ? this.stats.face : this.stats.body;
+    const s = lane.pipeline === 'face' ? this.stats.face : lane.pipeline === 'hands' ? this.stats.hands : this.stats.body;
     s.latency += k * (now - lane.sentAt - s.latency);
     s.infer += k * (r.timings.total - s.infer);
-    if (lane.pipeline === 'body') {
-      this.stats.body.pose += k * (r.timings.pose - this.stats.body.pose);
+    if (lane.pipeline === 'body') this.stats.body.pose += k * (r.timings.pose - this.stats.body.pose);
+    if (lane.pipeline === 'hands' || (lane.pipeline === 'body' && !this.lanes.hands.worker)) {
       this.stats.body.hands += k * (r.timings.hands - this.stats.body.hands);
     }
     lane.times.push(now);
     while (lane.times.length && lane.times[0] < now - 1000) lane.times.shift();
     s.fps = lane.times.length;
+  }
+
+  /** Switch pose lite/full live (the body pipeline keeps running on the old model until the new one loads). */
+  setPoseModel(poseModel: 'lite' | 'full'): void {
+    this.opts.poseModel = poseModel;
+    const w = this.lanes.body.worker;
+    if (w) w.postMessage({ type: 'setPoseModel', poseModel });
+    else if (this.main) setPoseModel(this.main, poseModel).catch((e) => this.onStatus(`POSE MODEL ERROR: ${e.message}`));
   }
 
   start(video: HTMLVideoElement): void {
@@ -174,9 +203,10 @@ export class Tracker {
     // Deadline scheduling: rAF ticks don't line up with the tracking rate, so
     // send when the next slot is due (within a few ms) and advance the slot.
     const interval = 1000 / this.opts.maxFps;
-    const want = (['face', 'body'] as Pipeline[]).filter((p) => {
+    const want = (['face', 'body', 'hands'] as Pipeline[]).filter((p) => {
       const l = this.lanes[p];
       if (p === 'body' && this.opts.mode === 'face') return false;
+      if (p === 'hands' && (this.opts.mode !== 'hands' || !l.worker)) return false;
       return !l.busy && now >= l.nextDue - 4;
     });
     if (!want.length) return;
@@ -196,7 +226,14 @@ export class Tracker {
         createImageBitmap(v)
           .then((image) =>
             l.worker!.postMessage(
-              { type: 'frame', image, t, mode: this.opts.mode, wantFaceLandmarks: this.opts.wantFaceLandmarks },
+              {
+                type: 'frame',
+                image,
+                t,
+                mode: this.opts.mode,
+                wantFaceLandmarks: this.opts.wantFaceLandmarks,
+                pose: p === 'hands' ? this.latestPose : undefined,
+              },
               [image],
             ),
           )

@@ -27,6 +27,7 @@ import { drawPreview } from './tracking/overlay';
 import type { BodyMode, TrackerResult } from './tracking/protocol';
 import { listCameras, VideoSource } from './tracking/source';
 import { Tracker } from './tracking/tracker';
+import { GestureTracker } from './core/gestures';
 import { toUnity, unityBoneName, vmcBlendName, type VmcFrame } from './vmc/vmcFrame';
 import {
   baseName,
@@ -83,12 +84,17 @@ face.gains = settings.gains;
 face.calibration = settings.calibration;
 face.setSmoothing(settings.smoothing);
 const poseFilter = new OneEuroVector(33 * 3);
+// The solver rebuilds arm depth from the 2D image points, so they are smoothed too.
+const poseImageFilter = new OneEuroVector(33 * 2);
 const tracker = new Tracker({
   mode: settings.mode,
   maxFps: settings.trackFps,
   poseModel: settings.poseModel,
   wantFaceLandmarks: settings.preview,
 });
+/** Hand gestures (hands mode): `gestures.on(e => ...)` fires on every change. */
+const gestures = new GestureTracker();
+gestures.mirror = settings.mirror;
 let avatar: Avatar | null = null;
 let modelHash: string | null = null;
 let lastResult: TrackerResult | null = null;
@@ -107,6 +113,8 @@ tracker.onStatus = (s) => setStatus(s, s.includes('ERROR'));
 function updatePoseFilter(): void {
   const p = smoothingToParams(settings.smoothing * 0.8);
   poseFilter.setParams(p);
+  poseImageFilter.setParams(p);
+  if (avatar) avatar.drive.smoothing = settings.smoothing;
 }
 updatePoseFilter();
 
@@ -126,7 +134,13 @@ tracker.onResult = (r) => {
       const flat = r.pose.world.flatMap((l) => [l.x, l.y, l.z]);
       const f = poseFilter.filter(flat, t);
       const world = r.pose.world.map((l, i) => ({ x: f[3 * i], y: f[3 * i + 1], z: f[3 * i + 2], visibility: l.visibility }));
-      avatar.setBody({ poseWorld: world, poseImage: r.pose.image, hands: settings.mode === 'hands' ? (r.hands ?? []) : [] });
+      const fi = poseImageFilter.filter(r.pose.image.flatMap((l) => [l.x, l.y]), t);
+      const image = r.pose.image.map((l, i) => ({ x: fi[2 * i], y: fi[2 * i + 1], z: l.z, visibility: l.visibility }));
+      avatar.setBody({ poseWorld: world, poseImage: image, hands: settings.mode === 'hands' ? (r.hands ?? []) : [], aspect: r.width / r.height });
+    }
+    gestures.update(settings.mode === 'hands' ? (r.hands ?? []) : [], r.t);
+    if (record && avatar) {
+      record.push({ body: true, vt: r.videoTime, hands: (r.hands ?? []).map((h) => h.userSide ?? h.handedness), handsRan: !!r.handsRan, rig: avatar.probe(), gestures: { ...gestures.current } });
     }
   }
   lastResult = {
@@ -210,6 +224,7 @@ async function openModelDialog(): Promise<void> {
 function applyDrive(a: Avatar): void {
   a.drive.mode = settings.mode;
   a.drive.mirror = settings.mirror;
+  a.drive.smoothing = settings.smoothing;
   a.drive.gazeGain = settings.gazeGain;
   a.drive.presetOptions.emotions = settings.emotions;
 }
@@ -366,6 +381,7 @@ checkBind('preview', () => settings.preview, (v) => setPreview(v));
 function setMirror(v: boolean): void {
   settings.mirror = v;
   face.mirror = v;
+  gestures.mirror = v;
   if (avatar) avatar.drive.mirror = v;
   persist();
   refreshInputs();
@@ -388,7 +404,7 @@ segBind('mode', () => settings.mode, (v) => setMode(v as BodyMode));
 selectBind('pose-model', () => settings.poseModel, (v) => {
   settings.poseModel = v as 'lite' | 'full';
   persist();
-  setStatus('POSE MODEL CHANGE APPLIES ON NEXT LAUNCH');
+  tracker.setPoseModel(settings.poseModel);
 });
 rangeBind('smoothing', () => settings.smoothing, (v) => {
   settings.smoothing = v;
@@ -848,7 +864,7 @@ function setDebug(on: boolean): void {
   persist();
 }
 
-motion = await mountMotion({ settings, persist, setStatus, stage: $('stage'), tracker, debug: params.get('debuglog') === '1' ? debugLog : undefined });
+motion = await mountMotion({ settings, persist, setStatus, stage: $('stage'), gestures, debug: params.get('debuglog') === '1' ? debugLog : undefined });
 
 // ---------------------------------------------------------------- home (model library, src/app/home.ts)
 const home = await mountHome({
@@ -975,9 +991,11 @@ function tick(now: number): void {
     const s = tracker.stats;
     const body = settings.mode !== 'face';
     $('d-render').textContent = `${renderTimes.length} FPS ${frameMs.toFixed(1)}MS`;
-    $('d-track').textContent = `FACE ${s.face.fps} / BODY ${body ? s.body.fps : '-'} FPS`;
+    $('d-track').textContent = `FACE ${s.face.fps} / BODY ${body ? s.body.fps : '-'}${settings.mode === 'hands' && s.hands.fps ? ` / HANDS ${s.hands.fps}` : ''} FPS`;
     $('d-latency').textContent = `${s.face.latency.toFixed(0)} / ${body ? s.body.latency.toFixed(0) : '-'} MS`;
     $('d-infer').textContent = `${s.face.infer.toFixed(1)}/${s.body.pose.toFixed(1)}/${s.body.hands.toFixed(1)} MS`;
+    $('d-gesture').textContent =
+      settings.mode === 'hands' ? `L ${gestures.current.left.toUpperCase()} R ${gestures.current.right.toUpperCase()}` : '-';
     $('d-where').textContent = `${s.where.toUpperCase()} ${s.delegate}`;
     $('d-phys').textContent = avatar
       ? `${settings.physics.mode.toUpperCase()} ${avatar.physics.lastSteps} STEP/F`
@@ -1055,6 +1073,7 @@ Object.assign(window, {
     settings,
     viewer,
     tracker,
+    gestures,
     face,
     source,
     get avatar() {

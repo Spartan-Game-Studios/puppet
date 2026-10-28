@@ -4,10 +4,12 @@ import type { Landmark } from '../core/bodySolver';
 export type BodyMode = 'face' | 'upper' | 'hands';
 
 /**
- * Tracking runs as two pipelines so they overlap on the GPU instead of queueing:
- * 'face' (FaceLandmarker) and 'body' (PoseLandmarker, then HandLandmarker).
+ * Tracking runs as three pipelines so they overlap on the GPU instead of
+ * queueing: 'face' (FaceLandmarker), 'body' (PoseLandmarker) and 'hands'
+ * (two HandLandmarkers on crops; only in hands mode). Hands need the pose to
+ * find a hand that isn't tracked yet, so they get the latest pose as a hint.
  */
-export type Pipeline = 'face' | 'body';
+export type Pipeline = 'face' | 'body' | 'hands';
 
 export interface TrackerInit {
   type: 'init';
@@ -26,6 +28,8 @@ export interface TrackerFrame {
   mode: BodyMode;
   /** Also return the 478 face landmarks (only needed for the preview overlay). */
   wantFaceLandmarks: boolean;
+  /** 'hands' pipeline: the latest pose (image landmarks are what it uses). */
+  pose?: PoseResult | null;
 }
 
 export interface FaceResult {
@@ -80,5 +84,11 @@ export interface TrackerError {
   fatal: boolean;
 }
 
-export type ToWorker = TrackerInit | TrackerFrame;
+/** Switch the body pipeline's pose model without restarting. */
+export interface TrackerSetPoseModel {
+  type: 'setPoseModel';
+  poseModel: 'lite' | 'full';
+}
+
+export type ToWorker = TrackerInit | TrackerFrame | TrackerSetPoseModel;
 export type FromWorker = TrackerResult | TrackerReady | TrackerError;

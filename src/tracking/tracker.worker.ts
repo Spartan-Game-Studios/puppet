@@ -5,7 +5,7 @@
  * transferred ImageBitmaps; one is processed at a time (the main thread waits
  * for the result before sending the next, so frames never queue up).
  */
-import { createLandmarkers, detect, type LandmarkerSet } from './landmarkers';
+import { createLandmarkers, detect, setPoseModel, type LandmarkerSet } from './landmarkers';
 import type { FromWorker, Pipeline, ToWorker } from './protocol';
 
 let set: LandmarkerSet | null = null;
@@ -30,13 +30,23 @@ self.onmessage = async (ev: MessageEvent<ToWorker>) => {
     }
     return;
   }
+  if (msg.type === 'setPoseModel') {
+    if (set) {
+      try {
+        await setPoseModel(set, msg.poseModel);
+      } catch (e) {
+        post({ type: 'error', message: `pose model: ${String((e as Error)?.message ?? e)}`, fatal: false });
+      }
+    }
+    return;
+  }
   if (msg.type === 'frame') {
     if (!set) {
       msg.image.close();
       return;
     }
     try {
-      const r = detect(set, pipeline, msg.image, msg.t, msg.mode, msg.wantFaceLandmarks);
+      const r = detect(set, pipeline, msg.image, msg.t, msg.mode, msg.wantFaceLandmarks, msg.pose ?? null);
       const transfer: Transferable[] = [];
       if (r.face?.landmarks2d) transfer.push(r.face.landmarks2d.buffer);
       post({ type: 'result', ...r }, transfer);

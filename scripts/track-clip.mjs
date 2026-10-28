@@ -3,10 +3,12 @@
 //   PUPPET_MODEL=/path/model.vrm node scripts/track-clip.mjs <clip-dir> [shots-dir]
 // Pass 1 plays the clip unmirrored and records every tracking result.
 // Pass 2 (if shots-dir is given) pauses on key moments, mirrored as in normal
-// use, and screenshots the whole UI.
+// use, and screenshots the whole UI. With PUPPET_VIDEO=1 it also records the
+// UI playing the body section into <shots-dir>/mirror.mp4 (needs ffmpeg).
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BASE, launch, requireEnv, serveLocal } from './lib/browser.mjs';
+import { bodyReport } from './lib/bodyMetrics.mjs';
 
 const model = requireEnv('PUPPET_MODEL');
 const dir = process.argv[2] ?? requireEnv('PUPPET_CLIP_DIR');
@@ -42,13 +44,26 @@ await page.evaluate(async (cal) => {
   await new Promise((r) => (v.onseeked = r));
   await v.play();
 }, calibrate);
-await page.waitForFunction(() => window.__puppet.source.video.ended, null, { timeout: 120000, polling: 250 });
+// Sample the tracker rates once a second while the clip plays.
+const fpsSamples = [];
+while (!(await page.evaluate(() => window.__puppet.source.video.ended))) {
+  await page.waitForTimeout(1000);
+  fpsSamples.push(await page.evaluate(() => {
+    const s = window.__puppet.tracker.stats;
+    return { face: s.face.fps, body: s.body.fps, hands: s.hands?.fps ?? null, faceLat: s.face.latency, bodyLat: s.body.latency, pose: s.body.pose, handsMs: s.body.hands };
+  }));
+}
 const rec = await page.evaluate(() => window.__puppet.record);
 const stats = await page.evaluate(() => window.__puppet.tracker.stats);
 await page.close();
 
 const tr = (vt) => truth.frames[Math.min(truth.frames.length - 1, Math.max(0, Math.round(vt * truth.fps)))];
 const rows = rec.filter((r) => r.vt != null && r.face);
+const faceRec = rec.filter((r) => !r.body);
+const avg = (k) => {
+  const xs = fpsSamples.slice(2).map((x) => x[k]).filter((x) => x != null);
+  return xs.length ? Math.round((10 * xs.reduce((a, b) => a + b, 0)) / xs.length) / 10 : null;
+};
 const pearson = (a, b) => {
   const n = a.length;
   const ma = a.reduce((s, x) => s + x, 0) / n;
@@ -70,13 +85,14 @@ const meanIn = (a, b, f) => {
 const deg = (x) => (x * 180) / Math.PI;
 
 const report = {
-  results: rec.length,
-  faceDetectedPct: (100 * rows.length) / rec.length,
-  poseDetectedPct: (100 * rec.filter((r) => r.pose).length) / rec.length,
-  handsDetectedPct: (100 * rec.filter((r) => r.hands > 0).length) / rec.length,
+  results: faceRec.length,
+  faceDetectedPct: (100 * rows.length) / faceRec.length,
+  poseDetectedPct: (100 * faceRec.filter((r) => r.pose).length) / faceRec.length,
+  handsDetectedPct: (100 * faceRec.filter((r) => r.hands > 0).length) / faceRec.length,
   calibrated: calibrate,
   stats,
-  handsRanPct: (100 * rec.filter((r) => r.handsRan).length) / rec.length,
+  meanFps: { face: avg('face'), body: avg('body'), hands: avg('hands'), faceLatencyMs: avg('faceLat'), bodyLatencyMs: avg('bodyLat'), poseMs: avg('pose'), handsMs: avg('handsMs') },
+  handsRanPct: (100 * faceRec.filter((r) => r.handsRan).length) / faceRec.length,
   where: `${stats.where}/${stats.delegate}`,
   correlation: {
     jawOpen: corr('jawOpen'),
@@ -101,6 +117,7 @@ const report = {
     foreRightUp: [meanIn(12.5, 13.0, (r) => r.foreRight?.[1] ?? 0), meanIn(0.5, 1.5, (r) => r.foreRight?.[1] ?? 0)],
   },
 };
+if (truth.frames.some((f) => f.rig)) report.body = bodyReport(rec, truth);
 console.log(JSON.stringify(report, null, 2));
 await writeFile(join(dir, 'track-report.json'), JSON.stringify({ report, rec }, null, 1));
 
@@ -124,9 +141,24 @@ if (shots) {
     ['head-left', 10.1],
     ['arms-up', 12.9],
     ['rest-body', 0.6],
+    ...(truth.frames.length > 14 * truth.fps
+      ? [
+          ['gesture-open-peace', 16.2],
+          ['gesture-fist-thumbsup', 17.4],
+          ['gesture-point-ok', 18.6],
+          ['gesture-peace-rock', 19.8],
+          ['curls', 26.3],
+          ['cross', 30.2],
+          ['near-face', 32.8],
+          ['lean', 35.0],
+          ['twist', 38.5],
+          ['out-of-frame', 41.5],
+          ['abduct90', 46.0],
+        ]
+      : []),
   ];
   for (const [name, t] of moments) {
-    await p2.evaluate((n) => window.__puppet.frame(n === 'arms-up' || n === 'rest-body' ? 'upper' : 'bust'), name);
+    await p2.evaluate((n) => window.__puppet.frame(n === 'arms-up' || n === 'rest-body' || n.includes('-') || ['curls', 'cross', 'lean', 'twist', 'abduct90'].includes(n) ? 'upper' : 'bust'), name);
     await p2.evaluate(async (tt) => {
       const v = window.__puppet.source.video;
       v.pause();
@@ -139,5 +171,34 @@ if (shots) {
     console.log(`shot ${name}`);
   }
   await p2.close();
+  if (process.env.PUPPET_VIDEO === '1') {
+    // Screenshots in a loop while the clip plays in real time, then encoded at
+    // the rate they were taken (Playwright's own video recorder needs a download).
+    const { execFileSync } = await import('node:child_process');
+    const framesDir = join(shots, 'mirror-frames');
+    await mkdir(framesDir, { recursive: true });
+    const p3 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await serveLocal(p3, { '/__local/model.vrm': model, '/__local/clip.webm': join(dir, 'clip.webm') });
+    await p3.goto(`${BASE}/?model=/__local/model.vrm&source=file&src=/__local/clip.webm&loop=0&mirror=1&mode=hands`);
+    await p3.waitForFunction(() => window.__puppet?.avatar && window.__puppet.tracker.stats.face.fps > 0, null, { timeout: 120000 });
+    const from = Number(process.env.PUPPET_VIDEO_FROM ?? 14.6);
+    await p3.evaluate(async (t0) => {
+      window.__puppet.frame('upper');
+      const v = window.__puppet.source.video;
+      v.pause();
+      v.currentTime = t0;
+      await new Promise((r) => (v.onseeked = r));
+      await v.play();
+    }, from);
+    const startedAt = Date.now();
+    let n = 0;
+    while (!(await p3.evaluate(() => window.__puppet.source.video.ended))) {
+      await p3.screenshot({ path: join(framesDir, `${String(n++).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 80 });
+    }
+    const rate = n / ((Date.now() - startedAt) / 1000);
+    await p3.close();
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', rate.toFixed(3), '-i', join(framesDir, '%05d.jpg'), '-c:v', 'libx264', '-crf', '23', '-pix_fmt', 'yuv420p', '-r', '30', join(shots, 'mirror.mp4')]);
+    console.log(`wrote ${join(shots, 'mirror.mp4')}`);
+  }
 }
 await browser.close();

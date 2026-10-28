@@ -11,10 +11,18 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
   - Otherwise the VRM presets are derived from the blendshapes: `blink`, `blinkLeft`/`blinkRight`, `aa`/`ih`/`ou`/`ee`/`oh`, and `happy`/`angry`/`sad`/`surprised`/`relaxed` (the emotions have a dead zone and can be switched off).
   - Head rotation comes from the facial transformation matrix. Gaze from the `eyeLook*` blendshapes drives VRM lookAt (bone or expression type).
   - One-euro smoothing with a single SMOOTHING slider. Blinks and jaw keep a faster response at any setting.
-  - **Calibrate** (`C`) captures your neutral face, head angle and gaze as zero.
+  - **Calibrate** (`C`) captures your neutral face, head angle and gaze as zero. Until you do, the first steady second of an open-eyed, closed-mouth face is taken as neutral automatically (not saved), so an uncalibrated start doesn't carry MediaPipe's resting offsets (a few degrees of head pitch, a dark-lipped "pucker") onto the avatar.
   - Per-blendshape **gain** and **curve** (exponent) so mouths read strongly. You can edit them live next to the raw and output bars.
 - **Upper body and hands.** PoseLandmarker world landmarks drive the spine, chest, shoulders and arms. HandLandmarker drives all finger bones. Choose FACE (`1`), +BODY (`2`) or +HANDS (`3`). Legs stay in an idle stance.
-  - The solver is Puppet's own: direction vectors against the model's measured rest directions, with an elbow-hinge-aware upper-arm twist and part of the wrist twist moved into the forearm. Hands are found by cropping around each pose wrist, so small webcam hands are still seen. Untracked arms ease back to an idle pose.
+  - The solver is Puppet's own: direction vectors against the model's measured rest directions.
+    - **Arms:** the elbow is a true hinge (0–150°, never backwards); the plane it bends in sets the upper arm's twist, which is limited and held while the arm is too straight to show it. Part of the wrist twist moves into the forearm. The clavicles follow arm raises and shrugs.
+    - **Depth:** MediaPipe's z is its noisiest axis, so arm and shoulder depth is rebuilt from the 2D image and each bone's tracked length; z only decides the sign.
+    - **Torso:** lean and twist are solved and limited separately; the twist sits mostly in the upper chest.
+    - **Occlusion:** each arm segment fades in and out with hysteresis. An arm reaching out of frame keeps its upper arm, and an untracked limb eases to idle instead of snapping. A wrist MediaPipe places at the chin with no hand found there is not followed.
+    - **Fingers:** solved as anatomical angles (spread and bend at the knuckle, bend only at the middle and end joints), clamped to their ranges and smoothed per joint. The thumb's twist comes from the plane it bends in, so opposition reads.
+  - **Hands** run in their own worker in parallel with the pose. Each hand is cropped from its last landmarks while tracked (the crop holds still, so MediaPipe's own tracking stays valid) and re-found from the pose wrist otherwise, with a wider retry. A found hand must sit on its own side's wrist, and one hand found by both crops is kept once.
+  - **Gestures** (HANDS mode): fist, open palm, point, peace, thumbs up, OK and rock, per hand, shown in the debug bar. They come from the hand landmarks (finger curls, thumb position) through hysteresis, so they don't flicker. Code can subscribe; see [Gesture events](#gesture-events).
+  - Pose LITE/FULL switches live.
 - **VMC protocol output** over OSC/UDP from the Rust side (`rosc`). Perfect-sync models also send the 13 VRM 0.x presets derived from the ARKit values, so preset-only receivers don't see a frozen face (see [VMC setup](#vmc-setup)). Messages: `/VMC/Ext/OK`, `/VMC/Ext/T`, `/VMC/Ext/Root/Pos`, `/VMC/Ext/Bone/Pos` (all humanoid bones, Unity coordinates), `/VMC/Ext/Blend/Val` and `/VMC/Ext/Blend/Apply`. Host and port are configurable (default `127.0.0.1:39539`). Bundles are split under 1200 bytes so they also cross a real network.
 - **Virtual camera output.** Puppet shows up as a webcam, **Puppet Virtual Camera**, in Zoom, Meet, Discord, FaceTime and OBS (**06 VIRTUAL CAM**, `W`). It sends the capture view at 1280×720 or 1920×1080, 30 fps. Cameras have no alpha, so the CLEAR background is sent as the chosen colour (green by default); a 3D environment is sent as rendered, except depth of field, which is display-only. See [Virtual camera](#virtual-camera).
   - macOS 12.3+: a CoreMediaIO Camera Extension inside Puppet.app (needs a Developer ID–signed build; see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)).
@@ -228,8 +236,12 @@ PUPPET_QUERY="source=file&src=/abs/clip.mp4&model=/abs/avatar.vrm&debuglog=1" pn
 
 The scripts in `scripts/` drive headless Chrome through Playwright, using your installed Google Chrome. Local assets are served by request interception, so they never need to be inside the repo.
 
-- `PUPPET_MODEL=avatar.vrm node scripts/render-clip.mjs out/` renders test footage from a VRM. It is a scripted performance (jaw, blinks, a wink, smile, pucker, brows, head turns, arm raises) shot by a webcam-like camera, with frame-exact ground truth (`truth.json`). `PUPPET_CLEAN=1` paints out heavy face makeup, which MediaPipe misreads (black lipstick reads as a pucker).
-- `PUPPET_MODEL=avatar.vrm node scripts/track-clip.mjs out/ shots/` plays that clip through the real app pipeline (`?source=file`). It reports detection rates, fps, latency and the correlation of each tracked channel with the truth, then screenshots key moments.
+- `PUPPET_MODEL=avatar.vrm node scripts/render-clip.mjs out/` renders test footage from a VRM, with frame-exact ground truth (`truth.json`). It is a scripted performance shot by a webcam-like camera (49 s):
+  - face, 0–14 s: jaw, blinks, a wink, smile, pucker, brows, head turns, arm raises;
+  - body, 14.6–49 s: the seven gestures held 0.9 s each with transitions (each hand runs its own order), slow finger curls, crossed arms, hands at the face, torso lean and twist, an arm leaving the frame, a T-pose and an arms-out-forearms-up pose.
+  - The truth includes each arm bone's direction and every finger joint's bend, measured from the posed model, the held gesture per hand, and whether each hand is in frame. `PUPPET_CLEAN=1` paints out heavy face makeup, which MediaPipe misreads (black lipstick reads as a pucker). `node scripts/render-frames.mjs out/ 16.2 30` renders single moments for a quick look.
+- `PUPPET_MODEL=avatar.vrm node scripts/track-clip.mjs out/ shots/` plays that clip through the real app pipeline (`?source=file`). It reports detection rates, fps, latency and the correlation of each face channel with the truth; for the body section, per segment: hand detection rate, finger-joint error, upper-arm and forearm direction error and elbow error, plus gesture accuracy with a confusion matrix, gesture flicker, jitter at rest, end-to-end lag and peak arm speed. It then screenshots key moments; `PUPPET_VIDEO=1` also records `shots/mirror.mp4`.
+- `node scripts/track-seq.mjs out/` runs the pose and hand models over the clip's frames on the main thread, frame by frame, and prints hand detection per segment: quicker and more repeatable than playing the video.
 - `PUPPET_MODEL=avatar.vrm node scripts/physics-test.mjs` runs the physics stability test below.
 - `PUPPET_MODEL=avatar.vrm node scripts/cloth-test.mjs [out.json]` runs the [cloth benchmark](#cloth-benchmark); `VIDEO=dir` also renders side-by-side videos.
 - `PUPPET_MODEL=avatar.vrm node scripts/record-pose.mjs clip-dir/ pose.json` records a real tracking session (the clip played through the app) as bone rotations, for the benchmark's `recorded` scenario (`PUPPET_POSE=pose.json`).
@@ -287,6 +299,52 @@ On the same avatar the stability test above gives, for the cloth solver: 1.44 m/
 
 **Skin-index overflow.** `VRMUtils.combineSkeletons` (three-vrm 3.5.5) remaps each mesh's joint indices into one combined skeleton but keeps the attribute's array type. With 8-bit `JOINTS_0` and more than 256 bones in total, indices wrap around: on the avatar above a third of the gown's vertex weights pointed at hair spring bones, so the skirt tore apart whenever the hair moved, whatever the physics. Puppet now widens skin indices to 16 bits before combining (`widenSkinIndices` in `src/scene/avatar.ts`).
 
+## Gesture events
+
+`GestureTracker` (`src/core/gestures.ts`) is the app's gesture source, at `window.__puppet.gestures` (and the `gestures` object in `main.ts`):
+
+```ts
+const off = gestures.on((e) => {
+  // e.hand: 'left' | 'right'          the user's hand
+  // e.avatarHand: 'left' | 'right'    the avatar hand it drives (swapped when mirrored)
+  // e.gesture / e.previous: 'none' | 'fist' | 'open' | 'point' | 'peace' | 'thumbsUp' | 'ok' | 'rock'
+  // e.confidence: 0..1;  e.t: tracker time, ms
+});
+gestures.current.right; // the right hand's gesture now
+off();                  // unsubscribe
+```
+
+An event fires on every change, including back to `none` (a gesture let go, or the hand lost for 300 ms). A gesture is reported after it has won for 150 ms and dropped after it has scored under 0.3 for 200 ms. Gestures need HANDS mode. The 08 HOTKEYS gesture triggers (e.g. thumbs up → an emote) are fed from these events through `trackerGestureSource` (`src/input/gestures.ts`), with the names `fist`, `open_palm`, `point`, `peace`, `thumbs_up`, `ok` and `horns`, per user hand.
+
+## Tracking quality
+
+Measured with `scripts/track-clip.mjs` on the rendered test clip (49 s, 640×480, played unmirrored in HANDS mode, headless Chrome on an M3 Pro), before → after the tracking-quality work, on three models. Errors are mean angles against the posed model's own bones; a hand counts as found only while it is in view. Repeated runs vary by a few points.
+
+| metric | realistic VRM 0.x | anime VRM 0.x | VRM 1.0, caped |
+|---|---|---|---|
+| hand found, all frames with a hand in view (%) | 61.9 → 86.2 | 33.4 → 65 | 9.9 → 57.2 |
+| hand found, gestures section (%) | 99.7 → 98.6 | 36 → 84.2 | 10.1 → 77.4 |
+| hand found, crossed arms (%) | 7.3 → 51.4 | 11 → 45.1 | 0 → 16 |
+| gesture accuracy (%) | 0 → 98 | 0 → 83.1 | 0 → 86.1 |
+| finger joint error (°) | 17.4 → 15.1 | 22.7 → 20.2 | 26.8 → 18.8 |
+| upper arm direction error (°) | 15.4 → 18.6 | 18 → 19.1 | 20.9 → 22.3 |
+| forearm direction error (°) | 39.6 → 36.3 | 36.2 → 30.3 | 45.8 → 41.4 |
+| forearm error, lean and twist (°) | 55 → 55.7 | 54.4 → 42.7 | 67.8 → 54.4 |
+| forearm error, arm leaving frame (°) | 55.1 → 48.3 | 67.6 → 57.5 | 110.8 → 91.5 |
+| forearm error, 90° abduction (°) | 43 → 35.8 | 59.2 → 46.9 | 61 → 53.5 |
+| elbow bend error (°) | 21.2 → 19.5 | 22 → 18.2 | 25.3 → 23.8 |
+| jitter at rest, arms (°, RMS 2nd diff) | 0.69 → 1.34 | 1.41 → 2.06 | 2.7 → 1.65 |
+| jitter at rest, fingers (°) | 1.63 → 1.16 | 4.16 → 1.83 | 1.35 → 1.17 |
+| end-to-end lag (ms) | 100 → 140 | 140 → 160 | 200 → 320 |
+| body fps | 24.3 → 30.6 | 25.6 → 30.6 | 30.5 → 30.5 |
+| face fps | 30.6 → 30.4 | 30.5 → 30.5 | 30.5 → 30.5 |
+| hands fps (own worker after) | (in body) → 28.9 | (in body) → 25.4 | (in body) → 25.9 |
+
+- Gestures: on the realistic model every gesture was recognised (the misses are thumbs up read as a fist for 2 frames and 10 frames of `none` read as a fist). On the other two, most misses are the hand not being found at all, which reads as `none`.
+- Arm jitter at rest went up on two models: arm depth now comes from the 2D image points, which carry their own noise.
+- The arm-leaving-the-frame and T-pose segments are hard on the rendered footage: MediaPipe's pose model loses or misplaces an arm stretched out of view, and on the caped model it places the elbow inside the cape.
+- Rendered footage is not a webcam: anime hands, gloves and capes are harder for MediaPipe than real hands. Real webcam footage was not available.
+
 ## Known limitations
 
 - **Camera permission in the packaged app.**
@@ -298,7 +356,9 @@ On the same avatar the stability test above gives, for the cloth solver: 1.44 m/
   - The window content is transparent on macOS. Whether OBS keeps that alpha depends on OBS and the OS's capture API; a chroma key is the dependable route.
   - Linux transparency needs a compositor.
   - Windows is untested.
-- **Hands** are the weakest tracker. Small, fast or overlapping hands drop out. On the rendered test footage, while both arms were raised, at least one hand was found in 52% of frames (26% per hand); the rendered hands are small (about 60 px) and pale. Real webcam footage was not available.
+- **Hands** are still the weakest tracker. Crossed arms and hands against the face are mostly lost (MediaPipe's palm detector rarely fires there), and crossed arms can swap MediaPipe's pose wrists. See [Tracking quality](#tracking-quality) for measured rates. Real webcam footage was not available.
+- **Costumes.** Wide sleeves or capes over the shoulders hide the elbow from MediaPipe's pose model, which then places it low: raised arms come out lower than they are. The solver can't recover an elbow the pose model got wrong.
+- **Upper mode** (no hands) can't cross-check the pose's wrists, so a wrist MediaPipe imagines at the chin is still followed there.
 - **Single-eye winks** register weakly with MediaPipe on the test footage. Both-eye blinks track well.
 - **Legs** follow the idle or an emote clip; tracking never moves them, and there is no walking.
 - **Animation clips.**
@@ -307,9 +367,8 @@ On the same avatar the stability test above gives, for the cloth solver: 1.44 m/
   - The six keyframed emotes are simple poses, not motion capture.
   - Root motion is kept in place only; turns in a clip (hips yaw) are kept.
   - An imported `.gltf` with separate files isn't supported; use `.glb` or `.fbx`.
-- **Hotkeys.** Global keys are tested on macOS only. Windows and Linux use the same plugin (Windows RegisterHotKey, Linux X11 only: global keys are not available on a pure Wayland session). Hand-gesture triggers wait for the tracker's gesture events (adapter in `src/input/gestures.ts`).
+- **Hotkeys.** Global keys are tested on macOS only. Windows and Linux use the same plugin (Windows RegisterHotKey, Linux X11 only: global keys are not available on a pure Wayland session). Hand-gesture triggers come from the tracker's gesture events (HANDS mode).
 - **Mic lip sync.** Tested with a synthetic voice through a fake capture device in Chrome; the macOS microphone prompt in the signed app and real voices are untested. FALLBACK switches on face loss only; it can't tell when mouth tracking is merely weak.
-- **Pose model** changes (LITE/FULL) apply on the next launch.
 - **Virtual camera.**
   - macOS needs a Developer ID–signed build with the system-extension entitlement; unsigned builds (including CI artifacts) can't install the camera. The extension, its activation and the CMIO sink path have been built and checked as far as an unsigned build allows (activation stops at "missing entitlement"); the signed install and a real Zoom/Meet session are untested.
   - Windows (softcam) and Linux (v4l2loopback) build and pass unit tests in CI but have not been run on real machines.
