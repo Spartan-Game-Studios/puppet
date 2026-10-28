@@ -20,14 +20,14 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
   - macOS 12.3+: a CoreMediaIO Camera Extension inside Puppet.app (needs a Developer ID–signed build; see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)).
   - Windows 10/11: a DirectShow camera built from [softcam](https://github.com/tshino/softcam) (MIT); one admin prompt to register it.
   - Linux: a v4l2loopback device you create with `modprobe`.
-- **Stable physics.** three-vrm's spring bones with stabilisers:
-  - a fixed-timestep solver (60 Hz × 1–4 substeps) decoupled from frame rate, with the accumulator clamped so a stall never replays as a burst;
-  - a max tail speed per step;
-  - velocity damping on collider contact (so leg colliders can't pump energy into a skirt);
-  - an "inertia" share that carries tails along with the body's own motion;
-  - smoothing and a speed limit on the tracked torso before physics sees it.
+- **Cloth and hair physics.** A bone-cloth solver over the VRM's own spring bones (`src/physics/cloth/`):
+  - neighbouring chains are found automatically (a skirt ring around the hips, a cape sheet, a hair fringe) and linked into a lattice, so panels move together instead of splaying into strands;
+  - capsule colliders are generated from the humanoid skeleton and fitted to the skinned mesh (hips, legs, torso, arms, shoulders, neck, head), next to the model's own colliders;
+  - whole segments collide (segment vs capsule, swept within each step), so a fast leg or arm can't tunnel through a joint;
+  - authored stiffness, drag and gravity keep their VRM meaning; stiffness fades toward the hem of skirts and capes so they drape;
+  - fixed-timestep (60 Hz × substeps), clamped speeds and smoothed torso input, as before.
 
-  There is a global OFF / STIFF / NORMAL switch (`8` `9` `0`), a per-chain table (on/off, stiffness/drag/gravity multipliers) and per-collider toggles. Overrides are saved per model, keyed by the SHA-256 of the file. See [Physics test](#physics-stability-test) for measurements.
+  There is a global OFF / STIFF / NORMAL switch (`8` `9` `0`), the cloth groups (links on/off, stiffness, and per-chain grouping overrides), a per-chain table (on/off, stiffness/drag/gravity multipliers) and per-collider toggles, including the generated BODY colliders. Overrides are saved per model, keyed by the SHA-256 of the file. The previous solver (three-vrm's spring bones with stabilisers) stays available as SOLVER → LEGACY. See [Cloth benchmark](#cloth-benchmark) for measurements.
 - **Model library (HOME).** The first screen at launch; `L` or `Esc` from the stage returns to it. See [Model library](#model-library).
 - **App UX.**
   - Open a VRM from a file dialog (`O`) or by dropping it on the window; it is added to the library too.
@@ -189,6 +189,8 @@ The scripts in `scripts/` drive headless Chrome through Playwright, using your i
 - `PUPPET_MODEL=avatar.vrm node scripts/render-clip.mjs out/` renders test footage from a VRM. It is a scripted performance (jaw, blinks, a wink, smile, pucker, brows, head turns, arm raises) shot by a webcam-like camera, with frame-exact ground truth (`truth.json`). `PUPPET_CLEAN=1` paints out heavy face makeup, which MediaPipe misreads (black lipstick reads as a pucker).
 - `PUPPET_MODEL=avatar.vrm node scripts/track-clip.mjs out/ shots/` plays that clip through the real app pipeline (`?source=file`). It reports detection rates, fps, latency and the correlation of each tracked channel with the truth, then screenshots key moments.
 - `PUPPET_MODEL=avatar.vrm node scripts/physics-test.mjs` runs the physics stability test below.
+- `PUPPET_MODEL=avatar.vrm node scripts/cloth-test.mjs [out.json]` runs the [cloth benchmark](#cloth-benchmark); `VIDEO=dir` also renders side-by-side videos.
+- `PUPPET_MODEL=avatar.vrm node scripts/record-pose.mjs clip-dir/ pose.json` records a real tracking session (the clip played through the app) as bone rotations, for the benchmark's `recorded` scenario (`PUPPET_POSE=pose.json`).
 - `PUPPET_MODEL=avatar.vrm node scripts/screenshot.mjs ui.png` screenshots the UI.
 - `PUPPET_MODEL=avatar.vrm node scripts/vcam-test.mjs out/` checks the virtual camera frame source in headless Chrome (size, BGRA order, background composite, 30 fps), and `scripts/vcam-desktop-test.mjs` runs a built desktop app with the file sink and measures CPU with the output on and off.
 - `PUPPET_MODEL=avatar.vrm PUPPET_CLIP=clip.webm node scripts/env-bench.mjs out/` benchmarks the 3D environments in capture view at 1920×1080: render fps, frame time, tracking fps and inference time, and the avatar's face brightness, for every scene at LOW and HIGH against the flat background. It saves a screenshot of each scene. `PUPPET_UNCAPPED=1` removes vsync to show headroom.
@@ -214,6 +216,32 @@ Results on a VRM 1.0 avatar with a 20-chain skirt (120 skirt joints, 223 joints 
 | + speed clamp + collision damping | 7.4 | 5.4 | 4.4 | 3.3 | 0.97 s |
 | **all stabilisers** (+ root smoothing, inertia 0.6) | **5.3** | **3.5** | **1.7** | **1.5** | **0.81 s** |
 
+### Cloth benchmark
+
+`harness/cloth.ts` (`scripts/cloth-test.mjs`) drives a VRM through scripted motion in virtual time and measures what makes spring cloth look bad:
+
+- **scenarios:** `shake` (the stability test's root sway, jitter and hitches), `lean` (hips ±25° yaw, ±15° roll, 25° forward bend, then a quick twist, over planted legs), `head` (turns, nods, tilts and a fast shake), `arms` (raised high, swung, flicked and dropped), `hitch` (15–25° torso snaps in one frame and 150–300 ms stalls), and `recorded` (a real tracking session from `scripts/record-pose.mjs`);
+- **clipping:** cloth segments, and mesh vertices skinned to cloth, inside the body (the inner part of the generated body capsules), beyond whatever overlaps in the rest pose; hair segments the same way; arms reported separately;
+- **shape:** how far neighbouring cloth chains drift from their rest spacing (splaying apart or bunching into a tube);
+- tail speed relative to the hips, settle time, jitter at rest, and the CPU time of the physics update.
+
+Results on a VRM 1.0 avatar (223 joints in 41 chains: a 20-chain floor-length skirt, 14 hair strands, 4 braids, 3 sleeve ribbons; 427 bones), two seeds, Chrome on an M3 Pro. "before" is `main` (legacy solver, and the skin-index overflow described below); "after" is the cloth solver.
+
+| scenario | skirt segments in the body (% of frames, max depth) | cloth vertices in the body (mean %) | hair in the body (% of frames, max depth) | neighbour spacing error (p95) | settle | physics ms/frame (mean / p99) |
+|---|---|---|---|---|---|---|
+| lean, before | 50.5%, 99 mm | 1.66% | 24.2%, 31 mm | 1118% | 0.54 s | 0.43 / 1.0 |
+| lean, after | 14.5%, 26 mm | 0.68% | 0%, 0 mm | 39% | 0.67 s | 0.55 / 0.9 |
+| head, before | 20.0%, 5 mm | 1.65% | 41.3%, 37 mm | 110% | 0.75 s | 0.41 / 0.9 |
+| head, after | 0% | 0.49% | 0% | 11% | 0.30 s | 0.54 / 0.9 |
+| hitch, before | 40.9%, 53 mm | 1.09% | 14.5%, 48 mm | 335% | 0.90 s | 0.43 / 1.4 |
+| hitch, after | 18.1%, 15 mm | 0.96% | 0.4%, 10 mm | 33% | 0.96 s | 0.56 / 1.9 |
+| recorded, before | 5.1%, 11 mm | 1.71% | 91.4%, 36 mm | 110% | 0.48 s | 0.40 / 0.6 |
+| recorded, after | 0% | 0.49% | 0.5%, 0.3 mm | 11% | 0.32 s | 0.55 / 0.9 |
+
+On the same avatar the stability test above gives, for the cloth solver: 1.44 m/s max tail speed (p99 1.36, skirt median 0.53) and 0.29 s settle time.
+
+**Skin-index overflow.** `VRMUtils.combineSkeletons` (three-vrm 3.5.5) remaps each mesh's joint indices into one combined skeleton but keeps the attribute's array type. With 8-bit `JOINTS_0` and more than 256 bones in total, indices wrap around: on the avatar above a third of the gown's vertex weights pointed at hair spring bones, so the skirt tore apart whenever the hair moved, whatever the physics. Puppet now widens skin indices to 16 bits before combining (`widenSkinIndices` in `src/scene/avatar.ts`).
+
 ## Known limitations
 
 - **Camera permission in the packaged app.**
@@ -234,7 +262,13 @@ Results on a VRM 1.0 avatar with a 20-chain skirt (120 skirt joints, 223 joints 
   - Windows (softcam) and Linux (v4l2loopback) build and pass unit tests in CI but have not been run on real machines.
   - The camera gets a new frame only when Puppet renders one, so its rate is capped by the app's render rate. Puppet keeps rendering while its window is hidden or covered (`backgroundThrottling` is off), but a heavily loaded machine lowers both.
   - 30 fps only. Windows: 64-bit camera apps only (no 32-bit DLL).
-- The **inertia** stabiliser assumes no VRM spring `center`; chains with a center are simulated in center space by three-vrm already.
+- **Physics.**
+  - The **inertia** stabiliser assumes no VRM spring `center`; the cloth solver simulates every chain in world space.
+  - Cloth is bone cloth: the mesh between two linked chains still deforms by linear skinning, so a coarse rig (few chains, long segments) can't fold finely.
+  - Generated body colliders are capsules fitted to the mesh; very loose clothing skinned to the body (not to spring bones) makes them fatter than the body underneath.
+  - Plane and "inside" colliders (the VRM extended-collider spec) are ignored by the cloth solver; the legacy solver handles them.
+  - Whatever a chain's rest shape overlaps on the body as authored (in the T-pose, and with the arms in the idle pose) is left overlapping rather than pushed out, so a model with clipping in its rest pose keeps it.
+  - Hair or cloth swept over a raised arm can stay caught on it until the arm moves again, as real hair would.
 
 ## Licences and credits
 
