@@ -103,3 +103,21 @@ export async function vmcStats(): Promise<VmcStats | null> {
   if (!isTauri) return null;
   return invoke<VmcStats>('vmc_stats');
 }
+
+/** PUPPET_QUERY env var (desktop app only): extra query parameters for testing. */
+export async function devQuery(): Promise<string> {
+  return isTauri ? invoke<string>('dev_query') : '';
+}
+
+export function debugLog(line: string): void {
+  if (isTauri) invoke('debug_log', { line }).catch(() => {});
+  else console.log('[puppet]', line);
+}
+
+/** A URL the <video> element can load: as-is in a browser; a blob of the file's bytes in the app. */
+export async function mediaUrl(src: string): Promise<string> {
+  if (!isTauri || /^(https?:|blob:|data:)/.test(src)) return src;
+  const buf = await readPath(src);
+  const type = src.endsWith('.webm') ? 'video/webm' : 'video/mp4';
+  return URL.createObjectURL(new Blob([buf], { type }));
+}

@@ -27,7 +27,10 @@ import { Tracker } from './tracking/tracker';
 import { toUnity, unityBoneName, vmcBlendName, type VmcFrame } from './vmc/vmcFrame';
 import {
   baseName,
+  debugLog,
+  devQuery,
   isTauri,
+  mediaUrl,
   onNativeDrop,
   pickBrowserFile,
   pickPath,
@@ -40,6 +43,7 @@ import { loadSettings, saveSettings, type Settings } from './app/settings';
 import type { PhysicsMode } from './physics/stableSprings';
 
 const params = new URLSearchParams(location.search);
+for (const [k, v] of new URLSearchParams(await devQuery())) params.set(k, v);
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const ACCENT = '#ff3b00';
 
@@ -47,6 +51,7 @@ const settings: Settings = await loadSettings();
 const urlMode = params.get('mode') as BodyMode | null;
 if (urlMode && ['face', 'upper', 'hands'].includes(urlMode)) settings.mode = urlMode;
 if (params.has('mirror')) settings.mirror = params.get('mirror') === '1';
+if (params.has('vmc')) settings.vmc.enabled = params.get('vmc') === '1';
 const persist = () => saveSettings(settings);
 
 // ---------------------------------------------------------------- core objects
@@ -189,7 +194,7 @@ async function startSource(): Promise<void> {
     let info: string;
     if (params.get('source') === 'file') {
       const src = params.get('src') ?? '/test-assets/clip.webm';
-      info = await source.openFile(src, params.get('loop') !== '0');
+      info = await source.openFile(await mediaUrl(src), params.get('loop') !== '0');
     } else {
       setStatus('OPENING CAMERA');
       info = await source.openCamera(settings.cameraId, settings.resolution, settings.trackFps);
@@ -759,6 +764,16 @@ function tick(now: number): void {
       ? `${settings.physics.mode.toUpperCase()} ${avatar.physics.lastSteps} STEP/F`
       : '-';
   }
+}
+
+// ?debuglog=1: print a stats line every 2 s (stdout in the desktop app).
+if (params.get('debuglog') === '1') {
+  setInterval(() => {
+    const s = tracker.stats;
+    debugLog(
+      `render ${renderTimes.length}fps frame ${frameMs.toFixed(1)}ms | face ${s.face.fps}fps lat ${s.face.latency.toFixed(0)}ms inf ${s.face.infer.toFixed(1)}ms | body ${s.body.fps}fps lat ${s.body.latency.toFixed(0)}ms pose ${s.body.pose.toFixed(1)} hands ${s.body.hands.toFixed(1)}ms | ${s.where} ${s.delegate} | ${$('status').textContent} | ${$('sync-mode').textContent} | vmc ${$('vmc-stats').textContent}`,
+    );
+  }, 2000);
 }
 
 async function pollVmc(): Promise<void> {

@@ -23,8 +23,10 @@ body.transparent, body.transparent .app { background: transparent; }
 button, input, select { font: inherit; color: inherit; }
 kbd {
   display: inline-block;
-  font: 700 10px/1 inherit;
   font-family: inherit;
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 1;
   border: var(--thin);
   padding: 2px 4px;
   margin-left: 6px;

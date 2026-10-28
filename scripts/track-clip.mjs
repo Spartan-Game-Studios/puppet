@@ -123,9 +123,10 @@ if (shots) {
     ['pucker', 7.8],
     ['head-left', 10.1],
     ['arms-up', 12.9],
+    ['rest-body', 0.6],
   ];
   for (const [name, t] of moments) {
-    await p2.evaluate((n) => window.__puppet.frame(n === 'arms-up' ? 'upper' : 'bust'), name);
+    await p2.evaluate((n) => window.__puppet.frame(n === 'arms-up' || n === 'rest-body' ? 'upper' : 'bust'), name);
     await p2.evaluate(async (tt) => {
       const v = window.__puppet.source.video;
       v.pause();

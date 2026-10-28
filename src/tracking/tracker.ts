@@ -38,7 +38,7 @@ interface Lane {
   busy: boolean;
   sentAt: number;
   sentVideoTime: number;
-  lastSend: number;
+  nextDue: number;
   times: number[];
 }
 
@@ -54,8 +54,8 @@ export class Tracker {
   onStatus: (s: string) => void = () => {};
 
   private lanes: Record<Pipeline, Lane> = {
-    face: { pipeline: 'face', worker: null, busy: false, sentAt: 0, sentVideoTime: 0, lastSend: 0, times: [] },
-    body: { pipeline: 'body', worker: null, busy: false, sentAt: 0, sentVideoTime: 0, lastSend: 0, times: [] },
+    face: { pipeline: 'face', worker: null, busy: false, sentAt: 0, sentVideoTime: 0, nextDue: 0, times: [] },
+    body: { pipeline: 'body', worker: null, busy: false, sentAt: 0, sentVideoTime: 0, nextDue: 0, times: [] },
   };
   private main: LandmarkerSet | null = null;
   private video: HTMLVideoElement | null = null;
@@ -171,11 +171,13 @@ export class Tracker {
     const v = this.video;
     if (!v || v.readyState < 2 || v.videoWidth === 0) return;
     const now = performance.now();
-    const interval = 1000 / this.opts.maxFps - 2;
+    // Deadline scheduling: rAF ticks don't line up with the tracking rate, so
+    // send when the next slot is due (within a few ms) and advance the slot.
+    const interval = 1000 / this.opts.maxFps;
     const want = (['face', 'body'] as Pipeline[]).filter((p) => {
       const l = this.lanes[p];
       if (p === 'body' && this.opts.mode === 'face') return false;
-      return !l.busy && now - l.lastSend >= interval;
+      return !l.busy && now >= l.nextDue - 4;
     });
     if (!want.length) return;
     // MediaPipe VIDEO mode needs strictly increasing timestamps.
@@ -183,7 +185,7 @@ export class Tracker {
     this.lastT = t;
     for (const p of want) {
       const l = this.lanes[p];
-      l.lastSend = now;
+      l.nextDue = Math.max(l.nextDue + interval, now - interval / 2);
       l.sentAt = now;
       l.sentVideoTime = v.currentTime;
     }
