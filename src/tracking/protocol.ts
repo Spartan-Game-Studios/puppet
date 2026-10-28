@@ -71,6 +71,11 @@ export interface TrackerResult {
   timings: { face: number; pose: number; hands: number; total: number };
   /** Source video time of the frame (seconds), filled in on the main thread. */
   videoTime?: number;
+  /**
+   * A 'body' result sent again with newer hands: same pose (already applied),
+   * fresher hand landmarks. Filled in on the main thread.
+   */
+  handsUpdate?: boolean;
 }
 
 export interface TrackerReady {
