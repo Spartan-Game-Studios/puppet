@@ -88,6 +88,9 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           PUPPET_APP_PROFILE_B64: ${{ secrets.PUPPET_APP_PROFILE }}
           PUPPET_CAMEXT_PROFILE_B64: ${{ secrets.PUPPET_CAMEXT_PROFILE }}
         run: |
@@ -109,14 +112,18 @@ jobs:
           fi
           PUPPET_APP_PROFILE="$RUNNER_TEMP/app.provisionprofile" bash src-tauri/macos/prepare-signing.sh
           echo "SIGNED_CONFIG=--config src-tauri/macos/build/tauri.signed.conf.json" >> "$GITHUB_ENV"
+          # Only now do the signing variables exist for the build step: Tauri
+          # tries to sign whenever APPLE_SIGNING_IDENTITY is set, even empty.
+          {
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            if [ -n "$APPLE_ID" ]; then
+              echo "APPLE_ID=$APPLE_ID"
+              echo "APPLE_PASSWORD=$APPLE_PASSWORD"
+            fi
+          } >> "$GITHUB_ENV"
       - name: Build (no release)
         uses: tauri-apps/tauri-action@v0
-        env:
-          # Empty unless the signing secrets are configured.
-          APPLE_SIGNING_IDENTITY: ${{ env.HAS_APPLE_SIGNING == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_TEAM_ID: ${{ env.HAS_APPLE_SIGNING == 'true' && secrets.APPLE_TEAM_ID || '' }}
-          APPLE_ID: ${{ env.HAS_APPLE_SIGNING == 'true' && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ env.HAS_APPLE_SIGNING == 'true' && secrets.APPLE_PASSWORD || '' }}
         with:
           args: ${{ matrix.args }} ${{ env.SIGNED_CONFIG }}
       - name: Check the virtual camera is in the bundle
