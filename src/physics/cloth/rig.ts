@@ -12,7 +12,7 @@
  */
 import { Matrix4, Object3D, Quaternion, Vector3 } from 'three';
 import type { VRMSpringBoneCollider, VRMSpringBoneJoint } from '@pixiv/three-vrm';
-import { ClothSolver, closestSegSeg, type EdgeDef, type LinkDef } from './solver';
+import { ClothSolver, closestSegSeg, type EdgeDef, type LinkContactDef, type LinkDef } from './solver';
 import { detectGroups, kindOf, type ChainInfo, type ClothGroup, type GroupKind } from './groups';
 import type { BodyCapsule } from './bodyColliders';
 
@@ -154,6 +154,56 @@ interface Edge {
 
 const _m = new Matrix4();
 const _m2 = new Matrix4();
+const _m3 = new Matrix4();
+
+/** Largest distance a skirt root is moved out of a leg (m). */
+export const MAX_ROOT_PUSH = 0.03;
+
+/** Distance from a point to the capsule axis caps[o..o+5]. */
+function pointSegDist(px: number, py: number, pz: number, caps: ArrayLike<number>, o: number): number {
+  const ax = caps[o], ay = caps[o + 1], az = caps[o + 2];
+  const bx = caps[o + 3] - ax, by = caps[o + 4] - ay, bz = caps[o + 5] - az;
+  const l2 = bx * bx + by * by + bz * bz;
+  let t = l2 > 1e-12 ? ((px - ax) * bx + (py - ay) * by + (pz - az) * bz) / l2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return Math.hypot(px - ax - bx * t, py - ay - by * t, pz - az - bz * t);
+}
+
+/**
+ * Offset that moves point h out of the capsules `cols` (axes in caps, 6
+ * numbers each) to radius rs[i], two passes, clamped to `max` in total.
+ */
+export function rootPush(
+  h: [number, number, number],
+  cols: ArrayLike<number>,
+  rs: ArrayLike<number>,
+  caps: ArrayLike<number>,
+  enabled: (c: number) => boolean,
+  max: number,
+): [number, number, number] {
+  const p: [number, number, number] = [h[0], h[1], h[2]];
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < cols.length; i++) {
+      const c = cols[i];
+      if (!enabled(c)) continue;
+      const o = 6 * c;
+      const ax = caps[o], ay = caps[o + 1], az = caps[o + 2];
+      const bx = caps[o + 3] - ax, by = caps[o + 4] - ay, bz = caps[o + 5] - az;
+      const l2 = bx * bx + by * by + bz * bz;
+      let t = l2 > 1e-12 ? ((p[0] - ax) * bx + (p[1] - ay) * by + (p[2] - az) * bz) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const nx = p[0] - ax - bx * t, ny = p[1] - ay - by * t, nz = p[2] - az - bz * t;
+      const d = Math.hypot(nx, ny, nz);
+      if (d >= rs[i] || d < 1e-6) continue;
+      const k = (rs[i] - d) / d;
+      p[0] += nx * k; p[1] += ny * k; p[2] += nz * k;
+    }
+  }
+  const o: [number, number, number] = [p[0] - h[0], p[1] - h[1], p[2] - h[2]];
+  const len = Math.hypot(o[0], o[1], o[2]);
+  if (len > max) for (let k = 0; k < 3; k++) o[k] *= max / len;
+  return o;
+}
 const _v = new Vector3();
 const _v2 = new Vector3();
 const _q = new Quaternion();
@@ -178,6 +228,15 @@ export class ClothRig {
   readonly particleNode: Array<Object3D | null> = [];
 
   private rootEdges: number[] = [];
+  /** Rest local position of each root edge's bone (root pushes move it; see pushRoots). */
+  private rootRestPos: Vector3[] = [];
+  /** Per root edge: leg colliders its animated head is kept out of, and the contact radius for each. */
+  private rootPushCols: Int32Array[] = [];
+  private rootPushR: Float64Array[] = [];
+  /** Per root edge: world offset applied to its head this frame. */
+  private rootOffset = new Float64Array(0);
+  /** Edge -> index in rootEdges, or -1. */
+  private rootIndex = new Int32Array(0);
   private updateList: Object3D[] = [];
   /** Animated targets at the last step and now (for interpolation across steps). */
   private rootPrev: Float64Array;
@@ -262,6 +321,12 @@ export class ClothRig {
       if (parent < 0) this.rootEdges.push(e);
     }
     this.solver = new ClothSolver(this.particleNode.length, edgeDefs);
+    this.rootRestPos = this.rootEdges.map((e) => this.edges[e].bone.position.clone());
+    this.rootPushCols = this.rootEdges.map(() => new Int32Array(0));
+    this.rootPushR = this.rootEdges.map(() => new Float64Array(0));
+    this.rootOffset = new Float64Array(3 * this.rootEdges.length);
+    this.rootIndex = new Int32Array(this.edges.length).fill(-1);
+    this.rootEdges.forEach((e, ri) => (this.rootIndex[e] = ri));
     for (let e = 0; e < this.edges.length; e++) this.solver.radius[edgeDefs[e].tail] = this.edges[e].joint.settings.hitRadius;
 
     // Chain paths (longest path through each chain's edges).
@@ -369,6 +434,7 @@ export class ClothRig {
   private computeRestCaps(): void {
     const s = this.solver;
     const seg = new Float64Array(2);
+    this.restSnaps.push({ x: Float64Array.from(s.x), cap: Float64Array.from(this.capNow) });
     const prev = this.restRadiusCap;
     this.restRadiusCap = this.edges.map((_, e) => {
       const caps = new Float64Array(this.colliders.length);
@@ -445,6 +511,8 @@ export class ClothRig {
     this.groups = detectGroups(infos, { maxAngle: (60 * Math.PI) / 180, assign, blocked });
     const stiffDiv = cfg.stiff ? 10 : 1;
     const links: LinkDef[] = [];
+    /** Links between neighbouring chains at the same level (not the shear diagonals): the sheet, for contacts. */
+    const sheet: number[] = [];
     const chainKind = [...this.kinds];
     this.chainKinds = chainKind;
     for (const g of this.groups) {
@@ -462,6 +530,7 @@ export class ClothRig {
         for (let ka = 1; ka < A.length; ka++) {
           const kb = map(ka);
           if (kb < 1) continue;
+          if (g.kind === 'skirt' || g.kind === 'cape') sheet.push(links.length);
           links.push(this.link(A[ka], B[kb], pre.stretch / k, pre.compress / k));
           if (isFinite(pre.shear)) {
             if (kb + 1 < B.length) links.push(this.link(A[ka], B[kb + 1], pre.shear / k, pre.shear / k));
@@ -513,12 +582,80 @@ export class ClothRig {
       s.eColliders[e] = list;
       s.eColliderR[e] = Float64Array.from(list, (i) => this.restRadiusCap[e][i]);
     }
+    s.setLinkContacts(this.linkContacts(links, sheet));
+    // Root pushes: skirt roots vs the generated leg capsules they clear at rest.
+    const legs = this.colliders.map((c, i) => (c.body && /UpperLeg|LowerLeg/.test(c.name) ? i : -1)).filter((i) => i >= 0);
+    const rest = this.restSnaps[0];
+    this.rootEdges.forEach((e, ri) => {
+      const cols: number[] = [];
+      const rs: number[] = [];
+      if (chainKind[this.edges[e].chain] === 'skirt' && cfg.bodyColliders && rest) {
+        const h = 3 * s.eHead[e];
+        for (const c of legs) {
+          const o = 6 * c;
+          const d = pointSegDist(rest.x[h], rest.x[h + 1], rest.x[h + 2], rest.cap, o);
+          const r = Math.min(this.colliders[c].body!.r, d - 0.003);
+          if (r > 0.01) {
+            cols.push(c);
+            rs.push(r);
+          }
+        }
+      }
+      this.rootPushCols[ri] = Int32Array.from(cols);
+      this.rootPushR[ri] = Float64Array.from(rs);
+    });
     this.syncParams();
+  }
+
+  /**
+   * Sheet links collide with what both their particles' edges collide with,
+   * capped (like edges) to what the link segment clears in every rest pose:
+   * the load pose, and for colliders on the arms the idle pose too.
+   */
+  private linkContacts(links: LinkDef[], sheet: number[]): LinkContactDef[] {
+    const s = this.solver;
+    const edgeOf = new Map<number, number>();
+    for (let e = 0; e < s.nEdges; e++) edgeOf.set(s.eTail[e], e);
+    const seg = new Float64Array(2);
+    const out: LinkContactDef[] = [];
+    for (const li of sheet) {
+      const { a, b } = links[li];
+      const ea = edgeOf.get(a), eb = edgeOf.get(b);
+      if (ea == null || eb == null || !s.enabled[ea] || !s.enabled[eb]) continue;
+      const inB = new Set(s.eColliders[eb]);
+      const pr = Math.min(s.radius[a], s.radius[b]);
+      const colliders: number[] = [];
+      const caps: number[] = [];
+      for (const c of s.eColliders[ea]) {
+        if (!inB.has(c)) continue;
+        let cap = Infinity;
+        this.restSnaps.forEach((snap, k) => {
+          if (k > 0 && !this.colliderOnArm[c]) return;
+          const x = snap.x, q = snap.cap, o = 6 * c;
+          closestSegSeg(x[3 * a], x[3 * a + 1], x[3 * a + 2], x[3 * b], x[3 * b + 1], x[3 * b + 2], q[o], q[o + 1], q[o + 2], q[o + 3], q[o + 4], q[o + 5], seg);
+          const sp = seg[0], u = seg[1];
+          const d = Math.hypot(
+            x[3 * a] + (x[3 * b] - x[3 * a]) * sp - (q[o] + (q[o + 3] - q[o]) * u),
+            x[3 * a + 1] + (x[3 * b + 1] - x[3 * a + 1]) * sp - (q[o + 1] + (q[o + 4] - q[o + 1]) * u),
+            x[3 * a + 2] + (x[3 * b + 2] - x[3 * a + 2]) * sp - (q[o + 2] + (q[o + 5] - q[o + 2]) * u),
+          );
+          cap = Math.min(cap, d - 0.003);
+        });
+        if (cap > pr + 0.005) {
+          colliders.push(c);
+          caps.push(cap);
+        }
+      }
+      if (colliders.length) out.push({ link: li, colliders, caps });
+    }
+    return out;
   }
 
   /** Original (untoggled) collider list of a group; StableSprings filters group.colliders for the legacy solver. */
   groupOriginal: (g: { colliders: VRMSpringBoneCollider[] }) => VRMSpringBoneCollider[] = (g) => g.colliders;
 
+  /** Particle and collider positions in each pose taken as rest (load, then the idle pose); root pushes use the first. */
+  private restSnaps: Array<{ x: Float64Array; cap: Float64Array }> = [];
   private restInfos: ChainInfo[] = [];
   /** Particle positions at rest (as at load). */
   private restX = new Float64Array(0);
@@ -562,11 +699,11 @@ export class ClothRig {
   capture(): void {
     this.updateMatrices();
     const s = this.solver;
-    for (const e of this.rootEdges) {
+    this.rootEdges.forEach((e, ri) => {
       const ed = this.edges[e];
       const parent = ed.bone.parent;
       const pw = parent ? parent.matrixWorld : _m.identity();
-      _v.copy(ed.bone.position).applyMatrix4(pw);
+      _v.copy(this.rootRestPos[ri]).applyMatrix4(pw);
       const p = s.eHead[e];
       this.rootNow[3 * p] = _v.x;
       this.rootNow[3 * p + 1] = _v.y;
@@ -576,7 +713,7 @@ export class ClothRig {
       this.frameNow[4 * e + 1] = _q.y;
       this.frameNow[4 * e + 2] = _q.z;
       this.frameNow[4 * e + 3] = _q.w;
-    }
+    });
     this.colliders.forEach((c, i) => {
       const o = 6 * i;
       if (c.vrm) {
@@ -597,6 +734,33 @@ export class ClothRig {
       this.capNow[o + 3] = _v2.x;
       this.capNow[o + 4] = _v2.y;
       this.capNow[o + 5] = _v2.z;
+    });
+    this.pushRoots();
+  }
+
+  /**
+   * Skirt roots are pinned to the hips, so when the hips turn, roll or bend
+   * over planted legs the front and side roots move into the thighs, where no
+   * contact can reach them (only the segments below a root are simulated).
+   * Here each root's animated head is moved out of the leg capsules it clears
+   * in the rest pose, by at most MAX_ROOT_PUSH; writeBack moves the bone with
+   * it, so the waistband slides over the thigh instead of the thigh poking
+   * through.
+   */
+  private pushRoots(): void {
+    const s = this.solver;
+    const off = this.rootOffset;
+    off.fill(0);
+    this.rootEdges.forEach((e, ri) => {
+      const cols = this.rootPushCols[ri];
+      if (!cols.length || !s.enabled[e]) return;
+      const p = 3 * s.eHead[e];
+      const h: [number, number, number] = [this.rootNow[p], this.rootNow[p + 1], this.rootNow[p + 2]];
+      const o = rootPush(h, cols, this.rootPushR[ri], this.capNow, (c) => s.capEnabled[c] === 1, MAX_ROOT_PUSH);
+      for (let k = 0; k < 3; k++) {
+        this.rootNow[p + k] += o[k];
+        off[3 * ri + k] = o[k];
+      }
     });
   }
 
@@ -675,7 +839,20 @@ export class ClothRig {
       if (!ed.write) continue;
       const bone = ed.bone;
       const pw = bone.parent ? bone.parent.matrixWorld : _m2.identity();
-      _m.multiplyMatrices(pw, ed.initLocal).invert();
+      const ri = this.rootIndex[e];
+      let local = ed.initLocal;
+      if (ri >= 0) {
+        // A pushed root: the bone moves to the simulated head (see pushRoots).
+        const o = 3 * ri;
+        const pos = this.rootRestPos[ri];
+        if (this.rootOffset[o] || this.rootOffset[o + 1] || this.rootOffset[o + 2] || !bone.position.equals(pos)) {
+          const hd = 3 * s.eHead[e];
+          _v2.set(s.x[hd], s.x[hd + 1], s.x[hd + 2]).applyMatrix4(_m.copy(pw).invert());
+          bone.position.copy(_v2);
+          local = _m3.copy(ed.initLocal).setPosition(_v2);
+        }
+      }
+      _m.multiplyMatrices(pw, local).invert();
       const t = 3 * s.eTail[e];
       _v.set(s.x[t], s.x[t + 1], s.x[t + 2]).applyMatrix4(_m);
       if (_v.lengthSq() < 1e-14) continue;
@@ -688,6 +865,7 @@ export class ClothRig {
 
   /** Put every bone at its rest rotation (physics off). */
   writeRest(): void {
+    this.restoreRoots();
     for (const ed of this.edges) {
       if (!ed.write) continue;
       ed.bone.quaternion.copy(ed.initRot);
@@ -700,5 +878,17 @@ export class ClothRig {
   /** Forget motion: next run() starts from rest at the then-current pose. */
   invalidate(): void {
     this.hasPrev = false;
+    this.restoreRoots();
+  }
+
+  /** Root bones back to their rest positions (undo root pushes). */
+  private restoreRoots(): void {
+    this.rootEdges.forEach((e, ri) => {
+      const bone = this.edges[e].bone;
+      if (bone.position.equals(this.rootRestPos[ri])) return;
+      bone.position.copy(this.rootRestPos[ri]);
+      bone.updateMatrix();
+    });
+    this.rootOffset.fill(0);
   }
 }

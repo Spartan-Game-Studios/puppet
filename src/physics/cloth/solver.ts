@@ -54,6 +54,20 @@ export interface LinkDef {
   compress: number;
 }
 
+/**
+ * A link that also collides: the cloth between two neighbouring chains, as a
+ * segment between their particles. Without it, two chains either side of a
+ * shin each clear the shin while the mesh skinned between them cuts through
+ * it (a chord across the leg).
+ */
+export interface LinkContactDef {
+  /** Index into the links given to setLinks. */
+  link: number;
+  /** Capsules it collides with, and the per-pair cap on the contact distance (as EdgeDef colliders). */
+  colliders: number[];
+  caps: number[];
+}
+
 export interface CapsuleState {
   a: Vec3;
   b: Vec3;
@@ -234,6 +248,11 @@ export class ClothSolver {
   private rootPosNext: Float64Array;
   private pinnedRoots: Int32Array;
 
+  // Link contacts
+  lcLink = new Int32Array(0);
+  lcColliders: Int32Array[] = [];
+  lcCaps: Float64Array[] = [];
+
   // Links
   lA = new Int32Array(0);
   lB = new Int32Array(0);
@@ -332,6 +351,12 @@ export class ClothSolver {
       this.lStretch[i] = l.stretch;
       this.lCompress[i] = l.compress;
     });
+  }
+
+  setLinkContacts(defs: LinkContactDef[]): void {
+    this.lcLink = Int32Array.from(defs, (d) => d.link);
+    this.lcColliders = defs.map((d) => Int32Array.from(d.colliders));
+    this.lcCaps = defs.map((d) => Float64Array.from(d.caps));
   }
 
   setCapsuleCount(n: number): void {
@@ -503,7 +528,9 @@ export class ClothSolver {
       this.interpolateCapsules(Math.min(1, (it + 1) / Math.min(iters, sweeps)));
       this.solveLinks(h);
       // Contacts every iteration while a collider sweeps fast, else on the last one only.
-      this.solveChains(sweeps > 1 || it === iters - 1);
+      const contacts = sweeps > 1 || it === iters - 1;
+      if (contacts) this.collideLinks();
+      this.solveChains(contacts);
     }
 
     // 3. Velocity limits: relative speed clamp, contact damping, sleep.
@@ -565,6 +592,57 @@ export class ClothSolver {
       const kx = (dx / d) * dl, ky = (dy / d) * dl, kz = (dz / d) * dl;
       x[oa] += kx * wa; x[oa + 1] += ky * wa; x[oa + 2] += kz * wa;
       x[ob] -= kx * wb; x[ob + 1] -= ky * wb; x[ob + 2] -= kz * wb;
+    }
+  }
+
+  /**
+   * Sheet contacts: push a link segment (cloth between two chains) out of a
+   * capsule, moving its two particles in proportion to where the contact is
+   * along it and to their inverse mass. Runs before the chain pass, which then
+   * restores exact edge lengths (keeping the pushed directions).
+   */
+  private collideLinks(): void {
+    const { x, w, cap, capBox, capR, seg } = this;
+    for (let i = 0; i < this.lcLink.length; i++) {
+      const cols = this.lcColliders[i];
+      if (!cols.length) continue;
+      const l = this.lcLink[i];
+      const a = this.lA[l], b = this.lB[l];
+      const wa = w[a], wb = w[b];
+      if (wa + wb === 0) continue;
+      const oa = 3 * a, ob = 3 * b;
+      const pr = Math.min(this.radius[a], this.radius[b]);
+      const caps = this.lcCaps[i];
+      for (let ci = 0; ci < cols.length; ci++) {
+        const c = cols[ci];
+        if (!this.capEnabled[c]) continue;
+        const R = Math.min(capR[c] + pr, caps[ci]);
+        if (R <= 0) continue;
+        const bo = 6 * c;
+        if (Math.min(x[oa], x[ob]) - pr > capBox[bo + 3] || Math.max(x[oa], x[ob]) + pr < capBox[bo]) continue;
+        if (Math.min(x[oa + 1], x[ob + 1]) - pr > capBox[bo + 4] || Math.max(x[oa + 1], x[ob + 1]) + pr < capBox[bo + 1]) continue;
+        if (Math.min(x[oa + 2], x[ob + 2]) - pr > capBox[bo + 5] || Math.max(x[oa + 2], x[ob + 2]) + pr < capBox[bo + 2]) continue;
+        closestSegSeg(x[oa], x[oa + 1], x[oa + 2], x[ob], x[ob + 1], x[ob + 2], cap[bo], cap[bo + 1], cap[bo + 2], cap[bo + 3], cap[bo + 4], cap[bo + 5], seg);
+        const sp = seg[0], u = seg[1];
+        const px = x[oa] + (x[ob] - x[oa]) * sp, py = x[oa + 1] + (x[ob + 1] - x[oa + 1]) * sp, pz = x[oa + 2] + (x[ob + 2] - x[oa + 2]) * sp;
+        const qx = cap[bo] + (cap[bo + 3] - cap[bo]) * u, qy = cap[bo + 1] + (cap[bo + 4] - cap[bo + 1]) * u, qz = cap[bo + 2] + (cap[bo + 5] - cap[bo + 2]) * u;
+        let nx = px - qx, ny = py - qy, nz = pz - qz;
+        const dist = Math.hypot(nx, ny, nz);
+        // On the axis there's no outward direction to trust: leave it to the chain contacts.
+        if (dist >= R || dist < 1e-6) continue;
+        nx /= dist; ny /= dist; nz /= dist;
+        // Move the contact point by `depth` with the smallest particle moves:
+        // a by (1 - s), b by s, scaled so the interpolated point moves exactly.
+        const ka = (1 - sp) * wa, kb = sp * wb;
+        const den = (1 - sp) * ka + sp * kb;
+        if (den < 1e-9) continue;
+        const depth = (R - dist) / den;
+        x[oa] += nx * depth * ka; x[oa + 1] += ny * depth * ka; x[oa + 2] += nz * depth * ka;
+        x[ob] += nx * depth * kb; x[ob + 1] += ny * depth * kb; x[ob + 2] += nz * depth * kb;
+        if (ka > 0) this.hit[a] = 1;
+        if (kb > 0) this.hit[b] = 1;
+        this.contacts++;
+      }
     }
   }
 
