@@ -864,7 +864,7 @@ function setDebug(on: boolean): void {
   persist();
 }
 
-motion = await mountMotion({ settings, persist, setStatus, stage: $('stage'), tracker, debug: params.get('debuglog') === '1' ? debugLog : undefined });
+motion = await mountMotion({ settings, persist, setStatus, stage: $('stage'), gestures, debug: params.get('debuglog') === '1' ? debugLog : undefined });
 
 // ---------------------------------------------------------------- home (model library, src/app/home.ts)
 const home = await mountHome({

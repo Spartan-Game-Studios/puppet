@@ -16,7 +16,7 @@ import { HotkeyManager } from '../input/hotkeys';
 import { sanitizeBindings, type Action, type Binding } from '../input/bindings';
 import { Picker, type PickerItem } from '../input/picker';
 import { mountHotkeyPanel } from '../input/panel';
-import { trackerGestureSource, type GestureSource } from '../input/gestures';
+import { trackerGestureSource, type GestureSource, type TrackerGestures } from '../input/gestures';
 import { LipSync } from '../audio/lipsync';
 import { mountLipSyncPanel } from '../audio/panel';
 
@@ -26,8 +26,8 @@ export interface MotionContext {
   setStatus: (s: string, err?: boolean) => void;
   /** The stage element (the picker overlays it). */
   stage: HTMLElement;
-  /** The tracker, for hand gestures once it has them (see input/gestures.ts). */
-  tracker?: unknown;
+  /** The tracker's hand gestures (src/core/gestures.ts), for gesture hotkeys. */
+  gestures?: TrackerGestures;
   /** Diagnostics (main.ts passes debugLog with ?debuglog=1). */
   debug?: (line: string) => void;
 }
@@ -249,7 +249,7 @@ export async function mountMotion(ctx: MotionContext) {
       logGlobal(r);
     });
   setInterval(() => hkPanel.status(), 2000);
-  const gestures: GestureSource | null = trackerGestureSource(ctx.tracker);
+  const gestures: GestureSource | null = trackerGestureSource(ctx.gestures);
   hotkeys.attachGestures(gestures);
 
   // ---------------------------------------------------------------- 09 LIP SYNC

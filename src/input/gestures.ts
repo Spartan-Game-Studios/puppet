@@ -1,16 +1,11 @@
 /**
  * Hand-gesture triggers for hotkeys: an adapter interface, so a gesture
  * recogniser plugs in without the hotkey code knowing where it lives.
- *
- * TODO(tracking-quality): the tracking-quality branch adds gesture events to
- * the tracker (fist, open palm, point, peace, thumbs up, OK, horns). When it
- * lands, implement `trackerGestureSource` below by subscribing to them and
- * mapping each to a GestureEvent ('start' when a gesture is recognised,
- * 'end' when it stops), then pass it to HotkeyManager.attachGestures() in
- * main.ts. Bindings with gesture triggers already resolve (see bindings.ts,
- * tests/bindings.test.ts); the HOTKEYS panel lists them as waiting for a
- * source until one is attached.
+ * `trackerGestureSource` adapts the tracker's GestureTracker
+ * (src/core/gestures.ts): each change of a hand's gesture ends the old one
+ * and starts the new one. Hands are the user's own (not the mirrored avatar's).
  */
+import type { Gesture, GestureEvent as TrackerGestureEvent } from '../core/gestures';
 import type { GestureName } from './bindings';
 
 export interface GestureEvent {
@@ -37,15 +32,30 @@ export class ManualGestureSource implements GestureSource {
   }
 }
 
-/**
- * The tracker's gestures as a GestureSource, or null while the tracker has
- * none. TODO(tracking-quality): see the file comment.
- */
-export function trackerGestureSource(tracker: unknown): GestureSource | null {
-  const t = tracker as { onGesture?: unknown } | null;
-  if (!t || typeof t.onGesture !== 'function') return null;
-  // Expected shape once tracking-quality merges: tracker.onGesture(cb) -> unsubscribe,
-  // cb({ gesture, hand, state, confidence }). Adjust here if it differs.
-  const on = t.onGesture as (cb: (e: GestureEvent) => void) => () => void;
-  return { subscribe: (cb) => on.call(tracker, cb) };
+/** Tracker gesture names -> binding names. */
+export const GESTURE_NAMES: Record<Exclude<Gesture, 'none'>, GestureName> = {
+  fist: 'fist',
+  open: 'open_palm',
+  point: 'point',
+  peace: 'peace',
+  thumbsUp: 'thumbs_up',
+  ok: 'ok',
+  rock: 'horns',
+};
+
+/** Anything with GestureTracker's `on(listener) -> unsubscribe`. */
+export interface TrackerGestures {
+  on(listener: (e: TrackerGestureEvent) => void): () => void;
+}
+
+/** The tracker's gestures as a GestureSource, or null if there is no gesture tracker. */
+export function trackerGestureSource(tracker: TrackerGestures | null | undefined): GestureSource | null {
+  if (!tracker || typeof tracker.on !== 'function') return null;
+  return {
+    subscribe: (cb) =>
+      tracker.on((e) => {
+        if (e.previous !== 'none') cb({ gesture: GESTURE_NAMES[e.previous], hand: e.hand, state: 'end' });
+        if (e.gesture !== 'none') cb({ gesture: GESTURE_NAMES[e.gesture], hand: e.hand, state: 'start', confidence: e.confidence });
+      }),
+  };
 }

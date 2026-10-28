@@ -175,3 +175,33 @@ describe('GestureTracker events', () => {
     expect(tr.current.left).toBe('none');
   });
 });
+
+describe('gestures -> hotkey triggers', () => {
+  it('a held thumbs up starts a THUMBS UP trigger that resolves to its binding, and ends when let go', async () => {
+    const { trackerGestureSource, GESTURE_NAMES } = await import('../src/input/gestures');
+    const { resolve } = await import('../src/input/bindings');
+    const tr = new GestureTracker();
+    const src = trackerGestureSource(tr)!;
+    const got: Array<{ gesture: string; hand: string; state: string }> = [];
+    src.subscribe((e) => got.push({ gesture: e.gesture, hand: e.hand, state: e.state }));
+    const lm = hand(SPECS.thumbsUp);
+    for (let t = 0; t <= 400; t += 33) tr.update([{ worldLandmarks: lm, userSide: 'right' }], t);
+    expect(got).toEqual([{ gesture: 'thumbs_up', hand: 'right', state: 'start' }]);
+    const cheer = {
+      id: 'cheer',
+      trigger: { kind: 'gesture' as const, gesture: 'thumbs_up' as const, hand: 'any' as const },
+      action: { kind: 'emote' as const, clip: 'cheer' },
+    };
+    expect(resolve([cheer as never], { kind: 'gesture', gesture: 'thumbs_up', hand: 'right' }, null)?.id).toBe('cheer');
+    // Switch straight to a fist: the thumbs up ends, the fist starts.
+    const fist = hand(SPECS.fist);
+    for (let t = 433; t <= 800; t += 33) tr.update([{ worldLandmarks: fist, userSide: 'right' }], t);
+    expect(got.slice(1)).toEqual([
+      { gesture: 'thumbs_up', hand: 'right', state: 'end' },
+      { gesture: 'fist', hand: 'right', state: 'start' },
+    ]);
+    // Every tracker gesture has a binding name.
+    expect(Object.keys(GESTURE_NAMES).sort()).toEqual(['fist', 'ok', 'open', 'peace', 'point', 'rock', 'thumbsUp']);
+    expect(trackerGestureSource(null)).toBeNull();
+  });
+});
