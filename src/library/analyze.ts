@@ -23,6 +23,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from '@pixiv/three-vrm';
 import { buildPerfectSyncMap, VRM_PRESETS } from '../core/blendshapes';
 import type { ModelStats } from './libraryIndex';
+import { gatherModelFacts } from '../scene/modelFacts';
 
 export const THUMB_SIZE = 512;
 /** Neutral card background (a shade under the UI's paper so the frame reads). */
@@ -143,6 +144,7 @@ export async function analyzeVrm(buf: ArrayBuffer, wantThumb = true): Promise<An
   try {
     const stats = measure(vrm);
     VRMUtils.rotateVRM0(vrm);
+    stats.warnings = gatherModelFacts(vrm).warnings;
     vrm.scene.traverse((o) => (o.frustumCulled = false));
     relaxArms(vrm);
     vrm.update(0);

@@ -25,6 +25,8 @@ import {
 } from '../core/bodySolver';
 import { probeRig, type RigProbe } from '../core/rigProbe';
 import { StableSprings, springNamesFromGltf, type PhysicsSettings } from '../physics/stableSprings';
+import { gatherModelFacts, type GatheredFacts } from './modelFacts';
+import { applyLookAtFallback } from './lookAtFallback';
 import type { FaceState } from '../tracking/faceProcessor';
 import type { BodyMode } from '../tracking/protocol';
 
@@ -69,6 +71,8 @@ export interface AvatarLayer {
 export interface LoadedAvatar {
   avatar: Avatar;
   hash: string;
+  /** Rest-pose checks (src/scene/modelChecks.ts): authoring problems to show in MODEL INFO. */
+  facts: GatheredFacts;
 }
 
 export async function sha256Hex(buf: ArrayBuffer): Promise<string> {
@@ -110,9 +114,11 @@ export async function loadAvatar(
   VRMUtils.combineSkeletons(gltf.scene);
   VRMUtils.rotateVRM0(vrm);
   vrm.scene.traverse((o) => (o.frustumCulled = false));
+  applyLookAtFallback(vrm);
+  const facts = gatherModelFacts(vrm);
   const springNames = await springNamesFromGltf(gltf as any);
   const avatar = new Avatar(vrm, physics, springNames);
-  return { avatar, hash };
+  return { avatar, hash, facts };
 }
 
 /** Rest directions (solver space) of the solved bones, measured from the model's normalized rig. */

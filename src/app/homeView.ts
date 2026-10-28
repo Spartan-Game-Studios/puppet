@@ -3,6 +3,7 @@ import { displayAuthor, displayName, formatAgo, formatBytes, formatCount } from 
 import type { Card } from '../library/library';
 import type { LicenceSummary, VrmMeta } from '../library/vrmMeta';
 import type { ModelStats } from '../library/libraryIndex';
+import type { ModelWarning } from '../scene/modelChecks';
 
 const MARK: Record<string, string> = { yes: '✓', no: '✕', '?': '?', '': '' };
 
@@ -42,6 +43,29 @@ export function renderLicence(el: HTMLElement, s: LicenceSummary, meta: VrmMeta)
   foot.textContent = `VRM ${meta.spec}${meta.version ? ` · MODEL VERSION ${meta.version}` : ''} · READ FROM THE MODEL'S OWN METADATA. INFORMATION, NOT LEGAL ADVICE: PUPPET NEVER BLOCKS A MODEL.`;
   el.append(foot);
 }
+
+/** MODEL INFO's "MODEL CHECKS" list: authoring problems found on load (src/scene/modelChecks.ts). */
+export function renderWarnings(warnings: ReadonlyArray<Pick<ModelWarning, 'text' | 'detail'>>): HTMLElement {
+  const box = document.createElement('div');
+  box.className = 'mi-checks';
+  const h = document.createElement('h3');
+  h.textContent = 'MODEL CHECKS';
+  const ul = document.createElement('ul');
+  for (const w of warnings) {
+    const li = document.createElement('li');
+    const b = document.createElement('b');
+    b.textContent = w.text;
+    const p = document.createElement('span');
+    p.textContent = w.detail.toUpperCase();
+    li.append(b, p);
+    ul.append(li);
+  }
+  box.append(h, ul);
+  return box;
+}
+
+/** Warnings worth a line on the library card (the rest are MODEL INFO only). */
+export const CARD_WARNINGS: ReadonlySet<ModelWarning['code']> = new Set(['face-backwards', 'faces-away', 'missing-bones', 'empty-expressions', 'no-expressions']);
 
 export function syncLabel(st: ModelStats): { text: string; title: string } {
   return st.perfectSync >= 40
@@ -87,5 +111,12 @@ export function buildCard(tpl: HTMLTemplateElement, c: Card, now: number, onStag
   q('.used').textContent = onStage ? 'ON STAGE NOW' : formatAgo(c.entry.lastUsedAt, now);
   q('.used').title = c.entry.lastUsedAt ? `Last used ${new Date(c.entry.lastUsedAt).toLocaleString()}` : `Added ${new Date(c.entry.addedAt).toLocaleString()}`;
   renderLicence(q('.lic-body'), c.licence, c.info.meta);
+  const warn = (st.warnings ?? []).filter((w) => CARD_WARNINGS.has(w.code));
+  const wEl = q('.card-warn');
+  if (wEl) {
+    wEl.textContent = warn.map((w) => `⚠ ${w.text}`).join(' · ');
+    wEl.title = warn.map((w) => w.detail).join('\n');
+    wEl.classList.toggle('hidden', !warn.length);
+  }
   return el;
 }

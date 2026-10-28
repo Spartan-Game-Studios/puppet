@@ -181,7 +181,7 @@ let motion: MotionFeatures | null = null;
 async function loadModel(buf: ArrayBuffer, label: string, path: string | null): Promise<boolean> {
   setStatus(`LOADING ${label}`);
   try {
-    const { avatar: a, hash } = await loadAvatar(buf, settings.physics);
+    const { avatar: a, hash, facts } = await loadAvatar(buf, settings.physics);
     applyDrive(a);
     const ov = settings.physicsOverrides[hash];
     if (ov) a.physics.setOverrides(ov);
@@ -203,7 +203,7 @@ async function loadModel(buf: ArrayBuffer, label: string, path: string | null): 
     buildBlendshapeList();
     buildPhysicsUI();
     setStatus(`MODEL OK: ${a.physics.chains.length} CHAINS, ${a.physics.jointCount} JOINTS`);
-    home.modelLoaded(hash, buf, label, path); // library: header name, licence, import if new
+    home.modelLoaded(hash, buf, label, path, facts.warnings); // library: header name, licence, import if new; model checks
     return true;
   } catch (e) {
     setStatus(`MODEL LOAD FAILED: ${(e as Error).message}`, true);
