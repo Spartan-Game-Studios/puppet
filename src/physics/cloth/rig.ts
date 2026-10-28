@@ -57,6 +57,22 @@ const BODY_FOR_KIND: Record<GroupKind, RegExp> = {
 };
 const SINGLE_MAX_ANGLE: Record<GroupKind, number> = { skirt: 75, cape: 80, sleeve: 75, hair: 110, other: 120 };
 
+/**
+ * Does the idle pose (arms down) also count as rest for this collider/edge
+ * pair? Where the arms moved one relative to the other: an arm collider vs a
+ * chain that does not hang off an arm (hands through a skirt). And a body
+ * collider vs a chain on the arm whose animated root sits in the collider's
+ * contact zone in the idle pose (a claw or tassel on the forearm that ends up
+ * at the hip once the arms are down): the solver can only push the tail, the
+ * root pulls it straight back in, and the chain jitters forever (found by the
+ * compatibility sweep). Only that root edge is relaxed; a sleeve ribbon whose
+ * root is clear of the hip is still held outside it.
+ */
+export function idlePoseIsRest(colliderOnArm: boolean, chainAnchor: string, rootInside = false): boolean {
+  const chainOnArm = /Shoulder|UpperArm|LowerArm|Hand/.test(chainAnchor);
+  return (colliderOnArm && !chainOnArm) || (rootInside && colliderOnArm !== chainOnArm);
+}
+
 export interface GroupOverride {
   /** Cloth links on (off = the chains swing as independent strands). */
   enabled: boolean;
@@ -370,9 +386,19 @@ export class ClothRig {
         const cap = d - 0.003;
         caps[c] = cap > s.radius[s.eTail[e]] + 0.005 ? cap : 0;
         if (prev[e]) {
-          // Second (idle) pose: only arm colliders vs chains not hanging off an arm.
-          const idleApplies = this.colliderOnArm[c] && !/Shoulder|UpperArm|LowerArm|Hand/.test(this.anchors[this.edges[e].chain]);
-          caps[c] = idleApplies ? Math.min(caps[c], prev[e][c]) : prev[e][c];
+          // A chain's animated root inside the collider's contact zone (it cannot be pushed out).
+          let rootStuck = false;
+          if (s.eParent[e] < 0) {
+            closestSegSeg(x[h], x[h + 1], x[h + 2], x[h], x[h + 1], x[h + 2], a[o], a[o + 1], a[o + 2], a[o + 3], a[o + 4], a[o + 5], seg);
+            const v = seg[1];
+            const dh = Math.hypot(
+              x[h] - (a[o] + (a[o + 3] - a[o]) * v),
+              x[h + 1] - (a[o + 1] + (a[o + 4] - a[o + 1]) * v),
+              x[h + 2] - (a[o + 2] + (a[o + 5] - a[o + 2]) * v),
+            );
+            rootStuck = dh < this.capR[c] + s.radius[s.eTail[e]] + 0.005;
+          }
+          caps[c] = idlePoseIsRest(this.colliderOnArm[c], this.anchors[this.edges[e].chain], rootStuck) ? Math.min(caps[c], prev[e][c]) : prev[e][c];
         }
       }
       return caps;
