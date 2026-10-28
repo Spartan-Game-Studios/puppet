@@ -55,7 +55,7 @@ If all three frame buffers are still in flight when the next frame is due, that 
 
 1. Move **Puppet.app** to **/Applications** and open it from there. macOS installs system extensions only from apps in /Applications.
 2. In **06 VIRTUAL CAM**, click **INSTALL CAMERA**.
-3. macOS asks for approval:
+3. macOS asks for approval. Click **OPEN SETTINGS** in the panel to jump to the right page (macOS has no in-app approval prompt for system extensions):
    - macOS 15 and later: **System Settings → General → Login Items & Extensions → Camera Extensions**, switch **Puppet** on.
    - macOS 13–14: **System Settings → Privacy & Security**, under "System software from application Puppet was blocked", click **Allow**.
 4. The panel switches to **PUPPET VIRTUAL CAMERA INSTALLED**. Tick **SEND TO VIRTUAL CAMERA** (`W`).
