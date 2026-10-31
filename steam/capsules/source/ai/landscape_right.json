@@ -1,0 +1,25 @@
+{
+  "model": "gpt-image-2.5-sunburst",
+  "size": "2560x1440",
+  "quality": "high",
+  "n": "2",
+  "output_format": "png",
+  "ref": "clean",
+  "prompt": "Recompose this illustration: zoom out slightly and move the black CRT television with the character so the whole CRT sits in the right 55% of the frame, fully visible including its bottom edge, with a little paper margin on the right. Keep the character, pose, hands, lighting and style unchanged. The left 45% of the image must be calm, empty light grid paper (a logo will be placed there later), with at most two or three tiny orange and black square pixels near the far left edge. The puppet strings continue straight up out of the top edge. The background is plain light off-white grid paper: a faint, even, square grid of thin light-grey lines, like engineering paper, flat and uncluttered. Keep the exact same art style as the reference: polished anime illustration, soft cel shading, a restrained brutalist palette of off-white paper (#f2f2ee), near-black ink (#0a0a0a) and a single accent of vivid red-orange (#ff3b00). Same character design as the reference: a young anime woman with shoulder-length messy silver-white hair, a red-orange X-shaped hair clip on her left side and small black hair ties, warm orange eyes, a gentle open-mouthed smile, a black choker with a metal O-ring, a black strap harness over a loose off-white blouse with puffed sleeves, black cuffs on her wrists and upper arms, black nail polish. Thin bright red-orange puppet strings run straight up from her wrist cuffs and shoulders out of the top of the frame. Hands must be anatomically correct: exactly five fingers on each hand, natural joints. ABSOLUTELY NO text, letters, numbers, words, logos, labels, captions, watermarks or signatures anywhere in the image.",
+  "usage": {
+    "input_tokens": 3772,
+    "input_tokens_details": {
+      "image_tokens": 3016,
+      "text_tokens": 756
+    },
+    "output_tokens": 3685,
+    "output_tokens_details": {
+      "image_tokens": 3685,
+      "text_tokens": 0
+    },
+    "total_tokens": 7457
+  },
+  "est_cost_usd_for_request": 0.138,
+  "revised_prompt": null,
+  "seconds": 33.9
+}

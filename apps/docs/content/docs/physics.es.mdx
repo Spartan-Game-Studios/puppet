@@ -1,0 +1,39 @@
+---
+title: Física (ropa y pelo)
+description: Cómo mueve VPuppet faldas, capas y pelo, y los ajustes de la ventana PHYSICS.
+---
+
+VPuppet simula los spring bones que tu VRM ya tiene (pelo, faldas, capas, lazos, orejas...). No hace falta preparar nada en el modelo más allá de lo que incluye una exportación VRM normal.
+
+## Qué hace el solver de tela
+
+- **Los paneles se mueven juntos.** Las cadenas vecinas se detectan automáticamente (el anillo de una falda alrededor de la cadera, una capa, un flequillo) y se unen en una malla, para que los paneles se balanceen como una sola pieza en lugar de abrirse en mechones separados.
+- **El cuerpo colisiona.** Se generan colisionadores de cápsula a partir del esqueleto, ajustados a la malla (cadera, piernas, torso, brazos, hombros, cuello, cabeza), junto a los colisionadores propios del modelo. Colisionan segmentos enteros, así que un brazo o una pierna rápidos no atraviesan la tela entre fotogramas.
+- **Los ajustes originales conservan su significado.** La rigidez, la resistencia y la gravedad del modelo funcionan tal como las configuró su autor. La rigidez disminuye hacia el bajo de faldas y capas para que caigan con naturalidad.
+- **Se mantiene estable.** La simulación funciona a una frecuencia fija, con velocidades limitadas y el movimiento del cuerpo suavizado, para que el pelo y la ropa no se agiten cuando el seguimiento tiembla.
+
+## Cambio rápido
+
+| Tecla | Ajuste |
+|---|---|
+| `8` | **OFF**: sin física |
+| `9` | **STIFF**: poco movimiento |
+| `0` | **NORMAL** |
+| `R` | Asentar: devuelve la física al reposo |
+
+## La ventana PHYSICS (`P`)
+
+- **Grupos de tela:** enlaces activados o desactivados, rigidez y ajustes de agrupación por cadena.
+- **Cadenas:** cada cadena activada o desactivada, con multiplicadores de rigidez, resistencia y gravedad.
+- **Colisionadores:** cada colisionador activado o desactivado, incluidos los colisionadores **BODY** generados.
+- **SETTLE** reinicia la simulación; **RESET OVERRIDES** borra tus cambios para este modelo.
+- **SOLVER → LEGACY** cambia al solver anterior (los spring bones de three-vrm con estabilizadores). Este también admite los colisionadores de plano e "inside" de la especificación de colisionadores extendidos de VRM, que el solver de tela ignora.
+
+Los ajustes se guardan por modelo, así que el mismo archivo siempre vuelve con tu configuración.
+
+## Límites
+
+- Es tela basada en huesos: la malla entre dos cadenas enlazadas se sigue deformando por skinning, así que un rig sencillo (pocas cadenas, segmentos largos) no puede formar pliegues finos.
+- La ropa muy holgada asignada al cuerpo en lugar de a spring bones hace que los colisionadores generados sean más gruesos que el cuerpo que hay debajo.
+- Lo que se superpone al cuerpo en la pose de reposo del modelo se deja superpuesto.
+- El pelo o la tela que pasan por encima de un brazo levantado pueden quedarse enganchados hasta que el brazo se vuelve a mover, como pasaría con pelo real.

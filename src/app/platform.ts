@@ -2,6 +2,7 @@
  * Platform layer: the Tauri shell when running as the desktop app, browser
  * fallbacks otherwise (`pnpm dev` in a normal browser, the test harness).
  */
+import { t } from '../i18n';
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -104,6 +105,47 @@ export async function vmcStats(): Promise<VmcStats | null> {
   return invoke<VmcStats>('vmc_stats');
 }
 
+// ---------------------------------------------------------------- demo (src-tauri/src/demo.rs)
+
+/** Mirrors `demo::Status`. `demo` is false in the full app. */
+export interface DemoStatus {
+  demo: boolean;
+  used_s: number;
+  limit_s: number;
+  locked: boolean;
+  /** Hours used up; when not `locked` yet, the app locks at its next start. */
+  expired: boolean;
+  steam: boolean;
+}
+
+/** In the browser `?demo=on|low|expired|locked` fakes a demo build (layout tests). */
+function fakeDemo(): DemoStatus {
+  const m = new URLSearchParams(location.search).get('demo');
+  const limit = 100 * 3600;
+  const used = m === 'locked' || m === 'expired' ? limit : m === 'low' ? limit - 4 * 3600 : 0;
+  return {
+    demo: ['on', 'low', 'expired', 'locked'].includes(m ?? ''),
+    used_s: used,
+    limit_s: limit,
+    locked: m === 'locked',
+    expired: used >= limit,
+    steam: false,
+  };
+}
+
+export async function demoStatus(): Promise<DemoStatus> {
+  return isTauri ? invoke<DemoStatus>('demo_status') : fakeDemo();
+}
+
+export async function demoHeartbeat(): Promise<DemoStatus> {
+  return isTauri ? invoke<DemoStatus>('demo_heartbeat') : fakeDemo();
+}
+
+export async function demoBuy(): Promise<void> {
+  if (isTauri) return invoke('demo_buy');
+  window.open('https://store.steampowered.com/search/?term=VPuppet', '_blank');
+}
+
 /** PUPPET_QUERY env var (desktop app only): extra query parameters for testing. */
 export async function devQuery(): Promise<string> {
   return isTauri ? invoke<string>('dev_query') : '';
@@ -111,7 +153,7 @@ export async function devQuery(): Promise<string> {
 
 export function debugLog(line: string): void {
   if (isTauri) invoke('debug_log', { line }).catch(() => {});
-  else console.log('[puppet]', line);
+  else console.log('[vpuppet]', line);
 }
 
 /** A URL the <video> element can load: as-is in a browser; a blob of the file's bytes in the app. */
@@ -162,8 +204,8 @@ export interface VcamRustStats {
 const BROWSER_VCAM: VcamStatus = {
   sink: 'browser',
   state: 'unavailable',
-  detail: 'DESKTOP APP ONLY',
-  hint: 'The virtual camera needs the desktop app. In a browser, use the OBS route below.',
+  detail: t('stage.desktopOnly'),
+  hint: t('stage.vcamBrowserHint'),
   command: null,
   action: null,
   devices: [],

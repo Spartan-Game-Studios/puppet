@@ -2,6 +2,16 @@
 import { listMics } from './mic';
 import { LIPSYNC_MODES, type LipSync, type LipSyncSettings } from './lipsync';
 import { VISEMES } from './visemes';
+import { t, type Key } from '../i18n';
+
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+/** Mode ids (persisted) -> button label, tooltip, and the name in the STATE line. */
+const MODE: Record<LipSyncSettings['mode'], { label: Key; title: Key; name: Key }> = {
+  off: { label: 'motion.ls.off', title: 'motion.ls.offTitle', name: 'motion.ls.off' },
+  fallback: { label: 'motion.ls.fallback', title: 'motion.ls.fallbackTitle', name: 'motion.ls.fallbackFull' },
+  blend: { label: 'motion.ls.blend', title: 'motion.ls.blendTitle', name: 'motion.ls.blend' },
+  audio: { label: 'motion.ls.audio', title: 'motion.ls.audioTitle', name: 'motion.ls.audio' },
+};
 
 export interface LipSyncPanelContext {
   host: HTMLElement;
@@ -14,16 +24,16 @@ export interface LipSyncPanelContext {
 export function mountLipSyncPanel(ctx: LipSyncPanelContext): { meter: () => void; apply: () => Promise<void> } {
   const { host, lipsync, settings } = ctx;
   host.innerHTML = `
-    <h2><span class="idx">09</span>LIP SYNC</h2>
+    <h2><span class="idx">09</span>${t('motion.ls.title')}</h2>
     <div class="seg" id="ls-mode" role="radiogroup">
-      ${LIPSYNC_MODES.map((m) => `<button data-value="${m}" title="${{ off: 'Microphone off', fallback: 'Audio drives the mouth only while the face is not tracked', blend: 'Larger of tracked and audio mouth', audio: 'Audio only drives the mouth' }[m]}">${m === 'fallback' ? 'FALLBK' : m.toUpperCase()}</button>`).join('')}
+      ${LIPSYNC_MODES.map((m) => `<button data-value="${m}" title="${esc(t(MODE[m].title))}">${t(MODE[m].label)}</button>`).join('')}
     </div>
-    <label class="row"><span class="lbl">MIC</span><select id="ls-device"><option value="">DEFAULT</option></select></label>
-    <label class="slider"><span class="lbl">GATE DB</span><input type="range" id="ls-gate" min="-80" max="-20" step="1" /><output id="ls-gate-out"></output></label>
-    <label class="slider"><span class="lbl">GAIN</span><input type="range" id="ls-gain" min="0.25" max="3" step="0.05" /><output id="ls-gain-out"></output></label>
-    <div class="ls-meter" title="Input level (orange tick: gate)"><div class="lvl"></div><div class="gate"></div></div>
+    <label class="row"><span class="lbl">${t('motion.ls.mic')}</span><select id="ls-device"><option value="">${esc(t('motion.ls.default'))}</option></select></label>
+    <label class="slider"><span class="lbl">${t('motion.ls.gate')}</span><input type="range" id="ls-gate" min="-80" max="-20" step="1" /><output id="ls-gate-out"></output></label>
+    <label class="slider"><span class="lbl">${t('motion.ls.gain')}</span><input type="range" id="ls-gain" min="0.25" max="3" step="0.05" /><output id="ls-gain-out"></output></label>
+    <div class="ls-meter" title="${esc(t('motion.ls.meterTitle'))}"><div class="lvl"></div><div class="gate"></div></div>
     <div class="ls-visemes">${[...VISEMES, 'jaw'].map((v) => `<span data-v="${v}"><i></i><b>${v.toUpperCase()}</b></span>`).join('')}</div>
-    <div class="row"><span class="lbl">STATE</span><span class="val" id="ls-state">OFF</span></div>`;
+    <div class="row"><span class="lbl">${t('motion.ls.state')}</span><span class="val" id="ls-state">${t('motion.ls.off')}</span></div>`;
   const $ = <T extends HTMLElement>(s: string) => host.querySelector<T>(s)!;
   const modeEl = $('#ls-mode');
   const dev = $<HTMLSelectElement>('#ls-device');
@@ -47,7 +57,7 @@ export function mountLipSyncPanel(ctx: LipSyncPanelContext): { meter: () => void
 
   async function refreshDevices(): Promise<void> {
     const mics = await listMics();
-    dev.innerHTML = '<option value="">DEFAULT</option>';
+    dev.innerHTML = `<option value="">${esc(t('motion.ls.default'))}</option>`;
     for (const m of mics) dev.append(new Option(m.label, m.id));
     if (settings.deviceId && mics.some((m) => m.id === settings.deviceId)) dev.value = settings.deviceId;
   }
@@ -58,7 +68,7 @@ export function mountLipSyncPanel(ctx: LipSyncPanelContext): { meter: () => void
     sliders();
     if (settings.mode === 'off') {
       lipsync.mic.stop();
-      state.textContent = 'OFF';
+      state.textContent = t('motion.ls.off');
       return;
     }
     try {
@@ -67,10 +77,10 @@ export function mountLipSyncPanel(ctx: LipSyncPanelContext): { meter: () => void
         dev.dataset.started = settings.deviceId ?? '';
         await refreshDevices();
       }
-      state.textContent = `${settings.mode.toUpperCase()}: ${(lipsync.mic.label || 'MIC').toUpperCase()}`;
+      state.textContent = t('motion.ls.stateOn', { mode: t(MODE[settings.mode].name), mic: (lipsync.mic.label || t('motion.ls.mic')).toUpperCase() });
     } catch (e) {
       const err = e as DOMException;
-      const msg = err.name === 'NotAllowedError' ? 'MIC BLOCKED: ALLOW PUPPET IN SYSTEM SETTINGS > PRIVACY > MICROPHONE' : err.name === 'NotFoundError' ? 'NO MICROPHONE FOUND' : `MIC: ${err.message}`;
+      const msg = err.name === 'NotAllowedError' ? t('motion.ls.blocked') : err.name === 'NotFoundError' ? t('motion.ls.notFound') : t('motion.ls.micError', { error: err.message });
       state.textContent = msg;
       ctx.setStatus(msg, true);
     }

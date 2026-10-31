@@ -1,0 +1,25 @@
+{
+  "title": "文档",
+  "pages": [
+    "---入门---",
+    "index",
+    "installation",
+    "getting-started",
+    "---使用 VPuppet---",
+    "tracking",
+    "model-library",
+    "scene",
+    "physics",
+    "motion",
+    "lip-sync",
+    "---输出---",
+    "virtual-camera",
+    "vmc",
+    "---指南---",
+    "...guides",
+    "---参考---",
+    "shortcuts",
+    "mcp",
+    "faq"
+  ]
+}

@@ -1,0 +1,1 @@
+Drive your VRM avatar live from an ordinary webcam: perfect-sync face with 52 blendshapes, upper body, hands and fingers. VPuppet shows up as a camera in Zoom, Meet, Discord and OBS, sends VMC to other apps, and adds cloth and hair physics, emote hotkeys and 3D scenes.

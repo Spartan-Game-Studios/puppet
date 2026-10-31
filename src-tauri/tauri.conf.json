@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Puppet",
+  "productName": "VPuppet",
   "version": "0.1.0",
-  "identifier": "com.spartangamestudios.puppet",
+  "identifier": "com.spartangamestudios.vpuppet",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:5173",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "PUPPET",
+        "title": "VPUPPET",
         "width": 1440,
         "height": 900,
         "minWidth": 960,
@@ -34,8 +34,8 @@
     "targets": "all",
     "category": "Video",
     "shortDescription": "Webcam VTuber app",
-    "longDescription": "Puppet drives a VRM avatar from a normal webcam using MediaPipe face, pose and hand tracking, with perfect-sync expressions, VMC output and stable spring-bone physics.",
-    "copyright": "MIT License. Copyright (c) Spartan Game Studios",
+    "longDescription": "VPuppet drives a VRM avatar from a normal webcam using MediaPipe face, pose and hand tracking, with perfect-sync expressions, VMC output and stable spring-bone physics.",
+    "copyright": "Copyright (c) Spartan Game Studios. Source under the MIT License.",
     "license": "MIT",
     "icon": [
       "icons/32x32.png",

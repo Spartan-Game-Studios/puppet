@@ -4,13 +4,13 @@
  * Several VRM 0.x exporters write `lookAtTypeName: Bone` by default even when
  * the model has no eye bones, while its LookUp/Down/Left/Right blend shapes
  * are bound and ready. three-vrm then drives bones that do not exist and the
- * eyes never move. When that is the case, Puppet drives the look expressions
+ * eyes never move. When that is the case, VPuppet drives the look expressions
  * instead (the model already says how its eyes look around); it never touches
  * a model that has eye bones or whose look expressions are empty.
  */
 import { VRMLookAtExpressionApplier, VRMLookAtRangeMap, type VRM } from '@pixiv/three-vrm';
 
-/** Gaze angle (degrees) that fully applies a look expression. Puppet's tracked gaze peaks near 30. */
+/** Gaze angle (degrees) that fully applies a look expression. VPuppet's tracked gaze peaks near 30. */
 export const LOOK_EXPRESSION_FULL_DEG = 25;
 
 const LOOKS = ['lookUp', 'lookDown', 'lookLeft', 'lookRight'] as const;

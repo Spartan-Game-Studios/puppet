@@ -1,0 +1,85 @@
+---
+title: Biblioteca de modelos
+description: HOME guarda todos los modelos que importas, con miniaturas, detalles e insignias de licencia.
+---
+
+**HOME** es la primera pantalla al abrir la app. `L` o `Esc` en el escenario te devuelven a ella.
+
+## Importar
+
+- **IMPORT .VRM** (`I`) importa uno o varios archivos a la vez; también puedes arrastrar archivos `.vrm` a HOME.
+- Abrir un modelo desde el escenario (`O`, o arrastrando un archivo) también lo importa.
+- Cada archivo muestra su progreso y, si algo va mal, su propio error (por ejemplo "NOT A VRM").
+- Si importas dos veces el mismo archivo, se guarda una sola vez.
+
+VPuppet guarda su propia copia de cada modelo, así que puedes mover o borrar el archivo original sin problema.
+
+## Las tarjetas
+
+Cada tarjeta muestra:
+
+- una miniatura de busto generada al importar, el nombre y el autor;
+- VRM 0.x o 1.0;
+- `PERFECT SYNC n/52` o `PRESETS n/13` (consulta [Seguimiento](./tracking.mdx#face));
+- las cadenas de spring bones, el número de triángulos y el tamaño del archivo;
+- una insignia de licencia, una estrella de favorito y cuándo lo usaste por última vez;
+- una marca `!` cuando VPuppet encuentra un problema de creación grave (consulta [Comprobaciones del modelo](#model-checks)).
+
+Cada tarjeta tiene además **RENAME** (renombrar), **RE-RENDER THUMBNAIL** (regenerar miniatura), **SHOW IN FOLDER** (mostrar en la carpeta) y **REMOVE FROM LIBRARY** (quitar de la biblioteca). Quitar un modelo pide confirmación y solo borra la copia de VPuppet, nunca tu archivo original.
+
+## Encontrar un modelo
+
+- Filtra por **ALL** (todos) o **FAVOURITES** (favoritos). En ALL, los favoritos siempre aparecen primero.
+- Busca por nombre o autor (`/`).
+- Ordena por último uso, nombre o fecha en que se añadió.
+
+## Teclado
+
+| Tecla | Acción |
+|---|---|
+| `←` `↑` `↓` `→` | Moverse entre tarjetas |
+| `Enter` | Cargar el modelo |
+| `S` | Favorito |
+| `L` | Licencia |
+| `F2` | Renombrar |
+| `Del` | Quitar de la biblioteca |
+| `/` | Buscar |
+| `I` | Importar |
+| `Esc` | Volver al escenario |
+
+## Insignias de licencia [#licence-badges]
+
+Cada VRM lleva en sus metadatos las condiciones de uso de su autor. VPuppet las lee (VRM 1.0 y 0.x) y las muestra en lenguaje claro en el panel **LICENCE** de la tarjeta y en la ventana **MODEL INFO** del escenario (`I`, o haz clic en el nombre del modelo en la barra inferior). La insignia las resume:
+
+| Insignia | Significado |
+|---|---|
+| **A** AUTHOR ONLY | Solo el autor puede actuar como este modelo. |
+| **L** LICENSED ONLY | Solo el autor y las personas a las que dio licencia pueden actuar como este modelo. |
+| **C** CC0 | Dominio público. |
+| **B** COMMERCIAL OK | Se permite el uso empresarial, también por parte de empresas. |
+| **S** SOLO COMMERCIAL | Los particulares pueden ganar dinero con él. |
+| **P** PERSONAL | Solo uso sin ánimo de lucro. |
+| **N** NO TERMS | El archivo no indica condiciones. |
+
+AUTHOR ONLY y LICENSED ONLY se muestran en el color de acento, y al cargar un modelo así aparece un aviso una sola vez.
+
+<Callout title="Información, no DRM">
+VPuppet nunca se niega a cargar un modelo. La insignia te dice lo que escribió el autor; cumplir esas condiciones es cosa tuya.
+</Callout>
+
+## Comprobaciones del modelo [#model-checks]
+
+Al cargar un modelo, VPuppet busca problemas de creación que puede detectar de forma fiable y los muestra en **MODEL CHECKS** dentro de MODEL INFO. Los graves aparecen también en la tarjeta de la biblioteca:
+
+- FACE POINTS AWAY FROM SKELETON (la cara apunta en dirección contraria al esqueleto)
+- MODEL FACES AWAY FROM THE CAMERA (el modelo mira en dirección contraria a la cámara)
+- MISSING BONES (faltan huesos)
+- FACE EXPRESSIONS ARE EMPTY (las expresiones existen pero no hacen nada)
+- NO FACE EXPRESSIONS (no hay expresiones faciales)
+- una pose de reposo que no es una pose en T (solo en MODEL INFO)
+
+VPuppet nunca edita tu modelo para "arreglar" estos problemas; corrígelos en la herramienta con la que hiciste el modelo.
+
+## Dónde se guarda la biblioteca
+
+La biblioteca se guarda en la carpeta de datos de la app de VPuppet, por ejemplo `~/Library/Application Support/com.spartangamestudios.vpuppet` en macOS. **SHOW IN FOLDER** en una tarjeta la abre.

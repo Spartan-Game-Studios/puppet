@@ -1,0 +1,88 @@
+---
+title: FAQ and troubleshooting
+description: The demo, camera permissions, a missing virtual camera, and other common questions.
+---
+
+## The demo
+
+### What happens after 100 hours?
+
+Tracking on the stage, the virtual camera and VMC output lock. The model library still opens and keeps every model you imported. The lock happens when VPuppet starts, never mid-stream: if the hours run out while you're live, that session keeps running.
+
+### Do I lose my models if I buy the full app?
+
+No. The full app picks up the same library, so nothing has to be imported again.
+
+### Is the demo missing features?
+
+No. Until the 100 hours are used up it's the full app.
+
+## Camera
+
+### The camera doesn't start [#camera-doesnt-start]
+
+- **Allow camera access.** The first time you start the camera, your operating system asks for permission. If you said no:
+  - **macOS:** System Settings → Privacy & Security → Camera, and switch VPuppet on. Then restart VPuppet.
+  - **Windows:** Settings → Privacy & security → Camera, and allow desktop apps to use the camera.
+- **Another app may be using the camera.** Close the video-call app or browser tab that holds it, then press **START CAMERA** in the **SOURCE** section.
+- **Pick the right camera** in SOURCE if you have more than one.
+
+### Tracking is slow or laggy
+
+- Use a lower tracking mode: FACE (`1`) costs the least, +HANDS (`3`) the most.
+- Set **POSE MODEL** to LITE.
+- In a 3D environment, choose LOW quality and switch off depth of field.
+- The debug overlay (`D`) shows render and tracking frame rates and latency.
+- Raise **SMOOTHING** for steadier movement, lower it for a faster response.
+
+### The avatar's face looks off at rest
+
+Sit as you usually do, eyes open, mouth closed, and press **CALIBRATE** (`C`).
+
+## Virtual camera
+
+### VPuppet Virtual Camera isn't listed [#vcam-not-listed]
+
+- **Is the output on?** The camera appears only while **CAMERA OUTPUT** is on (`W`) and VPuppet is running. This is on purpose: no frozen camera is left behind when VPuppet isn't sending.
+- **Restart the other app.** Many apps read the camera list only at start.
+- **macOS:**
+  - VPuppet must be in **/Applications**.
+  - The EXTENSION line must read **ACTIVE**. If it says it's waiting for approval, click **OPEN SETTINGS** and approve it.
+  - If it says a restart is needed, restart your Mac.
+  - Builds you compile yourself are unsigned and can't install the camera; use the [OBS route](./virtual-camera.mdx#obs-route).
+- **Windows:** click **REGISTER CAMERA** and accept the administrator prompt. 32-bit apps can't see the camera.
+- **Linux:** create the loopback device with the `modprobe` command from the panel; it doesn't survive a reboot unless you configure your system to load it. The device is called **VPuppet**.
+
+### The camera shows WAITING FOR FRAMES
+
+The camera exists but no frames are arriving. Check that VPuppet is running with CAMERA OUTPUT on.
+
+### The background isn't transparent in my video app
+
+Cameras have no transparency. With CLEAR, VPuppet sends the chosen colour (green by default); key it out in the receiving app.
+
+## VMC
+
+### My receiver doesn't move
+
+- Both apps must use the same port (default `39539`) and VPuppet's HOST must point at the receiver (`127.0.0.1` on the same computer, the other PC's local IP otherwise).
+- **SEND VMC** must be ticked (`V`), and receiving must be enabled in the other app.
+- A firewall can block UDP between two computers.
+
+### The face is frozen in the receiver
+
+If your model is perfect sync and the receiver reads only VRM presets, keep **ALSO SEND VRM PRESETS** on. In VSeeFace, enable perfect sync on the receiving model to use the ARKit blendshapes.
+
+## Models
+
+### Which models work?
+
+Any `.vrm` file, VRM 0.x or 1.0. VPuppet ships no avatar. Check each model's licence badge for what its author allows.
+
+### Can I use FBX or glTF avatars?
+
+Avatars must be VRM. `.fbx` and `.glb` files are used for animation clips and 3D scenes. To turn another model into a VRM, see the [guides](./guides/vroid.mdx).
+
+### I used "Puppet" before
+
+VPuppet was renamed from Puppet. The first launch moves the old settings and library to the new name automatically.

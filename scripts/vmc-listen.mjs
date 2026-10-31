@@ -1,4 +1,4 @@
-// Minimal VMC/OSC listener for checking Puppet's output.
+// Minimal VMC/OSC listener for checking VPuppet's output.
 //   node scripts/vmc-listen.mjs [port=39539] [seconds=5] [blends]
 // With `blends`, also lists every /VMC/Ext/Blend/Val name and its peak value.
 // Prints message counts per address and a few sample values.

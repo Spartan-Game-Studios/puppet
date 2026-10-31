@@ -1,0 +1,42 @@
+---
+title: Making an avatar with MetaHuman
+description: The general route from MetaHuman through Unreal Engine and Blender to VRM, and the licence question to settle first.
+---
+
+<Callout type="warn" title="Check the licence first">
+MetaHumans are covered by Epic Games' MetaHuman and Unreal Engine licence terms, and were originally licensed for use with Unreal Engine. Using a MetaHuman outside Unreal Engine, as a VRM in another app, **may not be permitted** under the terms that apply to you. Epic has revised these terms over time, so read the current MetaHuman and Unreal Engine EULA before you do any of this. This page is not legal advice.
+</Callout>
+
+This is the most involved route in these guides. The steps below are an outline; the tools change between versions, so follow each tool's current documentation for the details.
+
+## 1. MetaHuman to FBX
+
+Create the character with MetaHuman Creator and bring it into an Unreal Engine project. From Unreal, export the body and face skeletal meshes (FBX), with their textures.
+
+## 2. FBX to Blender
+
+Import the FBX files into Blender and join the body and face onto one skeleton.
+
+## 3. The face
+
+A MetaHuman face is driven by a joint-based rig with corrective shapes, not by a simple set of named blendshapes. Unreal's Live Link Face workflow maps the 52 ARKit blendshape names onto MetaHuman face poses, which shows the correspondence exists, but a VRM needs those poses as **shape keys**.
+
+For **perfect sync** in VPuppet, each ARKit pose has to be baked into a shape key named after it (`eyeBlinkLeft`, `jawOpen`, `mouthSmileLeft`...). VPuppet matches names ignoring case and punctuation and needs at least 40 of the 52. If that's too much work, bake at least the VRM presets (blink, `aa` `ih` `ou` `ee` `oh`, emotions); VPuppet derives those from tracking for any model.
+
+## 4. Make it a VRM
+
+With the [VRM Add-on for Blender](https://vrm-addon-for-blender.info/):
+
+- assign the humanoid bones and check the rest pose (T-pose is safest);
+- register the face shape keys as expressions;
+- add spring-bone chains and colliders for hair and loose clothing.
+
+## 5. Make it lighter
+
+MetaHuman meshes and textures are built for high-end real-time rendering and are heavy for an avatar that shares the computer with tracking. Use a lower level of detail if available, decimate, remove hidden geometry, and scale textures down (MetaHuman textures are often 4K or larger).
+
+## 6. Check it in VPuppet
+
+Import the `.vrm`, open **MODEL INFO** (`I`) and read **MODEL CHECKS**. The bottom bar shows `PERFECT SYNC n/52` or `PRESETS n/13`, and the FACE window (`F`) strikes through any ARKit rows the model lacks.
+
+An AI agent connected to VPuppet can run this check with you: inspect the model, re-import each new export, and test every perfect-sync shape. See [Connect an AI agent](../mcp.mdx#workflow).

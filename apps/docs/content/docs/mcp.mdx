@@ -1,0 +1,143 @@
+---
+title: Connect an AI agent (MCP)
+description: Let an AI agent such as Claude Code, Claude Desktop or Cursor look at and drive the running VPuppet app.
+---
+
+## What it is
+
+VPuppet can host a local [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server, so AI agents on your computer (Claude Code, Claude Desktop, Cursor and other MCP clients) can work with the running app. An agent can:
+
+- inspect the model on the stage while you build it in Blender, including its perfect-sync coverage;
+- take screenshots of the stage;
+- try expressions and animation clips;
+- read tracking statistics, recent status messages and errors.
+
+It's useful for building an avatar with an agent's help, and for finding out why something doesn't work.
+
+## Turn it on
+
+<Steps>
+<Step>
+Open the **VMC** window (`N`) and find the **AI AGENTS (MCP)** section.
+</Step>
+<Step>
+Tick **ALLOW AI AGENTS (LOCAL MCP SERVER)**. It's off by default.
+
+The first time, VPuppet creates a random access token. The **PORT** is `39540` unless you change it there.
+</Step>
+</Steps>
+
+The server runs only while VPuppet is open and this option is on.
+
+## Register your AI clients [#install]
+
+Run the installer once VPuppet is running with the option on. It finds Claude Code, Cursor and Claude Desktop on your computer and adds a `vpuppet` server to each.
+
+<Tabs items={['macOS / Linux', 'Windows']}>
+<Tab value="macOS / Linux">
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.sh | sh
+```
+
+To remove the entries again:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.sh | sh -s -- --uninstall
+```
+
+</Tab>
+<Tab value="Windows">
+
+In PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.ps1 | iex
+```
+
+To remove the entries again:
+
+```powershell
+$env:VPUPPET_MCP_UNINSTALL = 1; irm https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.ps1 | iex
+```
+
+</Tab>
+</Tabs>
+
+What the installer does:
+
+- reads the token from VPuppet's config folder (it never prints it);
+- **Claude Code:** runs `claude mcp add --transport http --scope user`;
+- **Cursor:** adds the server to `~/.cursor/mcp.json`;
+- **Claude Desktop:** adds it to `claude_desktop_config.json` through the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge, which needs Node.js (`npx`);
+- merges into existing config files and backs them up first. It's safe to run again.
+
+**Run it again** after you press **NEW TOKEN** or change the port, so your clients get the new values. Restart a client after the installer has changed its settings.
+
+Options, as environment variables:
+
+| Variable | Effect |
+|---|---|
+| `VPUPPET_CONFIG_DIR` | VPuppet's config folder, if it isn't in the usual place |
+| `VPUPPET_MCP_PORT` | The port, if the installer can't read it |
+| `VPUPPET_MCP_CLIENTS` | Which clients to set up, e.g. `"claude-code cursor"` (default: `claude-code cursor claude-desktop`) |
+
+<Callout title="Claude Code only?">
+**COPY CLAUDE CODE COMMAND** in the AI AGENTS section copies a ready `claude mcp add` command with the current port and token. Paste it into a terminal.
+</Callout>
+
+## Other clients
+
+Any MCP client that supports Streamable HTTP can connect:
+
+- **URL:** `http://127.0.0.1:39540/mcp` (or the port you set)
+- **Header:** `Authorization: Bearer <token>`, where the token is the contents of the `mcp-token` file in VPuppet's config folder:
+  - macOS: `~/Library/Application Support/com.spartangamestudios.vpuppet/`
+  - Windows: `%APPDATA%\com.spartangamestudios.vpuppet\`
+  - Linux: `~/.config/com.spartangamestudios.vpuppet/`
+
+## Tools
+
+| Tool | What it does |
+|---|---|
+| `app_status` | Snapshot of the app: version, demo state, the model on the stage, whether HOME is showing, tracking mode and state, outputs and frame rates. Agents call this first. |
+| `library_list` | Lists the models in the library with their stats, model-check warnings and licence badge. |
+| `library_load` | Loads a library model onto the stage. |
+| `library_import` | Imports a `.vrm` file from a path into the library (thumbnail, checks) and optionally loads it. |
+| `model_inspect` | Everything about the model on the stage: VRM version and meta, humanoid bones mapped or missing, every expression, ARKit perfect-sync coverage (including names present under another spelling), presets, look-at, spring chains and colliders, mesh / material / texture stats, licence, model-check warnings. |
+| `stage_screenshot` | A PNG of the stage as you see it, or the avatar framed face / bust / upper / full from the front, without moving your camera. |
+| `expression_set` | Holds an expression at a weight over tracking, or resets held expressions. |
+| `expression_sweep` | Drives each expression in turn with the pose frozen and reports shapes that do nothing and swapped left / right shapes, with a contact sheet. |
+| `clip_list` | Lists built-in and imported animation clips. |
+| `clip_play` | Plays or stops a clip on the avatar. |
+| `tracking_stats` | Tracking health: mode, state, frame rates, latency and inference time per pipeline, hand search per side, current gestures. |
+| `logs_recent` | Recent status lines, warnings and errors. |
+| `settings_get` | Reads the settings an agent may change. |
+| `settings_set` | Changes tracking mode, smoothing, framing, background or physics mode, live. |
+
+## A typical workflow [#workflow]
+
+Building or fixing an avatar with an agent usually goes round this loop:
+
+<Steps>
+<Step>
+**Inspect.** The agent runs `model_inspect` on the model on the stage: missing bones, expressions that do nothing, which ARKit names are missing for perfect sync.
+</Step>
+<Step>
+**Fix in Blender** (or the tool you made the model with), then export the `.vrm` again.
+</Step>
+<Step>
+**Re-import.** The agent runs `library_import` with the new file. A re-exported file becomes a new library entry.
+</Step>
+<Step>
+**Verify.** The agent runs `expression_sweep` over the ARKit set to check that every perfect-sync shape moves the face, and on the correct side.
+</Step>
+</Steps>
+
+## Security
+
+- **Local only.** The server listens on `127.0.0.1` only, so other computers can't reach it. Requests that carry a browser `Origin` header or a host name other than this computer are refused, so web pages can't reach it either.
+- **Token.** Every request needs the token. It's random, created when you first enable the server, and kept as `mcp-token` in VPuppet's config folder (readable only by you on macOS and Linux). Treat it like a password. **NEW TOKEN** replaces it; run the installer again afterwards.
+- **What an agent can change.** An agent can load and import models and change a safe subset of settings: tracking mode, smoothing, framing, background and physics mode. It **can't** change VMC, virtual camera or MCP settings. It reads only the files you or the agent name for import.
+- **Demo.** Once the demo's 100 hours are used up, loading models through MCP is refused, as it is in the app.
+- An agent acts with the permissions you grant it in your client. Review what it proposes before you approve it.

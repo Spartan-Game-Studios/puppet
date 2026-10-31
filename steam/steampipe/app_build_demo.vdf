@@ -1,0 +1,30 @@
+// TEMPLATE: adjust before use. Fill in every <PLACEHOLDER>, check every path
+// against what the build actually produced (the binary name changes with the
+// Puppet -> VPuppet rename), then run with steamcmd (see README.md).
+// Paths are relative to this file (steam/steampipe/); "../../" is the repo root.
+
+"AppBuild"
+{
+	"AppID" "<DEMO_APP_ID>"
+	"Desc" "VPuppet demo <VERSION> (<GIT_SHA>)"
+
+	// Default content root; each depot script sets its own.
+	"ContentRoot" "../../"
+	// Logs and build cache. Git-ignored (steam/steampipe/.gitignore).
+	"BuildOutput" "output/demo/"
+
+	// Branch to set live after upload. Leave "" to upload only, then set it
+	// live in Steamworks (the default branch can only be set live there).
+	"SetLive" ""
+	// "SetLive" "beta"
+
+	// 1 = dry run: builds the manifests and logs without uploading.
+	"Preview" "0"
+
+	"Depots"
+	{
+		"<DEMO_DEPOT_ID_WIN>" "depot_build_demo_windows.vdf"
+		"<DEMO_DEPOT_ID_MAC>" "depot_build_demo_macos.vdf"
+		"<DEMO_DEPOT_ID_LINUX>" "depot_build_demo_linux.vdf"
+	}
+}

@@ -1,0 +1,32 @@
+/* Steam demo: bottom-bar cell, HOME banner, stage lock card (src/app/demo.ts). */
+.bar.bottom .demo-cell {
+  font: inherit; color: inherit; background: none; border: 0; border-right: var(--thin); cursor: pointer;
+  display: flex; align-items: center;
+}
+.bar.bottom .demo-cell:hover, .bar.bottom .demo-cell:focus-visible { background: var(--white); }
+.bar.bottom .demo-cell.hot .val { color: var(--accent); }
+
+.demo-banner {
+  display: flex; align-items: center; gap: 12px; padding: 8px 16px;
+  border-bottom: var(--rule); background: var(--white); font-weight: 800; font-size: 12px; letter-spacing: 0.06em;
+}
+.demo-banner.ended { background: var(--accent); color: var(--ink); }
+.demo-banner .demo-msg { flex: 1 1 auto; min-width: 0; }
+.demo-banner .btn { flex: none; }
+.demo-banner.ended .btn.accent { background: var(--ink); color: var(--white); }
+.demo-banner.hidden { display: none; }
+.demo-banner.flash { animation: demo-flash 0.5s steps(2) 3; }
+@keyframes demo-flash { 50% { background: var(--ink); color: var(--white); } }
+
+.demo-lock {
+  position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(242, 242, 238, 0.92);
+}
+.demo-lock.hidden { display: none; }
+.demo-card { max-width: 520px; border: var(--rule); background: var(--white); padding: 20px 24px; }
+.demo-card h2 { margin: 0 0 12px; font-size: 20px; font-weight: 800; letter-spacing: 0.08em; }
+.demo-card h2 .idx { color: var(--accent); margin-right: 10px; }
+.demo-card p { margin: 0 0 12px; line-height: 1.5; font-size: 13px; }
+.demo-card .btns { display: flex; gap: 10px; margin-top: 16px; }
+.demo-card .btn.accent, .demo-banner .btn.accent { background: var(--accent); color: var(--ink); }
+.demo-card .btn.accent:hover, .demo-banner .btn.accent:hover { background: var(--ink); color: var(--white); }

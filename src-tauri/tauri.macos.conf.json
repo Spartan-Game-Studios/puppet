@@ -6,7 +6,7 @@
   "bundle": {
     "macOS": {
       "files": {
-        "Library/SystemExtensions/com.spartangamestudios.puppet.camera.systemextension": "macos/build/com.spartangamestudios.puppet.camera.systemextension"
+        "Library/SystemExtensions/com.spartangamestudios.vpuppet.camera.systemextension": "macos/build/com.spartangamestudios.vpuppet.camera.systemextension"
       }
     }
   }

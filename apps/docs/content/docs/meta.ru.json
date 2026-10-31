@@ -1,0 +1,25 @@
+{
+  "title": "Документация",
+  "pages": [
+    "---Начало---",
+    "index",
+    "installation",
+    "getting-started",
+    "---Работа с VPuppet---",
+    "tracking",
+    "model-library",
+    "scene",
+    "physics",
+    "motion",
+    "lip-sync",
+    "---Вывод---",
+    "virtual-camera",
+    "vmc",
+    "---Руководства---",
+    "...guides",
+    "---Справка---",
+    "shortcuts",
+    "mcp",
+    "faq"
+  ]
+}

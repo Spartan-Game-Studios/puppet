@@ -2,8 +2,8 @@
 //! DirectShow virtual camera.
 //!
 //! `scripts/build-softcam.ps1` builds `softcam.dll` from a pinned commit with
-//! Puppet's own filter name ("Puppet Virtual Camera"), CLSID and shared-memory
-//! names, and the bundle ships it next to `puppet.exe`. The DLL is two things
+//! VPuppet's own filter name ("VPuppet Virtual Camera"), CLSID and shared-memory
+//! names, and the bundle ships it next to `vpuppet.exe`. The DLL is two things
 //! at once: the DirectShow filter that camera apps load (it must be registered
 //! once, with admin rights, via `regsvr32`), and the sender API we load here
 //! at runtime (`scCreateCamera` / `scSendFrame` / `scDeleteCamera`). Frames go
@@ -86,13 +86,13 @@ impl VirtualCamSink for SoftcamSink {
             (None, _) => SinkStatus::new("softcam", SinkState::Unavailable, "SOFTCAM.DLL NOT IN THIS BUILD")
                 .hint("Build it with scripts/build-softcam.ps1, or use the OBS route."),
             (Some(dll), None) => SinkStatus::new("softcam", SinkState::NeedsSetup, "CAMERA NOT REGISTERED")
-                .hint("Click REGISTER CAMERA and accept the Windows admin prompt (once). It registers Puppet's camera DLL with regsvr32.")
+                .hint("Click REGISTER CAMERA and accept the Windows admin prompt (once). It registers VPuppet's camera DLL with regsvr32.")
                 .command(format!("regsvr32 \"{}\"", dll.display()))
                 .action("REGISTER CAMERA"),
             (Some(dll), Some(reg)) => {
                 let same = PathBuf::from(&reg) == *dll;
                 let state = if self.cam.is_some() { SinkState::Running } else { SinkState::Ready };
-                let mut s = SinkStatus::new("softcam", state, "PUPPET VIRTUAL CAMERA (DIRECTSHOW)");
+                let mut s = SinkStatus::new("softcam", state, "VPUPPET VIRTUAL CAMERA (DIRECTSHOW)");
                 if !same {
                     s = s
                         .hint(format!("Registered DLL is {reg}; this copy is {}. Click RE-REGISTER if the camera doesn't show up.", dll.display()))
@@ -137,7 +137,7 @@ impl VirtualCamSink for SoftcamSink {
             let create: Symbol<CreateFn> = lib.get(b"scCreateCamera\0").map_err(|e| e.to_string())?;
             let handle = create(cfg.width as i32, cfg.height as i32, cfg.fps as f32);
             if handle.is_null() {
-                let e = "scCreateCamera failed (is another Puppet already streaming?)".to_string();
+                let e = "scCreateCamera failed (is another VPuppet already streaming?)".to_string();
                 self.last_error = Some(e.clone());
                 return Err(e);
             }

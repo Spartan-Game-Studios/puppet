@@ -1,0 +1,143 @@
+---
+title: 连接 AI 智能体（MCP）
+description: 让 Claude Code、Claude Desktop 或 Cursor 等 AI 智能体查看并操作正在运行的 VPuppet。
+---
+
+## 这是什么
+
+VPuppet 可以运行一个本地 [MCP](https://modelcontextprotocol.io)（Model Context Protocol，模型上下文协议）服务器，让你电脑上的 AI 智能体（Claude Code、Claude Desktop、Cursor 及其他 MCP 客户端）与正在运行的应用协作。智能体可以：
+
+- 在你用 Blender 制作模型时检查舞台上的模型，包括 perfect sync 的覆盖情况；
+- 截取舞台画面；
+- 试用表情和动画片段；
+- 读取追踪统计、最近的状态消息和错误。
+
+它适合在智能体的帮助下制作虚拟形象，也适合排查某项功能为什么不正常。
+
+## 开启
+
+<Steps>
+<Step>
+打开 **VMC** 窗口（`N`），找到 **AI AGENTS (MCP)**（AI 智能体）部分。
+</Step>
+<Step>
+勾选 **ALLOW AI AGENTS (LOCAL MCP SERVER)**（允许 AI 智能体，本地 MCP 服务器）。默认关闭。
+
+首次开启时，VPuppet 会生成一个随机访问令牌。**PORT**（端口）默认为 `39540`，可以在同一处修改。
+</Step>
+</Steps>
+
+服务器只在 VPuppet 打开且此选项开启时运行。
+
+## 注册你的 AI 客户端 [#install]
+
+在 VPuppet 运行且已开启此选项后运行安装脚本。它会在你的电脑上查找 Claude Code、Cursor 和 Claude Desktop，并为每个客户端添加一个名为 `vpuppet` 的服务器。
+
+<Tabs items={['macOS / Linux', 'Windows']}>
+<Tab value="macOS / Linux">
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.sh | sh
+```
+
+删除这些条目：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.sh | sh -s -- --uninstall
+```
+
+</Tab>
+<Tab value="Windows">
+
+在 PowerShell 中：
+
+```powershell
+irm https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.ps1 | iex
+```
+
+删除这些条目：
+
+```powershell
+$env:VPUPPET_MCP_UNINSTALL = 1; irm https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.ps1 | iex
+```
+
+</Tab>
+</Tabs>
+
+安装脚本会：
+
+- 从 VPuppet 的配置文件夹读取令牌（绝不会打印出来）；
+- **Claude Code：** 运行 `claude mcp add --transport http --scope user`；
+- **Cursor：** 把服务器添加到 `~/.cursor/mcp.json`；
+- **Claude Desktop：** 通过 [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) 桥接把服务器添加到 `claude_desktop_config.json`，这需要 Node.js（`npx`）；
+- 合并到现有配置文件中，并事先备份。可以安全地重复运行。
+
+按下 **NEW TOKEN**（新令牌）或修改端口后，**请再次运行**安装脚本，让客户端获得新的值。安装脚本修改了某个客户端的设置后，请重启该客户端。
+
+可用环境变量调整：
+
+| 变量 | 作用 |
+|---|---|
+| `VPUPPET_CONFIG_DIR` | VPuppet 的配置文件夹（如果不在默认位置） |
+| `VPUPPET_MCP_PORT` | 端口（如果安装脚本无法读取） |
+| `VPUPPET_MCP_CLIENTS` | 要配置哪些客户端，例如 `"claude-code cursor"`（默认：`claude-code cursor claude-desktop`） |
+
+<Callout title="只用 Claude Code？">
+AI AGENTS 部分中的 **COPY CLAUDE CODE COMMAND**（复制 Claude Code 命令）会复制一条已填好当前端口和令牌的 `claude mcp add` 命令。把它粘贴到终端即可。
+</Callout>
+
+## 其他客户端
+
+任何支持 Streamable HTTP 的 MCP 客户端都可以连接：
+
+- **URL：** `http://127.0.0.1:39540/mcp`（或你设置的端口）
+- **请求头：** `Authorization: Bearer <token>`，其中令牌是 VPuppet 配置文件夹中 `mcp-token` 文件的内容：
+  - macOS：`~/Library/Application Support/com.spartangamestudios.vpuppet/`
+  - Windows：`%APPDATA%\com.spartangamestudios.vpuppet\`
+  - Linux：`~/.config/com.spartangamestudios.vpuppet/`
+
+## 工具
+
+| 工具 | 作用 |
+|---|---|
+| `app_status` | 应用快照：版本、试用状态、舞台上的模型、是否正在显示 HOME、追踪模式和状态、输出以及帧率。智能体会首先调用它。 |
+| `library_list` | 列出模型库中的模型及其统计数据、模型检查警告和许可徽章。 |
+| `library_load` | 把模型库中的模型加载到舞台上。 |
+| `library_import` | 按路径把 `.vrm` 文件导入模型库（生成缩略图、运行检查），并可选择直接加载。 |
+| `model_inspect` | 舞台上模型的全部信息：VRM 版本和元数据、已映射或缺少的人形骨骼、每个表情、ARKit perfect sync 覆盖情况（包括以其他拼写存在的名称）、预设、注视、弹簧骨骼链和碰撞体、网格 / 材质 / 纹理统计、许可、模型检查警告。 |
+| `stage_screenshot` | 你所看到的舞台画面的 PNG，或从正面以脸部 / 半身 / 上半身 / 全身取景的虚拟形象，不会移动你的镜头。 |
+| `expression_set` | 在追踪之上以指定权重保持某个表情，或重置已保持的表情。 |
+| `expression_sweep` | 冻结姿势，依次驱动每个表情，报告不起作用的形状和左右颠倒的形状，并生成对照图。 |
+| `clip_list` | 列出内置和导入的动画片段。 |
+| `clip_play` | 在虚拟形象上播放或停止片段。 |
+| `tracking_stats` | 追踪健康状况：模式、状态、各管线的帧率、延迟和推理时间、左右手的搜索情况、当前手势。 |
+| `logs_recent` | 最近的状态信息、警告和错误。 |
+| `settings_get` | 读取智能体可以修改的设置。 |
+| `settings_set` | 实时修改追踪模式、平滑、取景、背景或物理模式。 |
+
+## 典型工作流程 [#workflow]
+
+在智能体帮助下制作或修复虚拟形象，通常按以下循环进行：
+
+<Steps>
+<Step>
+**检查。** 智能体对舞台上的模型运行 `model_inspect`：缺少的骨骼、不起作用的表情、perfect sync 还缺哪些 ARKit 名称。
+</Step>
+<Step>
+**在 Blender 中修复**（或在你制作模型的工具中），然后重新导出 `.vrm`。
+</Step>
+<Step>
+**重新导入。** 智能体用新文件运行 `library_import`。重新导出的文件会成为模型库中的一个新条目。
+</Step>
+<Step>
+**验证。** 智能体对 ARKit 表情集运行 `expression_sweep`，确认每个 perfect sync 形状都能让面部产生变化，而且发生在正确的一侧。
+</Step>
+</Steps>
+
+## 安全
+
+- **仅限本机。** 服务器只监听 `127.0.0.1`，其他电脑无法访问。带有浏览器 `Origin` 请求头或主机名不是本机的请求会被拒绝，因此网页也无法访问它。
+- **令牌。** 每个请求都需要令牌。令牌是随机生成的，在你首次开启服务器时创建，以 `mcp-token` 文件保存在 VPuppet 的配置文件夹中（在 macOS 和 Linux 上仅你本人可读）。请像对待密码一样对待它。**NEW TOKEN** 会替换令牌；之后请再次运行安装脚本。
+- **智能体能修改什么。** 智能体可以加载和导入模型，并修改一小部分安全的设置：追踪模式、平滑、取景、背景和物理模式。它**不能**修改 VMC、虚拟摄像头或 MCP 设置。它只会读取你或智能体指定要导入的文件。
+- **试用版。** 试用版的 100 小时用完后，通过 MCP 加载模型会被拒绝，与应用内的行为一致。
+- 智能体的操作权限取决于你在客户端中授予它的权限。批准之前请先审阅它提出的操作。

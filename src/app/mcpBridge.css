@@ -1,0 +1,16 @@
+/* AI agents (MCP server) control (src/app/mcpBridge.ts). Uses the shared
+   tokens and .btn / .row / .check / .lbl / .val from styles.css. */
+.mcp-ctl { display: flex; flex-direction: column; gap: 8px; }
+.mcp-ctl .mcp-port { width: 90px; }
+.mcp-ctl .mcp-state { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mcp-ctl .hidden { display: none; }
+.mcp-ctl .mcp-hint { margin: 0; color: var(--mute); font-size: 10px; line-height: 1.4; }
+.mcp-ctl .mcp-cmd {
+  display: block;
+  padding: 6px;
+  border: var(--thin);
+  font-size: 10px;
+  line-height: 1.35;
+  word-break: break-all;
+  user-select: all;
+}

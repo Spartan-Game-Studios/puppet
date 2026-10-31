@@ -1,5 +1,6 @@
 /** Microphone capture for lip sync: getUserMedia -> AnalyserNode -> mouth shapes. */
 import { analyzeSpectrum, dbToMag, DEFAULT_ANALYSIS, MouthSmoother, rmsDb, silentShapes, type AnalysisOptions, type MouthShapes } from './visemes';
+import { t } from '../i18n';
 
 export interface MicDevice {
   id: string;
@@ -11,7 +12,7 @@ export async function listMics(): Promise<MicDevice[]> {
     const all = await navigator.mediaDevices.enumerateDevices();
     return all
       .filter((d) => d.kind === 'audioinput')
-      .map((d, i) => ({ id: d.deviceId, label: (d.label || `MICROPHONE ${i + 1}`).toUpperCase() }));
+      .map((d, i) => ({ id: d.deviceId, label: (d.label || t('motion.ls.micN', { n: i + 1 })).toUpperCase() }));
   } catch {
     return [];
   }

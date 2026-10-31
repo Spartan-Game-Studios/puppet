@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Build Puppet's CoreMediaIO Camera Extension as a universal (arm64 + x86_64)
+# Build VPuppet's CoreMediaIO Camera Extension as a universal (arm64 + x86_64)
 # .systemextension bundle, ready to embed at
-# Puppet.app/Contents/Library/SystemExtensions/ (tauri.macos.conf.json copies
+# VPuppet.app/Contents/Library/SystemExtensions/ (tauri.macos.conf.json copies
 # it there; this script runs as the beforeBundleCommand).
 #
 # Signing (all optional; without them the bundle is ad-hoc signed, which is
@@ -11,13 +11,13 @@
 #   PUPPET_CAMEXT_PROFILE    path to the extension's Developer ID provisioning
 #                            profile (.provisionprofile), embedded if given
 #
-# Output: src-tauri/macos/build/com.spartangamestudios.puppet.camera.systemextension
+# Output: src-tauri/macos/build/com.spartangamestudios.vpuppet.camera.systemextension
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$HERE/camera-extension"
 OUT_DIR="$HERE/build"
-ID="com.spartangamestudios.puppet.camera"
+ID="com.spartangamestudios.vpuppet.camera"
 BUNDLE="$OUT_DIR/$ID.systemextension"
 TEAM_ID="${APPLE_TEAM_ID:-0000000000}"
 IDENTITY="${APPLE_SIGNING_IDENTITY:--}"

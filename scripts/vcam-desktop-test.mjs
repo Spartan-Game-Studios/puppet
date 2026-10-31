@@ -1,12 +1,12 @@
 // Virtual camera end-to-end test of the DESKTOP app, without any camera:
-// runs a built Puppet binary with the file sink (PUPPET_VCAM_SINK=file:...),
+// runs a built VPuppet binary with the file sink (PUPPET_VCAM_SINK=file:...),
 // a model and debuglog, and reports what arrived in Rust (size, pixel format,
 // rate, drops) plus per-frame costs and the CPU used by the app and its
 // WebKit processes, with the output on and off.
 //
-//   PUPPET_MODEL=/abs/avatar.vrm PUPPET_CLIP=/abs/clip.mp4 node scripts/vcam-desktop-test.mjs <path/to/puppet binary> [outdir] [1280x720|1920x1080] [seconds]
+//   PUPPET_MODEL=/abs/avatar.vrm PUPPET_CLIP=/abs/clip.mp4 node scripts/vcam-desktop-test.mjs <path/to/vpuppet binary> [outdir] [1280x720|1920x1080] [seconds]
 //
-// The binary is e.g. src-tauri/target/release/bundle/macos/Puppet.app/Contents/MacOS/puppet
+// The binary is e.g. src-tauri/target/release/bundle/macos/VPuppet.app/Contents/MacOS/vpuppet
 // (`pnpm tauri build --bundles app`). It opens the app window; set
 // PUPPET_LAUNCH_PREFIX (e.g. "private-run --mode offscreen --") to wrap it.
 // Settings go to a temporary dir (PUPPET_SETTINGS_DIR), never your own.
@@ -71,7 +71,7 @@ async function run(vcamOn, extra = {}, sinkSpec = null) {
   const argv = [...prefix, bin];
   const child = spawn(argv[0], argv.slice(1), { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const lines = [];
-  child.stdout.on('data', (d) => lines.push(...d.toString().split('\n').filter((l) => l.startsWith('[puppet]'))));
+  child.stdout.on('data', (d) => lines.push(...d.toString().split('\n').filter((l) => l.startsWith('[vpuppet]'))));
   child.stderr.on('data', () => {});
   // Warm-up: model load, first frames.
   await new Promise((r) => setTimeout(r, 8000));

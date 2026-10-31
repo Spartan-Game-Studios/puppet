@@ -1,0 +1,5 @@
+# The desktop app is the root package; the docs site lives in apps/docs.
+packages:
+  - apps/*
+allowBuilds:
+  esbuild: true

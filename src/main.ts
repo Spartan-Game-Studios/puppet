@@ -1,5 +1,5 @@
 /**
- * Puppet: app entry. Wires the source -> tracker -> face/body processing ->
+ * VPuppet: app entry. Wires the source -> tracker -> face/body processing ->
  * avatar -> renderer / VMC, and binds the UI.
  *
  * URL parameters (dev / test harness):
@@ -56,6 +56,7 @@ import { VirtualCamOutput } from './vcam/output';
 import { loadSettings, saveSettings, type Settings } from './app/settings';
 import { bindEnvironmentUi } from './app/environmentUi';
 import { mountHome } from './app/home';
+import { mountDemo } from './app/demo';
 import { mountMotion, type MotionFeatures } from './anim/features';
 import { withPresetBlends } from './vmc/presets';
 import type { PhysicsMode } from './physics/stableSprings';
@@ -65,6 +66,17 @@ import { mountVcamControls } from './app/vcamControls';
 import { createModal, openModal, type Modal } from './app/modal';
 import { mountCardSection } from './app/ui';
 import { PadNav } from './app/padNav';
+import { mcpLog, mountMcpBridge } from './app/mcpBridge';
+import { applyDom, locale, t, LOCALE_NAMES, LOCALES, setLocale, type Locale } from './i18n';
+
+// Static markup in the chosen language before anything reads it (modal titles
+// come from data-title, cards and modals are cloned from templates).
+applyDom(document);
+{
+  const lang = document.getElementById('lang') as HTMLSelectElement;
+  for (const l of LOCALES) lang.add(new Option(LOCALE_NAMES[l], l, false, l === locale));
+  lang.addEventListener('change', () => setLocale(lang.value as Locale));
+}
 
 const params = new URLSearchParams(location.search);
 for (const [k, v] of new URLSearchParams(await devQuery())) params.set(k, v);
@@ -132,6 +144,8 @@ const gestures = new GestureTracker();
 const handStats = new HandStats(3000);
 gestures.mirror = settings.mirror;
 let avatar: Avatar | null = null;
+/** Steam demo out of hours (src/app/demo.ts): no stage, no outputs; HOME still works. */
+let demoLocked = false;
 let modelHash: string | null = null;
 let lastResult: TrackerResult | null = null;
 let frameCount = 0;
@@ -141,9 +155,10 @@ function setStatus(s: string, err = false): void {
   const el = $('status');
   el.textContent = s.toUpperCase();
   el.classList.toggle('status-err', err);
-  if (err) console.warn('[puppet]', s);
+  mcpLog.push(s, err);
+  if (err) console.warn('[vpuppet]', s);
 }
-tracker.onStatus = (s) => setStatus(s, s.includes('ERROR'));
+tracker.onStatus = (s, err) => setStatus(s, !!err);
 
 // ---------------------------------------------------------------- tracking -> avatar
 function updatePoseFilter(): void {
@@ -227,7 +242,12 @@ tracker.onResult = (r) => {
 /** 07 MOTION / 08 HOTKEYS / 09 LIP SYNC (src/anim/features.ts), mounted below. */
 let motion: MotionFeatures | null = null;
 async function loadModel(buf: ArrayBuffer, label: string, path: string | null): Promise<boolean> {
-  setStatus(`LOADING ${label}`);
+  if (demoLocked) {
+    demo.nudge();
+    setStatus(t('demo.statusRefused'), true);
+    return false;
+  }
+  setStatus(t('stage.loading', { name: label }));
   try {
     const { avatar: a, hash, facts } = await loadAvatar(buf, settings.physics);
     applyDrive(a);
@@ -246,23 +266,25 @@ async function loadModel(buf: ArrayBuffer, label: string, path: string | null): 
     $('model-name').title = `${a.name} [${label}]`;
     const ps = a.perfectSync.size;
     $('sync-mode').textContent = a.usePerfectSync
-      ? `PERFECT SYNC ${ps}/52`
-      : `PRESETS ${a.presets.size}/13${ps ? ` (ARKIT ${ps}/52)` : ''}`;
+      ? t('stage.syncPerfect', { n: ps })
+      : ps
+        ? t('stage.syncPresetsArkit', { n: a.presets.size, ps })
+        : t('stage.syncPresets', { n: a.presets.size });
     $('empty').classList.add('hidden');
     buildBlendshapeList();
     buildPhysicsUI();
-    setStatus(`MODEL OK: ${a.physics.chains.length} CHAINS, ${a.physics.jointCount} JOINTS`);
+    setStatus(t('stage.modelOk', { chains: a.physics.chains.length, joints: a.physics.jointCount }));
     home.modelLoaded(hash, buf, label, path, facts.warnings); // library: header name, licence, import if new; model checks
     return true;
   } catch (e) {
-    setStatus(`MODEL LOAD FAILED: ${(e as Error).message}`, true);
+    setStatus(t('stage.modelFailed', { error: (e as Error).message }), true);
     return false;
   }
 }
 
 async function openModelDialog(): Promise<void> {
   if (isTauri) {
-    const p = await pickPath('VRM avatar', ['vrm']);
+    const p = await pickPath(t('stage.pickVrm'), ['vrm']);
     if (p) await loadModel(await readPath(p), baseName(p), p);
   } else {
     const f = await pickBrowserFile('.vrm');
@@ -288,26 +310,26 @@ async function startSource(): Promise<void> {
       info = await source.openFile(await mediaUrl(src), params.get('loop') !== '0');
       $('cam-pick').classList.add('hidden');
       $('cam-file').classList.remove('hidden');
-      $('cam-file').textContent = `FILE ${baseName(src)}`;
+      $('cam-file').textContent = t('stage.camFile', { name: baseName(src) });
       $('cam-file').title = src;
     } else {
-      setStatus('OPENING CAMERA');
+      setStatus(t('stage.openingCamera'));
       info = await source.openCamera(settings.cameraId, settings.resolution, settings.trackFps);
       await refreshCameras();
     }
     $('cam-actual').textContent = info;
     $('preview-info').textContent = info;
-    $('btn-camera').textContent = source.kind === 'file' ? 'RESTART CLIP' : 'RESTART';
+    $('btn-camera').textContent = t(source.kind === 'file' ? 'stage.restartClip' : 'stage.restart');
     tracker.start(source.video);
-    setStatus(avatar ? 'TRACKING' : 'TRACKING (NO MODEL)');
+    setStatus(t(avatar ? 'stage.tracking' : 'stage.trackingNoModel'));
   } catch (e) {
     const err = e as DOMException;
     const msg =
       err.name === 'NotAllowedError'
-        ? 'CAMERA BLOCKED: ALLOW PUPPET IN SYSTEM SETTINGS > PRIVACY > CAMERA'
+        ? t('stage.camBlocked')
         : err.name === 'NotFoundError'
-          ? 'NO CAMERA FOUND'
-          : `CAMERA ERROR: ${err.message}`;
+          ? t('stage.noCameraFound')
+          : t('stage.cameraError', { error: err.message });
     setStatus(msg, true);
   }
 }
@@ -316,7 +338,7 @@ async function refreshCameras(): Promise<void> {
   const sel = $<HTMLSelectElement>('camera');
   const cams = await listCameras();
   sel.innerHTML = '';
-  if (!cams.length) sel.append(new Option('NO CAMERA', ''));
+  if (!cams.length) sel.append(new Option(t('stage.noCamera'), ''));
   for (const c of cams) sel.append(new Option(c.label, c.id));
   if (settings.cameraId && cams.some((c) => c.id === settings.cameraId)) sel.value = settings.cameraId;
 }
@@ -350,7 +372,7 @@ async function applyBackground(): Promise<void> {
 
 async function pickBackgroundImage(): Promise<void> {
   if (isTauri) {
-    const p = await pickPath('Image', ['png', 'jpg', 'jpeg', 'webp']);
+    const p = await pickPath(t('stage.pickImage'), ['png', 'jpg', 'jpeg', 'webp']);
     if (!p) return;
     settings.background.imagePath = p;
     if (bgUrl) URL.revokeObjectURL(bgUrl);
@@ -483,12 +505,12 @@ function calibrate(): void {
     settings.calibration = face.calibration;
     persist();
     showCalib();
-    setStatus('NEUTRAL CAPTURED');
-  } else setStatus('NO FACE TO CALIBRATE', true);
+    setStatus(t('stage.neutralCaptured'));
+  } else setStatus(t('stage.noFaceCalib'), true);
 }
 function showCalib(): void {
   const c = settings.calibration;
-  $('calib-state').textContent = c.head ? `SET (${Object.keys(c.baseline).length} BASELINES)` : 'NONE';
+  $('calib-state').textContent = c.head ? t('stage.calibSet', { n: Object.keys(c.baseline).length }) : t('track.calibNone');
 }
 $('btn-calibrate').addEventListener('click', calibrate);
 $('btn-calib-clear').addEventListener('click', () => {
@@ -541,11 +563,12 @@ segBind('framing', () => currentFraming, (v) => {
 
 // ---------------------------------------------------------------- VMC UI
 async function applyVmc(): Promise<void> {
+  if (demoLocked) return;
   try {
     await vmcConfigure(settings.vmc.enabled, settings.vmc.host, settings.vmc.port);
-    if (!isTauri && settings.vmc.enabled) setStatus('VMC NEEDS THE DESKTOP APP (BROWSER CANNOT SEND UDP)', true);
+    if (!isTauri && settings.vmc.enabled) setStatus(t('stage.vmcDesktop'), true);
   } catch (e) {
-    setStatus(`VMC: ${e}`, true);
+    setStatus(t('stage.vmcError', { error: String(e) }), true);
   }
 }
 checkBind('vmc-enabled', () => settings.vmc.enabled, (v) => {
@@ -577,7 +600,7 @@ portEl.addEventListener('change', () => {
 let vmcBusy = false;
 const t0 = performance.now();
 function sendVmc(): void {
-  if (!settings.vmc.enabled || !avatar || vmcBusy || !isTauri) return;
+  if (!settings.vmc.enabled || !avatar || vmcBusy || !isTauri || demoLocked) return;
   const a = avatar;
   const frame: VmcFrame = {
     t: (performance.now() - t0) / 1000,
@@ -594,7 +617,7 @@ function sendVmc(): void {
   if (settings.vmc.presets) frame.blends = withPresetBlends(frame.blends, a.drive.presetOptions);
   vmcBusy = true;
   vmcSend(frame)
-    .catch((e) => setStatus(`VMC: ${e}`, true))
+    .catch((e) => setStatus(t('stage.vmcError', { error: String(e) }), true))
     .finally(() => (vmcBusy = false));
 }
 
@@ -606,7 +629,7 @@ async function applyVcam(): Promise<void> {
   if (vcamBusy) return;
   vcamBusy = true;
   try {
-    if (settings.vcam.enabled) {
+    if (settings.vcam.enabled && !demoLocked) {
       const [w, h] = VCAM_RESOLUTIONS[settings.vcam.resolution] ?? VCAM_RESOLUTIONS['1280x720'];
       vcam.setBackground(settings.background.color);
       await vcamSelectDevice(settings.vcam.device);
@@ -620,7 +643,7 @@ async function applyVcam(): Promise<void> {
     persist();
     refreshInputs();
     if (vcam.running) await vcam.stop().catch(() => {});
-    setStatus(`VIRTUAL CAM: ${e}`, true);
+    setStatus(t('stage.vcamError', { error: String(e) }), true);
   } finally {
     vcamBusy = false;
   }
@@ -685,7 +708,7 @@ $('btn-vcam-setup').addEventListener('click', async () => {
   try {
     await vcamSetup();
   } catch (e) {
-    setStatus(`VIRTUAL CAM: ${e}`, true);
+    setStatus(t('stage.vcamError', { error: String(e) }), true);
   } finally {
     btn.disabled = false;
   }
@@ -704,20 +727,20 @@ $('vcam-cmd').addEventListener('click', async () => {
     /* clipboard unavailable: the text is selectable */
   }
 });
-vcam.onError = (e) => setStatus(`VIRTUAL CAM: ${e}`, true);
+vcam.onError = (e) => setStatus(t('stage.vcamError', { error: String(e) }), true);
 
 async function pollVcam(): Promise<void> {
   const el = $('vcam-stats');
   if (!vcam.running) {
-    el.textContent = 'OFF';
+    el.textContent = t('stage.off');
     return;
   }
   const r = await vcamStats().catch(() => null);
   const j = vcam.stats;
   const [w, h] = [vcam.grabber.width, vcam.grabber.height];
   el.textContent = r
-    ? `${Math.round(r.fps_out)} FPS ${w}×${h} ${r.format ?? ''}${r.dropped + j.busy ? ` ${r.dropped + j.busy} DROP` : ''}${r.write_errors ? ` ${r.write_errors} ERR` : ''}`
-    : `${j.fps} FPS ${w}×${h} (NOT SENT)`;
+    ? `${Math.round(r.fps_out)} FPS ${w}×${h} ${r.format ?? ''}${r.dropped + j.busy ? ` ${t('stage.dropped', { n: r.dropped + j.busy })}` : ''}${r.write_errors ? ` ${t('stage.errCount', { n: r.write_errors })}` : ''}`
+    : `${j.fps} FPS ${w}×${h} ${t('stage.notSent')}`;
 }
 setInterval(pollVcam, 1000);
 setInterval(() => {
@@ -744,7 +767,7 @@ function buildBlendshapeList(): void {
     const row = document.createElement('div');
     const mapped = !avatar || !avatar.usePerfectSync || avatar.perfectSync.has(name);
     row.className = `bs-row${mapped ? '' : ' unmapped'}`;
-    row.innerHTML = `<span class="name" title="${name}">${name}</span><div class="bs-bar"><div class="fill"></div><div class="raw"></div><span class="num">0.00</span></div><input type="number" step="0.05" min="0" max="4" title="gain" /><input type="number" step="0.05" min="0.2" max="3" title="curve exponent (<1 lifts small values)" />`;
+    row.innerHTML = `<span class="name" title="${name}">${name}</span><div class="bs-bar"><div class="fill"></div><div class="raw"></div><span class="num">0.00</span></div><input type="number" step="0.05" min="0" max="4" title="${t('stage.bsGainTitle')}" /><input type="number" step="0.05" min="0.2" max="3" title="${t('stage.bsCurveTitle')}" />`;
     const [gIn, cIn] = row.querySelectorAll('input');
     gIn.value = String(gains[name].gain);
     cIn.value = String(gains[name].curve);
@@ -847,12 +870,12 @@ function buildPhysicsUI(): void {
   const ph = avatar.physics;
   $('chain-count').textContent = `[${ph.chains.length}]`;
   $('collider-count').textContent = `[${ph.colliders.length}]`;
-  if (!ph.chains.length) list.innerHTML = '<span class="empty-note">THIS MODEL HAS NO SPRING BONES</span>';
+  if (!ph.chains.length) list.innerHTML = `<span class="empty-note">${t('stage.noSprings')}</span>`;
   for (const ch of ph.chains) {
     const o = ph.chainOverride(ch.name);
     const row = document.createElement('div');
     row.className = `chain-row${o.enabled ? '' : ' off'}`;
-    row.innerHTML = `<input type="checkbox" /><span class="name" title="${ch.name}">${ch.name} <small>${ch.joints.length}J</small></span><input type="number" step="0.1" min="0" max="10" title="stiffness ×" /><input type="number" step="0.1" min="0" max="3" title="drag ×" /><input type="number" step="0.1" min="0" max="5" title="gravity ×" />`;
+    row.innerHTML = `<input type="checkbox" /><span class="name" title="${ch.name}">${ch.name} <small>${t('stage.joints', { n: ch.joints.length })}</small></span><input type="number" step="0.1" min="0" max="10" title="${t('stage.stiffTitle')}" /><input type="number" step="0.1" min="0" max="3" title="${t('stage.dragTitle')}" /><input type="number" step="0.1" min="0" max="5" title="${t('stage.gravTitle')}" />`;
     const [on, s, d, g] = row.querySelectorAll('input');
     on.checked = o.enabled;
     s.value = String(o.stiffness);
@@ -873,7 +896,7 @@ function buildPhysicsUI(): void {
     num(g, 'gravity');
     list.append(row);
   }
-  if (!ph.colliders.length) cols.innerHTML = '<span class="empty-note">NO COLLIDERS</span>';
+  if (!ph.colliders.length) cols.innerHTML = `<span class="empty-note">${t('stage.noColliders')}</span>`;
   for (const c of ph.colliders) {
     const lab = document.createElement('label');
     lab.className = 'check';
@@ -920,6 +943,21 @@ const home = await mountHome({
   onShow: (on) => {
     if (on) openModal()?.close();
     requestAnimationFrame(() => viewer.resize());
+  },
+});
+
+// ---------------------------------------------------------------- Steam demo (src/app/demo.ts)
+const demo = await mountDemo({
+  stageActive: () => !!avatar && !home.visible,
+  showLibrary: () => home.show(true),
+  onLock: () => {
+    // Outputs and the webcam off. The settings stay as they were, so the
+    // full app starts the way the user left it.
+    demoLocked = true;
+    if (vcam.running) vcam.stop().catch(() => {});
+    vmcConfigure(false, settings.vmc.host, settings.vmc.port).catch(() => {});
+    source.stop();
+    setStatus(t('demo.statusEnded'), true);
   },
 });
 
@@ -995,7 +1033,7 @@ await onNativeDrop(
     if (p) await loadModel(await readPath(p), baseName(p), p);
     else {
       const rest = (await motion?.dropPaths(paths)) ?? paths; // animation clips
-      if (rest.length && !(await envUi.dropPaths(rest))) setStatus('DROP A .VRM, AN .FBX / .GLB CLIP (OR A .GLB / .HDR ENVIRONMENT)', true);
+      if (rest.length && !(await envUi.dropPaths(rest))) setStatus(t('stage.dropHint'), true);
     }
   },
   (on) => {
@@ -1083,12 +1121,12 @@ function tick(now: number): void {
 // ---------------------------------------------------------------- bottom bar: model status
 function trackState(): [string, boolean] {
   const s = tracker.stats;
-  if (source.kind === 'none') return ['NO SOURCE', true];
-  if (!s.face.fps && !s.body.fps) return ['WAITING', false];
-  if (!lastFace?.face) return ['LOST', true];
-  if (settings.mode !== 'face' && lastBody && !lastBody.pose) return ['FACE ONLY', true];
-  if (settings.mode === 'hands' && !(lastBody?.hands?.length)) return ['NO HANDS', false];
-  return ['TRACKING', false];
+  if (source.kind === 'none') return [t('stage.noSource'), true];
+  if (!s.face.fps && !s.body.fps) return [t('stage.waiting'), false];
+  if (!lastFace?.face) return [t('stage.lost'), true];
+  if (settings.mode !== 'face' && lastBody && !lastBody.pose) return [t('stage.faceOnly'), true];
+  if (settings.mode === 'hands' && !(lastBody?.hands?.length)) return [t('stage.noHands'), false];
+  return [t('stage.tracking'), false];
 }
 function setCell(id: string, text: string, hot = false): void {
   const el = $(id);
@@ -1106,8 +1144,8 @@ function updateStatusBar(): void {
   const exprs = layer?.overlay.active ?? [];
   setCell('expr-state', emote ? `▶ ${motion!.library.label(emote)}` : exprs.length ? exprs.join(' + ').toUpperCase() : '-', !!(emote || exprs.length));
   const outs = [settings.vmc.enabled && 'VMC', vcam.running && 'VCAM'].filter(Boolean) as string[];
-  setCell('out-state', outs.length ? outs.join(' + ') : 'OFF', outs.length > 0);
-  camSections.vcam?.setState(vcam.running ? 'ON' : settings.vcam.enabled ? '…' : 'OFF', vcam.running);
+  setCell('out-state', outs.length ? outs.join(' + ') : t('stage.off'), outs.length > 0);
+  camSections.vcam?.setState(vcam.running ? t('stage.on') : settings.vcam.enabled ? '…' : t('stage.off'), vcam.running);
   $('btn-env-toggle').classList.toggle('on', settings.background.kind === 'environment');
 }
 
@@ -1136,10 +1174,10 @@ function vcamLogLine(): string {
 async function pollVmc(): Promise<void> {
   const s = await vmcStats().catch(() => null);
   $('vmc-stats').textContent = !settings.vmc.enabled
-    ? 'OFF'
+    ? t('stage.off')
     : s
-      ? `${s.frames} FR ${(s.bytes / 1024).toFixed(0)} KB${s.errors ? ` ${s.errors} ERR` : ''}`
-      : 'DESKTOP APP ONLY';
+      ? `${t('stage.vmcStats', { frames: s.frames, kb: (s.bytes / 1024).toFixed(0) })}${s.errors ? ` ${t('stage.errCount', { n: s.errors })}` : ''}`
+      : t('stage.desktopOnly');
 }
 setInterval(pollVmc, 1000);
 
@@ -1162,7 +1200,7 @@ const modelUrl = params.get('model');
 if (modelUrl) {
   readPath(modelUrl)
     .then((b) => loadModel(b, baseName(modelUrl), null))
-    .catch((e) => setStatus(`MODEL: ${e.message}`, true));
+    .catch((e) => setStatus(t('stage.modelError', { error: e.message }), true));
 }
 // HOME is the first screen (it lists the library, last used first) unless a
 // model or capture view was asked for. The old "last model" setting is offered
@@ -1171,8 +1209,53 @@ home.show(params.has('home') ? params.get('home') === '1' : !modelUrl && params.
 
 tracker
   .init()
-  .then(() => startSource())
-  .catch((e) => setStatus(`TRACKER FAILED: ${e.message}`, true));
+  .then(() => (demoLocked ? undefined : startSource()))
+  .catch((e) => setStatus(t('stage.trackerFailed', { error: e.message }), true));
+
+// ---------------------------------------------------------------- AI agents: local MCP server (src/app/mcpBridge.ts, src-tauri/src/mcp)
+const mcp = mountMcpBridge({
+  settings,
+  persist,
+  viewer,
+  home,
+  avatar: () => avatar,
+  modelHash: () => modelHash,
+  motion: () => motion,
+  loadModel,
+  demoLocked: () => demoLocked,
+  tracker,
+  handStats,
+  gestures: () => gestures.current,
+  trackState: () => trackState()[0],
+  sourceKind: () => source.kind,
+  renderFps: () => renderTimes.length,
+  outputs: () => ({ vmc: settings.vmc.enabled, vmcTarget: `${settings.vmc.host}:${settings.vmc.port}`, vcam: vcam.running }),
+  framing: () => currentFraming,
+  set: {
+    mode: setMode,
+    smoothing: (v) => {
+      settings.smoothing = v;
+      face.setSmoothing(v);
+      updatePoseFilter();
+      persist();
+      $<HTMLInputElement>('smoothing').value = String(v);
+      $('smoothing-out').textContent = v.toFixed(2);
+    },
+    framing: (f) => {
+      currentFraming = f;
+      segSet('framing', f);
+      viewer.frame(f);
+    },
+    background: (kind, color) => {
+      settings.background = { ...settings.background, kind, color: color ?? settings.background.color };
+      persist();
+      applyBackground();
+    },
+    physicsMode: setPhysicsMode,
+  },
+  mount: document.getElementById('mcp-controls'),
+  t,
+});
 
 // Test hooks (used by the Playwright harness in scripts/).
 Object.assign(window, {
@@ -1200,6 +1283,7 @@ Object.assign(window, {
     padNav,
     modals,
     vcam,
+    mcp,
     env: envUi,
     frame: (f: Framing) => {
       currentFraming = f;

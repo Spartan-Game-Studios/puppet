@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "VPUPPET DEMO",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 600,
+        "transparent": true,
+        "dragDropEnabled": true,
+        "backgroundThrottling": "disabled"
+      }
+    ]
+  },
+  "bundle": {
+    "macOS": {
+      "files": {
+        "MacOS/libsteam_api.dylib": "vendor/steam/libsteam_api.dylib"
+      }
+    }
+  }
+}

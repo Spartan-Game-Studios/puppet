@@ -1,19 +1,19 @@
-// Puppet Virtual Camera: CoreMediaIO Camera Extension (macOS 12.3+).
+// VPuppet Virtual Camera: CoreMediaIO Camera Extension (macOS 12.3+).
 //
-// One device, "Puppet Virtual Camera", with two streams:
-//   - a SINK stream the Puppet app writes BGRA frames into (through the CMIO
+// One device, "VPuppet Virtual Camera", with two streams:
+//   - a SINK stream the VPuppet app writes BGRA frames into (through the CMIO
 //     C API, see src-tauri/macos/bridge/PuppetVCamBridge.m), and
 //   - a SOURCE stream that Zoom, Meet, Discord, FaceTime etc. read.
 // Every frame consumed from the sink is forwarded to the source (scaled with
 // vImage if the client picked the other resolution).
 //
-// The device exists only while Puppet is running with its camera output on.
+// The device exists only while VPuppet is running with its camera output on.
 // The app announces itself with a Darwin notification heartbeat (see
 // PRESENCE_NOTIFY and pvc_presence in PuppetVCamBridge.m): the provider adds
 // the device on the first beat and removes it when the app says "off" (camera
 // toggled off, app quit) or when beats stop for PRESENCE_TIMEOUT (app crashed
 // or was killed). Between the device appearing and the first frame, or if
-// frames stall, clients see a "PUPPET / WAITING FOR FRAMES" card.
+// frames stall, clients see a "VPUPPET / WAITING FOR FRAMES" card.
 //
 // Written from Apple's CoreMediaIO headers; no third-party code.
 
@@ -29,18 +29,18 @@ import os.log
 
 // Must match PVC_DEVICE_UUID / PVC_DEVICE_NAME in PuppetVCamBridge.m.
 let DEVICE_UUID = UUID(uuidString: "6A3B1E0C-4F7D-4E8A-9C21-5B0D7E2F9A41")!
-let DEVICE_NAME = "Puppet Virtual Camera"
+let DEVICE_NAME = "VPuppet Virtual Camera"
 let SOURCE_STREAM_UUID = UUID(uuidString: "0C9E5B7A-2D41-4C3F-8E6A-1F2B3C4D5E60")!
 let SINK_STREAM_UUID = UUID(uuidString: "7D1F2A3B-5C6E-4F80-9A1B-2C3D4E5F6071")!
 // Must match PVC_PRESENCE_NOTIFY in PuppetVCamBridge.m. The notification's
-// state is a beat counter while Puppet's camera output is on, 0 when it is off.
-let PRESENCE_NOTIFY = "com.spartangamestudios.puppet.camera.presence"
-/// No beat (or frame) for this long: Puppet is gone, remove the device.
+// state is a beat counter while VPuppet's camera output is on, 0 when it is off.
+let PRESENCE_NOTIFY = "com.spartangamestudios.vpuppet.camera.presence"
+/// No beat (or frame) for this long: VPuppet is gone, remove the device.
 let PRESENCE_TIMEOUT_NS: UInt64 = 3_500_000_000
 let FPS: Int32 = 30
 let SIZES: [(Int32, Int32)] = [(1280, 720), (1920, 1080)]
 
-let log = Logger(subsystem: "com.spartangamestudios.puppet.camera", category: "extension")
+let log = Logger(subsystem: "com.spartangamestudios.vpuppet.camera", category: "extension")
 
 func makeFormats() -> [CMIOExtensionStreamFormat] {
     SIZES.map { (w, h) in
@@ -75,8 +75,8 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         super.init()
         device = CMIOExtensionDevice(localizedName: DEVICE_NAME, deviceID: DEVICE_UUID, legacyDeviceID: nil, source: self)
         let formats = makeFormats()
-        sourceStream = StreamSource(name: "Puppet Video", id: SOURCE_STREAM_UUID, formats: formats, device: self)
-        sinkStream = SinkSource(name: "Puppet Input", id: SINK_STREAM_UUID, formats: formats, device: self)
+        sourceStream = StreamSource(name: "VPuppet Video", id: SOURCE_STREAM_UUID, formats: formats, device: self)
+        sinkStream = SinkSource(name: "VPuppet Input", id: SINK_STREAM_UUID, formats: formats, device: self)
         do {
             try device.addStream(sourceStream.stream)
             try device.addStream(sinkStream.stream)
@@ -92,7 +92,7 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
     func deviceProperties(forProperties properties: Set<CMIOExtensionProperty>) throws -> CMIOExtensionDeviceProperties {
         let p = CMIOExtensionDeviceProperties(dictionary: [:])
         if properties.contains(.deviceTransportType) { p.transportType = kIOAudioDeviceTransportTypeVirtual }
-        if properties.contains(.deviceModel) { p.model = "Puppet" }
+        if properties.contains(.deviceModel) { p.model = "VPuppet" }
         return p
     }
 
@@ -143,7 +143,7 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         send(pb, at: now)
     }
 
-    // MARK: sink side (the Puppet app)
+    // MARK: sink side (the VPuppet app)
 
     /// A frame from the app: forward it to the source stream.
     func deliver(_ sbuf: CMSampleBuffer) {
@@ -208,7 +208,7 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         guard let pb = newBuffer(w, h) else { return nil }
         CVPixelBufferLockBaseAddress(pb, [])
         if let base = CVPixelBufferGetBaseAddress(pb) {
-            // Near-black (#101010) with a label, so a stalled feed reads as Puppet's, not a broken camera.
+            // Near-black (#101010) with a label, so a stalled feed reads as VPuppet's, not a broken camera.
             memset(base, 0x10, CVPixelBufferGetBytesPerRow(pb) * h)
             drawCard(base, w, h, CVPixelBufferGetBytesPerRow(pb))
         }
@@ -217,7 +217,7 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
         return pb
     }
 
-    /// "PUPPET" over "WAITING FOR FRAMES", centred, in the app's monospace style.
+    /// "VPUPPET" over "WAITING FOR FRAMES", centred, in the app's monospace style.
     private func drawCard(_ base: UnsafeMutableRawPointer, _ w: Int, _ h: Int, _ rowBytes: Int) {
         let info = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         guard let ctx = CGContext(data: base, width: w, height: h, bitsPerComponent: 8, bytesPerRow: rowBytes,
@@ -235,7 +235,7 @@ final class DeviceSource: NSObject, CMIOExtensionDeviceSource {
             CTLineDraw(l, ctx)
         }
         // Bitmap contexts map memory row 0 to the top, so y counts up from the bottom edge as usual.
-        line("PUPPET", size: 72, alpha: 1, y: 380)
+        line("VPUPPET", size: 72, alpha: 1, y: 380)
         line("WAITING FOR FRAMES", size: 24, alpha: 0.6, y: 320)
     }
 
@@ -297,7 +297,7 @@ final class StreamSource: NSObject, CMIOExtensionStreamSource {
     func stopStream() throws { device?.sourceStopped() }
 }
 
-// MARK: - Sink stream (what the Puppet app writes)
+// MARK: - Sink stream (what the VPuppet app writes)
 
 final class SinkSource: NSObject, CMIOExtensionStreamSource {
     private(set) var stream: CMIOExtensionStream!
@@ -373,7 +373,7 @@ final class SinkSource: NSObject, CMIOExtensionStreamSource {
 
 // MARK: - Provider
 
-/// Adds the device while Puppet is alive (heartbeat), removes it otherwise.
+/// Adds the device while VPuppet is alive (heartbeat), removes it otherwise.
 final class ProviderSource: NSObject, CMIOExtensionProviderSource {
     private(set) var provider: CMIOExtensionProvider!
     private var deviceSource: DeviceSource!

@@ -1,0 +1,33 @@
+---
+title: Crear un avatar con Daz 3D
+description: De Daz Studio a un VRM que VPuppet puede cargar, pasando por Blender, y las licencias que debes revisar antes.
+---
+
+Los personajes de Daz Studio se pueden convertir en avatares VRM a través de Blender. Es una ruta avanzada: cuenta con dedicar tiempo al rig, a las formas de la cara y al rendimiento.
+
+<Callout type="warn" title="Revisa primero la licencia">
+El contenido de Daz está sujeto al EULA de Daz, que restringe la distribución y la exportación de sus recursos 3D, y algunos usos requieren una licencia adicional (Daz vende una Interactive License para usar contenido en software interactivo). Un VRM contiene la malla y las texturas completas, así que subirlo o compartirlo equivale a distribuirlas. Lee el [EULA de Daz 3D](https://www.daz3d.com/eula) y las condiciones de cada producto que uses antes de empezar. Esta página no es asesoramiento legal.
+</Callout>
+
+## 1. De Daz Studio a Blender
+
+Crea y viste tu figura en Daz Studio y luego llévala a Blender. El puente oficial **Daz to Blender** es una opción; exportar FBX desde Daz Studio es otra. Cada una tiene su propia documentación; sigue la de la versión actual.
+
+## 2. Convertirlo en VRM en Blender
+
+Instala el [VRM Add-on for Blender](https://vrm-addon-for-blender.info/). Exporta VRM 0.x y 1.0 y documenta cada paso. A grandes rasgos:
+
+- **Huesos humanoides.** Asigna los huesos de la figura a los huesos humanoides de VRM (cadera, columna, pecho, cuello, cabeza, brazos, manos, dedos, piernas, ojos). VPuppet los necesita para seguirte.
+- **Pose de reposo.** Una pose en T es la pose de reposo más segura para VRM. MODEL INFO en VPuppet avisa cuando la pose de reposo no lo es.
+- **Expresiones.** Registra las shape keys de la cara como expresiones VRM. Para **perfect sync**, crea shape keys para los 52 blendshapes de ARKit (`eyeBlinkLeft`, `jawOpen`, `mouthSmileLeft`...) asignando o combinando los morphs faciales de la figura, y registra cada una con su nombre de ARKit. VPuppet compara los nombres sin tener en cuenta mayúsculas ni signos de puntuación, así que `eyeBlinkLeft`, `EyeBlinkLeft` y `eye_blink_left` funcionan todos, y necesita al menos 40 de los 52 para tratar el modelo como perfect sync. Si no los tienes, añade al menos los presets de VRM (parpadeo, `aa` `ih` `ou` `ee` `oh`, emociones).
+- **Spring bones.** Añade cadenas de spring bones para el pelo y la ropa suelta, con colisionadores en la cabeza y el cuerpo. El [solver de tela](../physics.mdx) de VPuppet se basa en estas cadenas.
+
+## 3. Mantenlo ligero
+
+Las figuras de Daz están pensadas para renderizar y suelen pesar mucho más de lo que necesita un avatar en tiempo real. Reduce las mallas que no se van a ver de cerca, elimina la geometría oculta (el cuerpo bajo la ropa), combina materiales donde puedas y reduce el tamaño de las texturas. El seguimiento y el renderizado comparten tu ordenador, así que un modelo más ligero deja más recursos para el seguimiento. La tarjeta de la biblioteca de VPuppet muestra el número de triángulos.
+
+## 4. Compruébalo en VPuppet
+
+Importa el `.vrm` en la [biblioteca de modelos](../model-library.mdx) y abre **MODEL INFO** (`I`). Su sección **MODEL CHECKS** enumera problemas como huesos que faltan, una cara que apunta en dirección contraria al esqueleto o expresiones que no hacen nada. Corrígelos en Blender y vuelve a exportar.
+
+Un agente de IA conectado a VPuppet puede hacer este ciclo contigo: inspeccionar el modelo, volver a importar cada nueva exportación y probar cada forma de perfect sync. Consulta [Conectar un agente de IA](../mcp.mdx#workflow).

@@ -345,7 +345,7 @@ function html(results) {
 <tr class="shots"><td colspan="${keys.length + 1}">${['neutral', 'driven', 'gaze', 'frame-bust', 'frame-upper', 'frame-full', 'full', 'back', 'app-rest-body', 'app-head-left', 'app-arms-up', 'app-model-info', 'app-card'].map((k) => img(r, k)).join('')}${clipShots}</td></tr>`;
   });
   const sumRows = keys.map((k) => `<tr><th>${k}</th><td class="PASS">${summary[k].PASS}</td><td class="WARN">${summary[k].WARN}</td><td class="FAIL">${summary[k].FAIL}</td><td class="NA">${summary[k]['N/A']}</td></tr>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Puppet VRM compatibility</title>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VPuppet VRM compatibility</title>
 <style>
 :root{--bg:#f4f3ee;--fg:#1b1b1b;--mute:#666;--pass:#d7ecd3;--warn:#f6e7b5;--fail:#f4c4c0;--na:#e4e4e4;--line:#ccc}
 @media (prefers-color-scheme:dark){:root{--bg:#161616;--fg:#e8e8e8;--mute:#999;--pass:#21402a;--warn:#4a3f17;--fail:#55201d;--na:#2a2a2a;--line:#333}}
@@ -355,7 +355,7 @@ td small,th small{display:block;color:var(--mute);font-weight:normal;max-width:2
 .PASS{background:var(--pass)}.WARN{background:var(--warn)}.FAIL{background:var(--fail)}.NA{background:var(--na)}
 .model{min-width:180px}.thumb{width:128px;height:128px}ul.warn{margin:4px 0;padding-left:16px;color:#b04000}
 tr.shots img{height:150px;margin:2px}.wrap{overflow-x:auto}
-</style></head><body><h1>Puppet VRM compatibility sweep</h1>
+</style></head><body><h1>VPuppet VRM compatibility sweep</h1>
 <p>${results.length} models · generated ${new Date().toISOString()} · app pass ${appPass ? 'on (tracking clip)' : 'off'}</p>
 <table><tr><th>check</th><th>PASS</th><th>WARN</th><th>FAIL</th><th>N/A</th></tr>${sumRows}</table>
 <h2>Models</h2><div class="wrap"><table><tr><th>model</th>${keys.map((k) => `<th>${k}</th>`).join('')}</tr>${rows.join('\n')}</table></div></body></html>`;

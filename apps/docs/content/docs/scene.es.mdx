@@ -1,0 +1,68 @@
+---
+title: Escena y entornos 3D
+description: Fondos, las seis escenas 3D integradas, tus propias escenas y cielos, el encuadre y la vista de captura.
+---
+
+Abre **SCENE** (`B`) para elegir qué hay detrás del avatar.
+
+## Fondo
+
+La sección **BACKGROUND** ofrece:
+
+- **COLOUR**: un color sólido, con presets para croma (verde, azul, magenta...) o cualquier color que elijas;
+- **CLEAR**: una ventana transparente;
+- **IMAGE**: una imagen de tu elección (**PICK IMAGE**);
+- **3D**: un entorno 3D iluminado (`E` lo activa y desactiva).
+
+<Callout title="Las cámaras no tienen canal alfa">
+La cámara virtual no puede transmitir transparencia. Con CLEAR, envía el avatar sobre el color elegido (verde por defecto), así que el croma sigue funcionando en la app que lo recibe.
+</Callout>
+
+## Entornos 3D
+
+![Los seis entornos integrados](/screenshots/environments.jpg)
+
+Pulsa `E` (o cambia el fondo a 3D) para colocar al avatar en una escena iluminada. Las seis escenas integradas las genera la app en tiempo de ejecución:
+
+| Escena | Qué es |
+|---|---|
+| STUDIO CYCLORAMA | Ciclorama continuo de estudio fotográfico, luz principal, de relleno y de contorno suaves, dos softboxes que enmarcan el plano |
+| COSY ROOM | Rincón empapelado con una estantería, una ventana al anochecer, una alfombra y una lámpara de pie que ilumina al avatar |
+| MOOR AT DUSK | Brezal ondulado, un círculo de piedras erguidas, sol bajo, niebla y bruma a la deriva |
+| NIGHT CLEARING | Círculo de coníferas bajo un cielo estrellado, luz de luna y luciérnagas |
+| NEON GRID | Cuadrícula synthwave en movimiento, sol a rayas, crestas brillantes |
+| CONCRETE HALL | Hormigón encofrado, columnas, ranuras de luz, una ventana alargada y una línea naranja |
+| CUSTOM | Tu propia escena `.glb` / `.gltf` y un cielo equirectangular `.hdr` / `.exr` |
+
+### Tu propia escena
+
+Carga un `.glb` o `.gltf` con **SCENE** y un cielo con **SKY**, o arrastra los archivos a la ventana. Un `.gltf` puede hacer referencia a archivos `.bin` y de textura situados junto a él. **NO SKY** quita un cielo personalizado.
+
+- **Colocación:** SCALE (0,01–100×), POS X / Y / Z y ROTATE. Una escena cargada se centra bajo el avatar con su punto más bajo en el suelo.
+- **FLOOR M** (en todas las escenas) sube o baja la escena para que coincida con los pies del avatar.
+- Un cielo HDR personalizado también ilumina al avatar y la escena.
+
+La app vuelve a abrir la última escena y el último cielo personalizados. **RESET THIS SCENE** restablece el aspecto y la colocación de una escena.
+
+### Aspecto
+
+- **Luz:** SCENE usa la iluminación propia de la escena; KEY, RIM y SOFT le dan otro estilo. **INTENSITY** y **TEMP K** (balance de blancos; 6500 es neutro) se aplican encima. La iluminación se mantiene dentro de un rango en el que la cara ni se quema a blanco ni se vuelve negra.
+- **Atmósfera:** **FOG** (niebla; 0,5 es el valor por defecto de la escena) y **GROUND SHADOW** (sombra en el suelo) bajo el avatar.
+- **Cámara:** **IDLE SWAY** añade una deriva lenta de unos ±1 cm. **DEPTH OF FIELD** (profundidad de campo; desactivada por defecto, solo en calidad HIGH) mantiene nítido al avatar y desenfoca el fondo.
+- **Calidad:** **LOW** usa una sombra difusa simple y ningún posprocesado. **HIGH** añade una sombra direccional real y permite la profundidad de campo.
+
+Los ajustes de aspecto se guardan por escena.
+
+<Callout type="warn" title="Rendimiento">
+La profundidad de campo reduce notablemente la velocidad a la que puede funcionar el seguimiento; por eso está desactivada por defecto. Si el seguimiento va lento en una escena 3D, prueba primero la calidad LOW.
+</Callout>
+
+## Encuadre
+
+**02 FRAMING** en el escenario elige **BUST** (busto), **UPPER** (medio cuerpo) o **FULL** (cuerpo entero). El encuadre se adapta al avatar, así que los modelos muy pequeños o muy grandes también se encuadran de forma razonable.
+
+## Vista de captura
+
+Pulsa `H` (o **CAPTURE VIEW** en la barra superior) para ocultar toda la interfaz y dejar solo el avatar, para una captura de ventana limpia en OBS. `Esc` sale de la vista de captura.
+
+La cámara virtual siempre envía esta vista de captura, se esté mostrando en pantalla o no.

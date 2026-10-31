@@ -1,0 +1,60 @@
+[img]{STEAM_APP_IMAGE}/extras/vpuppet_banner_face.gif[/img]
+
+VPuppet convierte una webcam normal en un equipo completo para VTuber. Carga tu avatar VRM y seguirá tu rostro, tu cuerpo, tus manos y tus dedos en tiempo real, con expresiones, física de ropa y cabello, emotes y un escenario 3D donde estar. Luego llévalo a donde quieras: VPuppet aparece como una cámara llamada [b]VPuppet Virtual Camera[/b] en Zoom, Google Meet, Discord y OBS, y transmite datos por el protocolo VMC a otras apps para VTubers.
+
+Sin iPhone, sin cámara de profundidad, sin traje de captura. Todo se ejecuta en tu propio equipo; la imagen de la cámara nunca sale de él.
+
+[h2]Tu rostro, 1:1[/h2]
+[list]
+[*][b]52 blendshapes de ARKit desde una webcam.[/b] Google MediaPipe lee las mismas 52 formas faciales que usa el seguimiento facial del iPhone (salvo la lengua), además de la rotación de la cabeza y la mirada.
+[*][b]Perfect sync.[/b] Si tu modelo tiene las expresiones de ARKit, cada una se controla directamente, así que cada ceja, mejilla y forma de la boca se mueve tal como la esculpió su artista. Los modelos que no las tienen reciben parpadeos, las cinco vocales y emociones derivadas para ellos.
+[*][b]Ajusta cada forma.[/b] Ganancia y curva por blendshape, en vivo junto al valor original, para que una boca que apenas se abre se lea con claridad en el stream.
+[*][b]Calibración con una tecla:[/b] captura tu rostro neutro, el ángulo de la cabeza y la mirada.
+[/list]
+
+[img]{STEAM_APP_IMAGE}/extras/vpuppet_hands.gif[/img]
+
+[h2]Cuerpo, manos y dedos[/h2]
+[list]
+[*][b]Parte superior del cuerpo:[/b] columna, pecho, hombros y brazos, con una articulación de codo real y límites para que los brazos nunca se doblen hacia atrás.
+[*][b]Las manos y cada dedo[/b] se siguen en paralelo con el cuerpo. Ambas manos se buscan en cada fotograma, así que una mano se detecta aunque el seguimiento del cuerpo haya perdido la muñeca.
+[*][b]Gestos:[/b] puño, palma abierta, señalar, paz, pulgar arriba, OK y cuernos, por cada mano, que puedes asignar a emotes.
+[*]Elige FACE, +BODY o +HANDS según tu cámara, tu equipo y tu stream.
+[/list]
+
+[h2]Aparece en cualquier lugar[/h2]
+[list]
+[*][b]Cámara virtual:[/b] VPuppet aparece como webcam en Zoom, Meet, Discord, OBS y otras apps, a 1280×720 o 1920×1080, 30 fps. Con un fondo liso envía un color de croma de tu elección.
+[*][b]Salida por protocolo VMC[/b] a VSeeFace, Warudo, VNyan y otros receptores VMC, en este mismo equipo o en otro de tu red.
+[*][b]La vista de captura[/b] oculta todos los controles para capturar la ventana limpia en OBS.
+[/list]
+
+[img]{STEAM_APP_IMAGE}/extras/vpuppet_environments.png[/img]
+
+[h2]Dale vida[/h2]
+[list]
+[*][b]Física de ropa y cabello[/b] basada en los propios spring bones de tu modelo. Las cadenas vecinas de faldas y capas están enlazadas para moverse como un solo panel, y los colisionadores del cuerpo se ajustan a tu modelo para que la tela caiga sobre piernas y brazos en lugar de atravesarlos.
+[*][b]Emotes y expresiones con atajos:[/b] saludar, asentir, aplaudir, celebrar, hacer una reverencia, encogerse de hombros y más, además de animaciones idle en bucle, superpuestas al seguimiento en vivo. Asígnalos al teclado, a un gamepad o a un gesto de la mano; las teclas pueden funcionar en todo el sistema mientras OBS o un juego tienen el foco.
+[*][b]Usa tus propias animaciones:[/b] importa clips FBX o glTF (se detectan Mixamo, VRoid y los rigs más comunes) y se retargetean a tu avatar.
+[*][b]Lip sync por micrófono:[/b] mantiene tu boca en movimiento cuando apartas la vista de la cámara, o se combina con el seguimiento.
+[*][b]Entornos 3D:[/b] seis escenas iluminadas incluidas (estudio fotográfico, habitación acogedora, páramo al anochecer, claro nocturno, cuadrícula de neón, sala de cemento) o tu propia escena glTF con un cielo HDR.
+[/list]
+
+[h2]Tus modelos, en orden[/h2]
+[list]
+[*]Una pantalla de inicio con tu [b]biblioteca de modelos[/b]: miniaturas, búsqueda, favoritos y ajustes por modelo.
+[*]Compatible con [b]VRM 0.x y 1.0[/b], por ejemplo, modelos exportados desde VRoid Studio.
+[*]Los términos de licencia de cada modelo se leen del archivo y se muestran en lenguaje sencillo, para que sepas qué permite cada autor.
+[*][b]Pensado para gamepad:[/b] puedes llegar a cada control de la app con un gamepad, y el gamepad sirve además como panel de emotes mientras actúas.
+[/list]
+
+[h2]Código abierto[/h2]
+El código fuente de VPuppet tiene licencia MIT y es público en GitHub. La versión de Steam es la compilación firmada y lista para usar que se actualiza sola a través de Steam e incluye soporte. Comprarla también es la forma de financiar su desarrollo.
+
+[h2]Antes de comprar[/h2]
+[list]
+[*][b]Se necesita una webcam.[/b] Una iluminación buena y uniforme en el rostro es lo que más mejora el seguimiento.
+[*][b]VPuppet no incluye ningún avatar.[/b] Usa tu propio modelo VRM o crea uno gratis en VRoid Studio.
+[*]El seguimiento corporal cubre la parte superior del cuerpo y los brazos. Las piernas siguen las animaciones idle y los emotes; no se puede caminar.
+[*]Pruébalo primero: la demo gratuita es la app completa durante 100 horas de uso.
+[/list]

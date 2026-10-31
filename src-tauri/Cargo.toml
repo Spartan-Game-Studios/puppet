@@ -1,15 +1,16 @@
 [package]
-name = "puppet"
+name = "vpuppet"
 version = "0.1.0"
-description = "Free, open-source webcam VTuber app"
+description = "Webcam VTuber app"
 authors = ["Spartan Game Studios"]
 license = "MIT"
 repository = "https://github.com/Spartan-Game-Studios/puppet"
 edition = "2021"
-rust-version = "1.77"
+# 1.88: rmcp (the MCP SDK, src/mcp).
+rust-version = "1.88"
 
 [lib]
-name = "puppet_lib"
+name = "vpuppet_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -23,6 +24,23 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rosc = "0.11"
 tauri-plugin-global-shortcut = "2"
+hmac = "0.12"
+sha2 = "0.10"
+steamworks = { version = "0.13", optional = true }
+# Local MCP server (src/mcp): the official Rust MCP SDK over Streamable HTTP,
+# served by axum on Tauri's tokio runtime.
+rmcp = { version = "3.8", default-features = false, features = ["server", "transport-streamable-http-server"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "1", features = ["net", "time", "sync", "rt", "macros"] }
+tokio-util = "0.7"
+getrandom = "0.3"
+
+[features]
+# The free Steam demo: 100 hours of use, then the outputs lock (src/demo.rs).
+demo = []
+# Steamworks: mirrors the demo clock to a Steam stat. Needs the Steam
+# redistributable next to the binary (scripts/stage-steam-redist.mjs).
+steam = ["dep:steamworks"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = "2.0"

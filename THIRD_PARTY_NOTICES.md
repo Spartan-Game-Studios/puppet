@@ -1,6 +1,6 @@
 # Third-party notices
 
-Puppet is MIT licensed. It uses the components below. Every direct dependency
+VPuppet is MIT licensed. It uses the components below. Every direct dependency
 is under a permissive licence; transitive notes are at the end.
 
 ## Shipped in the app (frontend)
@@ -34,11 +34,11 @@ is under a permissive licence; transitive notes are at the end.
 
 | Component | Version | Licence | Notes |
 |---|---|---|---|
-| [softcam](https://github.com/tshino/softcam) | v1.8.1 (`afb424c`) | MIT, Copyright (c) 2020 tshino | Windows only. Built by `scripts/build-softcam.ps1` from the pinned commit, with Puppet's own filter name, CLSID and shared-memory names patched in; shipped as `softcam.dll` with its licence as `LICENSE-softcam.txt`. Loaded at runtime, not linked. |
+| [softcam](https://github.com/tshino/softcam) | v1.8.1 (`afb424c`) | MIT, Copyright (c) 2020 tshino | Windows only. Built by `scripts/build-softcam.ps1` from the pinned commit, with VPuppet's own filter name, CLSID and shared-memory names patched in; shipped as `softcam.dll` with its licence as `LICENSE-softcam.txt`. Loaded at runtime, not linked. |
 | DirectShow Base Classes (part of softcam, from [Windows-classic-samples](https://github.com/microsoft/Windows-classic-samples)) | as in softcam | MIT, Copyright (c) Microsoft Corporation | compiled into `softcam.dll` |
-| Puppet camera extension (`src-tauri/macos/camera-extension/`) and bridge (`src-tauri/macos/bridge/`) | | MIT (Puppet's own code) | macOS only; uses Apple system frameworks (CoreMediaIO, CoreMedia, CoreVideo, Accelerate, SystemExtensions) |
+| VPuppet camera extension (`src-tauri/macos/camera-extension/`) and bridge (`src-tauri/macos/bridge/`) | | MIT (VPuppet's own code) | macOS only; uses Apple system frameworks (CoreMediaIO, CoreMedia, CoreVideo, Accelerate, SystemExtensions) |
 
-Linux uses the user-installed [v4l2loopback](https://github.com/umlaeute/v4l2loopback) kernel module (GPL-2.0) only through the standard V4L2 device interface (`open`, `ioctl`, `write` on `/dev/videoN`). No v4l2loopback code is linked into or shipped with Puppet.
+Linux uses the user-installed [v4l2loopback](https://github.com/umlaeute/v4l2loopback) kernel module (GPL-2.0) only through the standard V4L2 device interface (`open`, `ioctl`, `write` on `/dev/videoN`). No v4l2loopback code is linked into or shipped with VPuppet.
 
 Transitive Rust dependencies (about 250 crates, pulled in by Tauri) are almost
 all MIT / Apache-2.0 / BSD / ISC / Zlib / Unicode-3.0 / Unlicense. Run
@@ -49,7 +49,7 @@ all MIT / Apache-2.0 / BSD / ISC / Zlib / Unicode-3.0 / Unlicense. Run
 - `option-ext` (MPL-2.0) is linked into the app through Tauri (`tauri → dirs → dirs-sys → option-ext`).
 - `cssparser`, `cssparser-macros`, `selectors` and `dtoa-short` (MPL-2.0) are used only at compile time, by Tauri's code-generation macros.
 
-MPL-2.0 is file-level copyleft. Using these crates unmodified (their source is on crates.io) places no obligations on Puppet's own MIT code. They come with Tauri itself and every Tauri app carries them.
+MPL-2.0 is file-level copyleft. Using these crates unmodified (their source is on crates.io) places no obligations on VPuppet's own MIT code. They come with Tauri itself and every Tauri app carries them.
 
 ## Dev / test only (not shipped)
 
@@ -66,9 +66,9 @@ MPL-2.0 is file-level copyleft. Using these crates unmodified (their source is o
 | Asset | Licence | Notes |
 |---|---|---|
 | `public/clips/ual.glb`: 12 clips from the [Universal Animation Library](https://quaternius.com) and Universal Animation Library 2 by Quaternius (`Idle_Loop`, `Idle_LookAround_Loop`, `Idle_Talking_Loop`, `Idle_FoldArms_Loop`, `Yes`, `Idle_No_Loop`, `Celebration`, `Dance_Loop`, `Sitting_Idle_Loop`, `Counter_Angry`, `Crying`, `Drink`) | CC0 1.0 (both packs' `License.txt`) | skeleton and bone tracks only, made by `scripts/build-builtin-clips.mjs`; the source names are in each animation's `extras.source` |
-| WAVE, CLAP, BOW, POINT, SHRUG, THINK (`src/anim/authored.ts`) | MIT (Puppet's own) | keyframed poses |
+| WAVE, CLAP, BOW, POINT, SHRUG, THINK (`src/anim/authored.ts`) | MIT (VPuppet's own) | keyframed poses |
 
-Retargeting (`src/anim/retarget.ts`) is Puppet's own code. The idea of mapping a clip onto a VRM's normalized bones through world-space rest rotations is the one three-vrm's `loadMixamoAnimation` example shows (MIT); no code was copied from it. Users' imported clips (Mixamo or other) stay on their machine and are never bundled.
+Retargeting (`src/anim/retarget.ts`) is VPuppet's own code. The idea of mapping a clip onto a VRM's normalized bones through world-space rest rotations is the one three-vrm's `loadMixamoAnimation` example shows (MIT); no code was copied from it. Users' imported clips (Mixamo or other) stay on their machine and are never bundled.
 
 ## Environment assets
 

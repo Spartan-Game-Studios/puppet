@@ -1,6 +1,6 @@
-// Puppet: keep running in the background (macOS).
+// VPuppet: keep running in the background (macOS).
 //
-// Puppet is a live video source: while it is minimized, hidden or covered it
+// VPuppet is a live video source: while it is minimized, hidden or covered it
 // must keep tracking, rendering and sending (virtual camera, VMC). Three
 // things stand in the way on macOS, and this file turns each off:
 //
@@ -37,7 +37,7 @@ void pbg_begin_activity(void) {
     dispatch_once(&once, ^{
         g_activity = [[NSProcessInfo processInfo]
             beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep | NSActivityLatencyCritical
-                              reason:@"Puppet sends live video (virtual camera, VMC) while in the background"];
+                              reason:@"VPuppet sends live video (virtual camera, VMC) while in the background"];
     });
 }
 

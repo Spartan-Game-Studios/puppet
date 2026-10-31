@@ -1,0 +1,88 @@
+---
+title: Preguntas frecuentes y solución de problemas
+description: La demo, los permisos de la cámara, una cámara virtual que no aparece y otras dudas habituales.
+---
+
+## La demo
+
+### ¿Qué pasa después de 100 horas?
+
+El seguimiento en el escenario, la cámara virtual y la salida VMC se bloquean. La biblioteca de modelos sigue abriéndose y conserva todos los modelos que importaste. El bloqueo se aplica al iniciar VPuppet, nunca a mitad de un directo: si las horas se acaban mientras emites, esa sesión sigue funcionando.
+
+### ¿Pierdo mis modelos si compro la app completa?
+
+No. La app completa usa la misma biblioteca, así que no hace falta volver a importar nada.
+
+### ¿A la demo le faltan funciones?
+
+No. Hasta que se agotan las 100 horas, es la app completa.
+
+## Cámara
+
+### La cámara no se inicia [#camera-doesnt-start]
+
+- **Permite el acceso a la cámara.** La primera vez que inicias la cámara, el sistema operativo pide permiso. Si dijiste que no:
+  - **macOS:** Ajustes del Sistema → Privacidad y seguridad → Cámara, y activa VPuppet. Después reinicia VPuppet.
+  - **Windows:** Configuración → Privacidad y seguridad → Cámara, y permite que las aplicaciones de escritorio usen la cámara.
+- **Puede que otra app esté usando la cámara.** Cierra la app de videollamadas o la pestaña del navegador que la tiene ocupada y pulsa **START CAMERA** en la sección **SOURCE**.
+- **Elige la cámara correcta** en SOURCE si tienes más de una.
+
+### El seguimiento va lento o con retraso
+
+- Usa un modo de seguimiento inferior: FACE (`1`) es el que menos consume, +HANDS (`3`) el que más.
+- Pon **POSE MODEL** en LITE.
+- En un entorno 3D, elige la calidad LOW y desactiva la profundidad de campo.
+- La superposición de depuración (`D`) muestra los fotogramas por segundo del renderizado y del seguimiento, y la latencia.
+- Sube **SMOOTHING** para un movimiento más estable, bájalo para una respuesta más rápida.
+
+### La cara del avatar se ve rara en reposo
+
+Siéntate como sueles hacerlo, con los ojos abiertos y la boca cerrada, y pulsa **CALIBRATE** (`C`).
+
+## Cámara virtual
+
+### VPuppet Virtual Camera no aparece [#vcam-not-listed]
+
+- **¿Está activada la salida?** La cámara solo aparece mientras **CAMERA OUTPUT** está activado (`W`) y VPuppet está abierto. Es intencionado: así no queda una cámara congelada cuando VPuppet no está enviando.
+- **Reinicia la otra app.** Muchas apps solo leen la lista de cámaras al iniciarse.
+- **macOS:**
+  - VPuppet debe estar en **/Applications** (Aplicaciones).
+  - La línea EXTENSION debe mostrar **ACTIVE**. Si indica que está esperando aprobación, haz clic en **OPEN SETTINGS** y apruébala.
+  - Si indica que hace falta reiniciar, reinicia el Mac.
+  - Las versiones que compilas tú no están firmadas y no pueden instalar la cámara; usa la [ruta con OBS](./virtual-camera.mdx#obs-route).
+- **Windows:** haz clic en **REGISTER CAMERA** y acepta el aviso de administrador. Las apps de 32 bits no ven la cámara.
+- **Linux:** crea el dispositivo loopback con el comando `modprobe` del panel; no sobrevive a un reinicio salvo que configures tu sistema para cargarlo. El dispositivo se llama **VPuppet**.
+
+### La cámara muestra WAITING FOR FRAMES
+
+La cámara existe, pero no llegan fotogramas. Comprueba que VPuppet esté abierto con CAMERA OUTPUT activado.
+
+### El fondo no es transparente en mi app de vídeo
+
+Las cámaras no tienen transparencia. Con CLEAR, VPuppet envía el color elegido (verde por defecto); recórtalo con croma en la app receptora.
+
+## VMC
+
+### Mi receptor no se mueve
+
+- Las dos apps deben usar el mismo puerto (por defecto `39539`) y el HOST de VPuppet debe apuntar al receptor (`127.0.0.1` en el mismo ordenador; si no, la IP local del otro PC).
+- **SEND VMC** debe estar marcado (`V`) y la recepción debe estar activada en la otra app.
+- Un cortafuegos puede bloquear el tráfico UDP entre dos ordenadores.
+
+### La cara está congelada en el receptor
+
+Si tu modelo es perfect sync y el receptor solo lee presets de VRM, deja activado **ALSO SEND VRM PRESETS**. En VSeeFace, activa perfect sync en el modelo receptor para usar los blendshapes de ARKit.
+
+## Modelos
+
+### ¿Qué modelos funcionan?
+
+Cualquier archivo `.vrm`, VRM 0.x o 1.0. VPuppet no incluye ningún avatar. Revisa la insignia de licencia de cada modelo para saber qué permite su autor.
+
+### ¿Puedo usar avatares FBX o glTF?
+
+Los avatares deben ser VRM. Los archivos `.fbx` y `.glb` se usan para clips de animación y escenas 3D. Para convertir otro modelo en VRM, consulta las [guías](./guides/vroid.mdx).
+
+### Antes usaba "Puppet"
+
+VPuppet antes se llamaba Puppet. El primer inicio traslada automáticamente los ajustes y la biblioteca antiguos al nuevo nombre.

@@ -1,4 +1,4 @@
-// Puppet virtual camera: app-side bridge (macOS).
+// VPuppet virtual camera: app-side bridge (macOS).
 //
 // Two jobs, exposed to Rust as plain C functions (src-tauri/src/vcam/macos.rs):
 //
@@ -7,10 +7,10 @@
 //    report where that stands: needs approval in System Settings, needs the
 //    app in /Applications, activated, failed (with the OSSystemExtension
 //    error code).
-// 2. Announce that Puppet is alive (pvc_presence): a Darwin notification
+// 2. Announce that VPuppet is alive (pvc_presence): a Darwin notification
 //    heartbeat the extension watches. It adds the camera device while beats
 //    arrive and removes it on "off" or when they stop (quit, crash).
-// 3. Feed frames to the extension: find the "Puppet Virtual Camera" CMIO
+// 3. Feed frames to the extension: find the "VPuppet Virtual Camera" CMIO
 //    device, take its sink stream (direction = output), and enqueue BGRA
 //    CMSampleBuffers into the sink's CMSimpleQueue. The extension forwards
 //    them to its source stream, which is what Zoom / Meet / Discord read.
@@ -27,12 +27,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#define PVC_EXTENSION_ID @"com.spartangamestudios.puppet.camera"
+#define PVC_EXTENSION_ID @"com.spartangamestudios.vpuppet.camera"
 // Must match DEVICE_UUID / DEVICE_NAME in camera-extension/Provider.swift.
 #define PVC_DEVICE_UUID @"6A3B1E0C-4F7D-4E8A-9C21-5B0D7E2F9A41"
-#define PVC_DEVICE_NAME @"Puppet Virtual Camera"
+#define PVC_DEVICE_NAME @"VPuppet Virtual Camera"
 // Must match PRESENCE_NOTIFY in camera-extension/Provider.swift.
-#define PVC_PRESENCE_NOTIFY "com.spartangamestudios.puppet.camera.presence"
+#define PVC_PRESENCE_NOTIFY "com.spartangamestudios.vpuppet.camera.presence"
 
 enum {
     PVC_REQ_IDLE = 0,
@@ -325,7 +325,7 @@ int32_t pvc_open(int32_t w, int32_t h, int32_t fps, char *err, int32_t errlen) {
     @synchronized(g_lock) {
         CMIODeviceID dev = find_device();
         if (dev == kCMIOObjectUnknown) {
-            copy_err(err, errlen, @"Puppet Virtual Camera device not found (extension not installed or not approved)");
+            copy_err(err, errlen, @"VPuppet Virtual Camera device not found (extension not installed or not approved)");
             return -1;
         }
         CMIOStreamID sink = kCMIOObjectUnknown;

@@ -1,7 +1,8 @@
 /** 08 HOTKEYS panel: bindings list, rebinding, global toggle, gamepad status. */
-import { defaultBindings, findConflicts, formatTrigger, newBindingId, type Action, type Binding, type Trigger } from './bindings';
+import { defaultBindings, findConflicts, formatTrigger, modeLabel, newBindingId, type Action, type Binding, type Trigger } from './bindings';
 import type { HotkeyManager } from './hotkeys';
 import type { ExpressionMode } from '../anim/expressions';
+import { t } from '../i18n';
 
 export interface HotkeyPanelContext {
   host: HTMLElement;
@@ -29,17 +30,17 @@ function actionValue(a: Action): string {
 export function mountHotkeyPanel(ctx: HotkeyPanelContext): { render: () => void; flash: (id: string) => void; status: () => void } {
   const { host } = ctx;
   host.innerHTML = `
-    <h2><span class="idx">08</span>HOTKEYS</h2>
-    <label class="check"><input type="checkbox" id="hk-global" /><span>GLOBAL (WORK WHILE PUPPET IS IN THE BACKGROUND)</span></label>
+    <h2><span class="idx">08</span>${t('motion.hk.title')}</h2>
+    <label class="check"><input type="checkbox" id="hk-global" /><span>${t('motion.hk.global')}</span></label>
     <div class="hk-status" id="hk-global-status"></div>
-    <div class="row"><span class="lbl">GAMEPAD</span><span class="val" id="hk-pad">NONE</span></div>
-    <div class="hk-head"><span>TRIGGER</span><span>ACTION</span><span>MODE</span><span title="This model only">MDL</span><span></span></div>
+    <div class="row"><span class="lbl">${t('motion.hk.gamepad')}</span><span class="val" id="hk-pad">${t('motion.hk.padNone')}</span></div>
+    <div class="hk-head"><span>${t('motion.hk.colTrigger')}</span><span>${t('motion.hk.colAction')}</span><span>${t('motion.hk.colMode')}</span><span title="${esc(t('motion.hk.colModelTitle'))}">${t('motion.hk.colModel')}</span><span></span></div>
     <div class="hk-list" id="hk-list"></div>
     <div class="row btns">
-      <button class="btn" id="hk-add">+ ADD</button>
-      <button class="btn ghost" id="hk-defaults" title="Replace all bindings with the starter set">DEFAULTS</button>
+      <button class="btn" id="hk-add">${t('motion.hk.add')}</button>
+      <button class="btn ghost" id="hk-defaults" title="${esc(t('motion.hk.defaultsTitle'))}">${t('motion.hk.defaults')}</button>
     </div>
-    <p class="note mute">CLICK A TRIGGER, THEN PRESS A KEY, PAD BUTTON OR GESTURE. <kbd>ESC</kbd> CANCELS. ● = THIS MODEL ONLY.</p>`;
+    <p class="note mute">${t('motion.hk.note')}</p>`;
   const list = host.querySelector<HTMLElement>('#hk-list')!;
   const globalCb = host.querySelector<HTMLInputElement>('#hk-global')!;
   globalCb.checked = ctx.global();
@@ -56,9 +57,9 @@ export function mountHotkeyPanel(ctx: HotkeyPanelContext): { render: () => void;
     const exprs = ctx.expressions().map((n) => opt(`expr:${n}`, `◐ ${n.toUpperCase()}`)).join('');
     let extra = '';
     if (!sel.startsWith('emote:') && !sel.startsWith('expr:') && sel !== 'reset' && sel !== 'picker' && sel !== 'camera') extra = opt(sel, sel);
-    else if (sel.startsWith('expr:') && !ctx.expressions().includes(sel.slice(5))) extra = opt(sel, `◐ ${sel.slice(5).toUpperCase()} (NOT ON MODEL)`);
-    else if (sel.startsWith('emote:') && !ctx.emotes().some(([id]) => `emote:${id}` === sel)) extra = opt(sel, `▶ ${sel.slice(6)} (MISSING)`);
-    return `${extra}<optgroup label="EMOTES">${emotes}</optgroup><optgroup label="EXPRESSIONS">${exprs}</optgroup>${opt('reset', '■ RESET')}${opt('picker', '▣ PICKER')}${opt('camera', '● CAMERA ON/OFF')}`;
+    else if (sel.startsWith('expr:') && !ctx.expressions().includes(sel.slice(5))) extra = opt(sel, `◐ ${t('motion.hk.notOnModel', { name: sel.slice(5).toUpperCase() })}`);
+    else if (sel.startsWith('emote:') && !ctx.emotes().some(([id]) => `emote:${id}` === sel)) extra = opt(sel, `▶ ${t('motion.hk.missing', { name: sel.slice(6) })}`);
+    return `${extra}<optgroup label="${esc(t('motion.hk.emotes'))}">${emotes}</optgroup><optgroup label="${esc(t('motion.hk.expressions'))}">${exprs}</optgroup>${opt('reset', `■ ${t('motion.act.reset')}`)}${opt('picker', `▣ ${t('motion.act.picker')}`)}${opt('camera', `● ${t('motion.act.camera')}`)}`;
   }
 
   function render(): void {
@@ -66,7 +67,7 @@ export function mountHotkeyPanel(ctx: HotkeyPanelContext): { render: () => void;
     const model = ctx.modelHash();
     const conflicts = findConflicts(all, model);
     const clash = new Map<string, string>();
-    for (const c of conflicts) for (const id of c.ids) clash.set(id, c.app ? `SHADOWS ${c.app}` : `SAME TRIGGER AS ${c.ids.filter((x) => x !== id).length} OTHER(S)`);
+    for (const c of conflicts) for (const id of c.ids) clash.set(id, c.app ? t('motion.hk.shadows', { app: c.app }) : t('motion.hk.sameTrigger', { n: c.ids.filter((x) => x !== id).length }));
     list.innerHTML = '';
     const shown = all.filter((b) => !b.model || b.model === model);
     for (const b of shown) {
@@ -75,19 +76,19 @@ export function mountHotkeyPanel(ctx: HotkeyPanelContext): { render: () => void;
       row.dataset.id = b.id;
       const isExpr = b.action.kind === 'expression';
       const label = b.trigger.kind === 'key' && !b.trigger.code ? '—' : formatTrigger(b.trigger, mac);
-      row.innerHTML = `<button class="trig${clash.has(b.id) ? ' clash' : ''}" title="${esc(clash.get(b.id) ?? 'Click to rebind')}">${esc(label)}</button>
+      row.innerHTML = `<button class="trig${clash.has(b.id) ? ' clash' : ''}" title="${esc(clash.get(b.id) ?? t('motion.hk.rebindTitle'))}">${esc(label)}</button>
         <select class="act">${actionOptions(actionValue(b.action))}</select>
-        <select class="mode"${isExpr ? '' : ' disabled'}>${(['toggle', 'on', 'momentary'] as ExpressionMode[]).map((m) => `<option value="${m}"${isExpr && (b.action as { mode: string }).mode === m ? ' selected' : ''}>${m === 'momentary' ? 'HOLD' : m.toUpperCase()}</option>`).join('')}</select>
-        <input type="checkbox" class="mdl" title="This model only (expressions differ per model)"${b.model ? ' checked' : ''}${model ? '' : ' disabled'} />
-        <button class="x" title="Remove">×</button>`;
+        <select class="mode"${isExpr ? '' : ' disabled'}>${(['toggle', 'on', 'momentary'] as ExpressionMode[]).map((m) => `<option value="${m}"${isExpr && (b.action as { mode: string }).mode === m ? ' selected' : ''}>${esc(modeLabel(m))}</option>`).join('')}</select>
+        <input type="checkbox" class="mdl" title="${esc(t('motion.hk.mdlTitle'))}"${b.model ? ' checked' : ''}${model ? '' : ' disabled'} />
+        <button class="x" title="${esc(t('motion.hk.removeTitle'))}">×</button>`;
       const trig = row.querySelector<HTMLButtonElement>('.trig')!;
       trig.addEventListener('click', () => {
         if (ctx.hotkeys.capturing) return;
         trig.classList.add('listen');
-        trig.textContent = 'PRESS…';
-        ctx.hotkeys.captureNext((t: Trigger) => {
-          if (t.kind === 'key' && !t.code) return render();
-          save(ctx.bindings().map((x) => (x.id === b.id ? { ...x, trigger: t } : x)));
+        trig.textContent = t('motion.hk.press');
+        ctx.hotkeys.captureNext((trg: Trigger) => {
+          if (trg.kind === 'key' && !trg.code) return render();
+          save(ctx.bindings().map((x) => (x.id === b.id ? { ...x, trigger: trg } : x)));
         });
       });
       row.querySelector<HTMLSelectElement>('.act')!.addEventListener('change', (e) => {
@@ -109,7 +110,7 @@ export function mountHotkeyPanel(ctx: HotkeyPanelContext): { render: () => void;
       row.querySelector<HTMLButtonElement>('.x')!.addEventListener('click', () => save(ctx.bindings().filter((x) => x.id !== b.id)));
       list.append(row);
     }
-    if (!shown.length) list.innerHTML = '<span class="empty-note">NO BINDINGS</span>';
+    if (!shown.length) list.innerHTML = `<span class="empty-note">${esc(t('motion.hk.empty'))}</span>`;
     status();
   }
 
@@ -126,11 +127,14 @@ export function mountHotkeyPanel(ctx: HotkeyPanelContext): { render: () => void;
   function status(): void {
     const st = host.querySelector<HTMLElement>('#hk-global-status')!;
     const g = ctx.hotkeys.globalStatus;
-    if (!ctx.global()) st.textContent = 'OFF: KEYS WORK WHILE THE PUPPET WINDOW IS FOCUSED. PAD BUTTONS WORK ALWAYS.';
-    else if (g.failed.length && !g.registered.length) st.textContent = `GLOBAL KEYS UNAVAILABLE (${g.failed[0].error.toUpperCase()}): IN-WINDOW ONLY.`;
-    else st.textContent = `${g.registered.length} KEYS GLOBAL${g.failed.length ? `, ${g.failed.length} TAKEN BY ANOTHER APP: ${g.failed.map((f) => f.accelerator).join(' ')}` : ''}.`;
+    if (!ctx.global()) st.textContent = t('motion.hk.stOff');
+    else if (g.failed.length && !g.registered.length) st.textContent = t('motion.hk.stUnavailable', { error: g.failed[0].error.toUpperCase() });
+    else
+      st.textContent = g.failed.length
+        ? t('motion.hk.stGlobalTaken', { n: g.registered.length, failed: g.failed.length, keys: g.failed.map((f) => f.accelerator).join(' ') })
+        : t('motion.hk.stGlobal', { n: g.registered.length });
     st.classList.toggle('err', ctx.global() && g.failed.length > 0);
-    host.querySelector('#hk-pad')!.textContent = ctx.hotkeys.gamepad.pads.length ? ctx.hotkeys.gamepad.pads[0].toUpperCase().slice(0, 40) : 'NONE (PRESS A BUTTON)';
+    host.querySelector('#hk-pad')!.textContent = ctx.hotkeys.gamepad.pads.length ? ctx.hotkeys.gamepad.pads[0].toUpperCase().slice(0, 40) : t('motion.hk.padNone');
   }
 
   function flash(id: string): void {

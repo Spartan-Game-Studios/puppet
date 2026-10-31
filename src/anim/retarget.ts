@@ -11,7 +11,7 @@
  *        D(t) = W(t) * W_rest^-1,
  *    plus the bone's rest direction (bone -> child). Both are expressed in a
  *    canonical frame detected from the rest pose: +Y up, the character faces
- *    +Z, its left hand is +X (Puppet's solver space, = VRM 1.0). Hips
+ *    +Z, its left hand is +X (VPuppet's solver space, = VRM 1.0). Hips
  *    translation is kept relative to rest, divided by the source hip height.
  *
  * 2. `bindClip` (per avatar). A VRM's normalized bones are identity at its
@@ -30,6 +30,7 @@
  */
 import { AnimationClip, AnimationMixer, LoopOnce, Matrix4, Object3D, Quaternion, Skeleton, SkinnedMesh, Vector3 } from 'three';
 import { DIR_CHILD, VRM_BONES, VRM_PARENT, detectRig, type RigFamily } from './rigMap';
+import { t } from '../i18n';
 
 export const SAMPLE_FPS = 30;
 
@@ -134,7 +135,7 @@ function poseToBind(root: Object3D, nodes: Map<string, Object3D>): boolean {
 export function extractSourceClip(root: Object3D, clip: AnimationClip, opts: ExtractOptions = {}): SourceClip {
   const fps = opts.fps ?? SAMPLE_FPS;
   const { family, nodes } = findRig(root, opts.map);
-  if (!nodes.has('hips')) throw new Error(`${clip.name}: no hips bone found (rig not recognised)`);
+  if (!nodes.has('hips')) throw new Error(t('motion.err.noHips', { clip: clip.name }));
 
   // Save transforms so extraction leaves the scene untouched.
   const saved: Array<[Object3D, Vector3, Quaternion, Vector3]> = [];

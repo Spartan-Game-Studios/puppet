@@ -1,8 +1,8 @@
 //! macOS sink: a CoreMediaIO Camera Extension (system extension, macOS 12.3+).
 //!
 //! The extension (`src-tauri/macos/camera-extension/`, Swift) is embedded at
-//! `Puppet.app/Contents/Library/SystemExtensions/` and publishes a device
-//! "Puppet Virtual Camera" with a source stream (what Zoom / Meet / Discord
+//! `VPuppet.app/Contents/Library/SystemExtensions/` and publishes a device
+//! "VPuppet Virtual Camera" with a source stream (what Zoom / Meet / Discord
 //! read) and a sink stream (what we write into). The app side lives in
 //! `src-tauri/macos/bridge/PuppetVCamBridge.m` (activation through
 //! OSSystemExtensionRequest, frames through the CMIO sink queue); this module
@@ -10,8 +10,8 @@
 //!
 //! The extension publishes its device only while this app sends a presence
 //! heartbeat (`pvc_presence`, a Darwin notification; see [`Presence`]): the
-//! camera is listed in other apps while Puppet runs with its output on, and
-//! disappears when the output is turned off, Puppet quits, or it crashes
+//! camera is listed in other apps while VPuppet runs with its output on, and
+//! disappears when the output is turned off, VPuppet quits, or it crashes
 //! (beats stop; the extension times out after 3.5 s).
 //!
 //! Installing a system extension requires a Developer ID-signed app with the
@@ -138,7 +138,7 @@ impl BridgeState {
 /// in-app approval prompt for system extensions; this is the closest we can get.
 const SETTINGS_URL: &str = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension";
 
-const APPROVE_HINT: &str = "Open System Settings > General > Login Items & Extensions > Camera Extensions and switch PUPPET on (macOS 13-14: System Settings > Privacy & Security, click Allow). Then come back here.";
+const APPROVE_HINT: &str = "Open System Settings > General > Login Items & Extensions > Camera Extensions and switch VPUPPET on (macOS 13-14: System Settings > Privacy & Security, click Allow). Then come back here.";
 const OBS_HINT: &str = "Until then, use the OBS route: Capture view (H), OBS Window Capture, Start Virtual Camera.";
 
 /// Map the bridge state to what the panel shows.
@@ -146,11 +146,11 @@ pub fn describe(b: &BridgeState) -> SinkStatus {
     let s = |st, d: &str| SinkStatus::new("coremediaio", st, d);
     let mut out = if b.installed() && b.request_state != REQ_PENDING {
         let st = if b.streaming { SinkState::Running } else { SinkState::Ready };
-        s(st, if b.device_present { "PUPPET VIRTUAL CAMERA LIVE" } else { "PUPPET VIRTUAL CAMERA READY" })
-            .hint("While the output is ON, pick \"Puppet Virtual Camera\" in Zoom, Meet, Discord or FaceTime. It is listed only while Puppet sends.")
+        s(st, if b.device_present { "VPUPPET VIRTUAL CAMERA LIVE" } else { "VPUPPET VIRTUAL CAMERA READY" })
+            .hint("While the output is ON, pick \"VPuppet Virtual Camera\" in Zoom, Meet, Discord or FaceTime. It is listed only while VPuppet sends.")
     } else if !b.is_bundle {
         s(SinkState::Unavailable, "DEV BUILD: CAMERA EXTENSION NEEDS THE INSTALLED APP")
-            .hint(format!("Run a signed Puppet.app from /Applications to install the camera. {OBS_HINT}"))
+            .hint(format!("Run a signed VPuppet.app from /Applications to install the camera. {OBS_HINT}"))
     } else if !b.extension_embedded {
         s(SinkState::Unavailable, "THIS BUILD HAS NO CAMERA EXTENSION").hint(OBS_HINT)
     } else {
@@ -159,10 +159,10 @@ pub fn describe(b: &BridgeState) -> SinkStatus {
             REQ_NEEDS_APPROVAL => s(SinkState::NeedsApproval, "APPROVE THE CAMERA IN SYSTEM SETTINGS").hint(APPROVE_HINT),
             REQ_NEEDS_REBOOT => s(SinkState::NeedsSetup, "RESTART YOUR MAC TO FINISH INSTALLING"),
             REQ_FAILED => failure(b),
-            _ if !b.in_applications => s(SinkState::NeedsSetup, "MOVE PUPPET TO /APPLICATIONS")
-                .hint(format!("macOS installs camera extensions only from apps in the Applications folder. Drag Puppet.app there, open it from there, then click INSTALL. {OBS_HINT}")),
+            _ if !b.in_applications => s(SinkState::NeedsSetup, "MOVE VPUPPET TO /APPLICATIONS")
+                .hint(format!("macOS installs camera extensions only from apps in the Applications folder. Drag VPuppet.app there, open it from there, then click INSTALL. {OBS_HINT}")),
             _ => s(SinkState::NeedsSetup, "CAMERA NOT INSTALLED")
-                .hint("Click INSTALL on the EXTENSION line. macOS will ask you to approve the Puppet camera extension in System Settings (once)."),
+                .hint("Click INSTALL on the EXTENSION line. macOS will ask you to approve the VPuppet camera extension in System Settings (once)."),
         }
     };
     if b.request_state == REQ_FAILED && !b.message.is_empty() && out.state != SinkState::Running && out.state != SinkState::Ready {
@@ -176,8 +176,8 @@ fn failure(b: &BridgeState) -> SinkStatus {
     let s = |st, d: &str| SinkStatus::new("coremediaio", st, d);
     match b.error_code {
         // OSSystemExtensionErrorUnsupportedParentBundleLocation
-        3 => s(SinkState::NeedsSetup, "MOVE PUPPET TO /APPLICATIONS")
-            .hint("macOS installs camera extensions only from apps in the Applications folder. Move Puppet.app there, reopen it, click INSTALL."),
+        3 => s(SinkState::NeedsSetup, "MOVE VPUPPET TO /APPLICATIONS")
+            .hint("macOS installs camera extensions only from apps in the Applications folder. Move VPuppet.app there, reopen it, click INSTALL."),
         // MissingEntitlement, CodeSignatureInvalid, ValidationFailed, ForbiddenBySystemPolicy
         2 | 8 | 9 | 10 => s(SinkState::Unavailable, "THIS BUILD IS NOT SIGNED AND NOTARIZED FOR CAMERA EXTENSIONS")
             .hint(format!("Camera extensions need a Developer ID-signed, notarized build (see docs/virtual-camera.md). {OBS_HINT}")),
@@ -247,7 +247,7 @@ pub fn describe_extension(b: &BridgeState) -> ExtensionStatus {
                 e.install = Some("RETRY".into());
             }
         }
-        _ if !b.in_applications => set(&mut e, ExtState::NotInstalled, "NOT INSTALLED: MOVE PUPPET TO /APPLICATIONS FIRST"),
+        _ if !b.in_applications => set(&mut e, ExtState::NotInstalled, "NOT INSTALLED: MOVE VPUPPET TO /APPLICATIONS FIRST"),
         REQ_DEACTIVATED => {
             set(&mut e, ExtState::NotInstalled, "REMOVED");
             e.install = Some("INSTALL".into());

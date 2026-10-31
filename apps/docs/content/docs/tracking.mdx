@@ -1,0 +1,72 @@
+---
+title: Tracking
+description: Face and perfect sync, body, hands and gestures, smoothing, and per-blendshape tuning.
+---
+
+VPuppet tracks you with Google MediaPipe, on your own computer. Pick how much of you it follows in **01 TRACKING**: **FACE** (`1`), **+BODY** (`2`) or **+HANDS** (`3`).
+
+## Face [#face]
+
+MediaPipe reads 52 ARKit blendshapes (blinks, brows, jaw, mouth shapes...) and the head's rotation from every frame. How they reach your avatar depends on the model.
+
+### Perfect sync models
+
+A **perfect sync** model has one expression per ARKit name (`eyeBlinkLeft`, `jawOpen`, `mouthSmileLeft` and so on), sculpted by the modeller. VPuppet then drives each expression from the tracked value of the same name, one to one, so every mouth and brow shape reads as the artist made it instead of being squeezed into five vowels and a blink.
+
+- Names match ignoring case and punctuation: `eyeBlinkLeft`, `EyeBlinkLeft` and `eye_blink_left` all work.
+- VPuppet treats a model as perfect sync when it has at least 40 of the 52 names. The bottom bar shows `PERFECT SYNC n/52`.
+- MediaPipe provides every ARKit name except `tongueOut`, so a webcam can drive a perfect-sync model without an iPhone.
+
+### Preset models
+
+Other models show `PRESETS n/13`. VPuppet derives the standard VRM expressions from the tracked blendshapes:
+
+- `blink`, `blinkLeft`, `blinkRight`;
+- the vowels `aa`, `ih`, `ou`, `ee`, `oh`;
+- the emotions `happy`, `angry`, `sad`, `surprised`, `relaxed`. They have a dead zone so a neutral face stays neutral, and you can switch them off with **EMOTIONS (PRESET MODELS)**.
+
+### Head and gaze
+
+Head rotation comes straight from MediaPipe's face transform. Gaze drives the model's look-at, whether the model uses eye bones or look expressions. **GAZE GAIN** scales how far the eyes move.
+
+## Body (+BODY)
+
+The spine, chest, shoulders and arms follow MediaPipe's pose landmarks.
+
+- The elbow bends like a real hinge (0–150°, never backwards), and the collarbones follow shrugs and raised arms.
+- Lean and twist of the torso are limited separately, so a small movement doesn't throw the avatar around.
+- An arm that leaves the frame keeps its upper arm, and an arm that can't be seen eases back to rest instead of snapping.
+- **POSE MODEL** switches between LITE (faster) and FULL while tracking runs.
+
+Legs are never tracked: they stay in an idle stance or follow an emote.
+
+## Hands and gestures (+HANDS)
+
+Every finger joint is driven, including the thumb's twist, so pinches and opposition read. Hands run in parallel with the body and both hands are searched for every frame, including low in the frame, in front of the body or near the face.
+
+In +HANDS mode VPuppet recognises seven gestures per hand: **fist**, **open palm**, **point**, **peace**, **thumbs up**, **OK** and **rock**. They are held briefly before they register, so they don't flicker. You can see them in the debug overlay (`D`) and bind them to emotes and expressions in [HOTKEYS](./motion.mdx#hotkeys).
+
+<Callout type="warn" title="What hand tracking finds hard">
+Crossed arms and hands pressed against the face are often lost, because MediaPipe's palm detector rarely fires there. Wide sleeves or capes over the shoulders can hide the elbow from the pose model, which then places raised arms lower than they are.
+</Callout>
+
+## Smoothing
+
+One **SMOOTHING** slider sets how much tracking is filtered. Lower is more responsive and a little jittery; higher is steadier and lags slightly more. Blinks and the jaw keep a fast response at any setting.
+
+## Calibration
+
+**CALIBRATE** (`C`) stores your neutral face, head angle and gaze as zero; **CLR** clears it. See [Getting started](./getting-started.mdx#calibrate).
+
+## Per-blendshape gain and curve (FACE window) [#face-window]
+
+Open **FACE** (`F`) to see each blendshape with its raw value, the value sent to the model, and two numbers you can edit live:
+
+- **GAIN** multiplies the value. Raise it for a mouth shape that reads too weakly.
+- **CURVE** is an exponent. Below 1 makes small movements show sooner; above 1 makes the shape hold back until the movement is larger.
+
+Rows the model lacks are struck through. The window also shows head and gaze readouts.
+
+## Debug overlay
+
+`D` shows render fps and frame time, face and body tracking fps, latency, inference time, gestures, head and gaze, and **HANDS L/R**: each hand's search status (TRACKED, FOUND, MISS, ...) and how often it was found over the last 3 seconds.

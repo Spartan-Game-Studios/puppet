@@ -1,0 +1,44 @@
+---
+title: Si vienes de VRoid
+description: Exporta un personaje de VRoid Studio como VRM, llévalo a VPuppet y añade perfect sync si quieres más expresividad.
+---
+
+[VRoid Studio](https://vroid.com/en/studio) crea avatares VRM directamente, así que un personaje de VRoid funciona en VPuppet sin ninguna otra herramienta.
+
+## Exportar desde VRoid Studio
+
+Usa la exportación VRM de VRoid Studio. Los menús y las opciones cambian entre versiones de VRoid Studio, así que consulta la [documentación de VRoid](https://vroid.pixiv.help/) para ver los pasos exactos en la tuya. Qué revisar en el cuadro de diálogo de exportación:
+
+- **Versión de VRM.** VPuppet carga tanto **VRM 0.x** como **VRM 1.0**, así que cualquiera sirve. Muchas otras apps de VTuber siguen esperando 0.x; si también usas alguna, 0.x es la opción segura.
+- **Expresiones y spring bones.** Las expresiones estándar de VRoid (parpadeo, vocales, emociones) y los spring bones del pelo y la ropa forman parte de una exportación normal. VPuppet usa ambos.
+- **Opciones de rendimiento.** La exportación puede reducir polígonos, combinar materiales y limitar el tamaño de las texturas. Un modelo más ligero deja más recursos del ordenador para el seguimiento. La tarjeta del modelo en VPuppet muestra su número de triángulos y el tamaño del archivo, así que puedes comparar exportaciones.
+- **Información del avatar.** Rellena el autor y las condiciones de uso (quién puede actuar como el avatar, uso comercial, etc.). VPuppet las muestra como [insignia de licencia](../model-library.mdx#licence-badges).
+
+## Importar en VPuppet
+
+Arrastra el `.vrm` a la pantalla HOME de VPuppet, o haz clic en **IMPORT .VRM** (`I`). Selecciónalo y pulsa `Enter`. Después [calibra](../getting-started.mdx#calibrate) con `C`.
+
+## Qué hace VPuppet automáticamente con un modelo de VRoid
+
+Una exportación de VRoid tiene las expresiones estándar de VRM pero no los 52 blendshapes de ARKit, así que aparece como `PRESETS n/13` en la barra inferior. VPuppet lo controla igualmente con el seguimiento facial:
+
+- `blink`, `blinkLeft`, `blinkRight` a partir de tus ojos;
+- las vocales `aa`, `ih`, `ou`, `ee`, `oh` a partir de tu mandíbula y tu boca;
+- `happy`, `angry`, `sad`, `surprised`, `relaxed` a partir de tu expresión. Desactívalas con **EMOTIONS (PRESET MODELS)** si prefieres activar las emociones con [atajos](../motion.mdx#hotkeys).
+
+La mirada funciona a través del look-at del modelo (huesos de los ojos o expresiones de mirada), y la [ventana FACE](../tracking.mdx#face-window) te permite ajustar con qué intensidad se nota cada forma.
+
+## Añadir perfect sync (opcional)
+
+Con perfect sync, cada movimiento seguido de la boca, las mejillas y las cejas tiene su propia forma en el modelo, en lugar de reducirse a cinco vocales y un parpadeo. Los modelos de VRoid no incluyen estas formas, así que hay que añadirlas después de exportar:
+
+- **Herramientas existentes.** Hay herramientas de terceros que añaden blendshapes con nombres de ARKit a los modelos de VRoid; HANA_Tool es un ejemplo conocido. Sigue las instrucciones y la licencia de la propia herramienta.
+- **Blender.** Con el [VRM Add-on for Blender](https://vrm-addon-for-blender.info/) puedes importar el VRM, esculpir o transferir shape keys con los nombres de los 52 blendshapes de ARKit, registrarlas como expresiones y volver a exportar un VRM. Los add-ons de transferencia de blendshapes pueden copiar formas desde una cabeza de referencia con una topología similar.
+
+VPuppet compara los nombres sin tener en cuenta mayúsculas ni signos de puntuación, así que `eyeBlinkLeft`, `EyeBlinkLeft` y `eye_blink_left` funcionan todos. Cuando el modelo tiene al menos 40 de los 52, la barra inferior muestra `PERFECT SYNC n/52`. Las filas que al modelo todavía le faltan aparecen tachadas en la ventana FACE.
+
+Un agente de IA conectado a VPuppet puede revisar tu trabajo por ti: puede listar los nombres de ARKit que faltan y probar cada forma. Consulta [Conectar un agente de IA](../mcp.mdx#workflow).
+
+## Física
+
+Los spring bones de VRoid funcionan tal como se configuraron. El solver de tela de VPuppet además une las cadenas vecinas (el anillo de una falda, un flequillo) para que los paneles se muevan juntos, y ajusta los colisionadores al cuerpo. Usa `8` / `9` / `0` para OFF / STIFF / NORMAL, y la [ventana PHYSICS](../physics.mdx) (`P`) para ajustar cadenas o colisionadores concretos. Tus cambios se guardan por modelo.

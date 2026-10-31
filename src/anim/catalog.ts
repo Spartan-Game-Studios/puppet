@@ -1,8 +1,9 @@
 /**
  * The clip catalogue: built-in clips (CC0 Quaternius Universal Animation
- * Library, bundled as public/clips/ual.glb, plus Puppet's own keyframed
+ * Library, bundled as public/clips/ual.glb, plus VPuppet's own keyframed
  * emotes) and the user's imported FBX / glTF clips.
  */
+import { t } from '../i18n';
 import type { BoneMask } from './masks';
 import type { RootMotion } from './retarget';
 
@@ -51,25 +52,26 @@ const own = (id: string, label: string, mask: BoneMask): ClipDef => ({
   source: { type: 'authored', name: id },
 });
 
+/** Labels are translated (motion.clip.<id>); ids and the persisted settings use only `id`. */
 export const BUILTIN_CLIPS: ClipDef[] = [
-  ual('idle', 'IDLE: BREATHE', 'idle', 'full', true),
-  ual('idle_look', 'IDLE: LOOK AROUND', 'idle', 'full', true),
-  ual('idle_talk', 'IDLE: TALKING', 'idle', 'full', true),
-  ual('idle_arms_folded', 'IDLE: ARMS FOLDED', 'idle', 'full', true),
-  own('wave', 'WAVE', 'arms'),
-  ual('yes', 'NOD (YES)', 'emote', 'head', false),
-  ual('no', 'SHAKE (NO)', 'emote', 'head', false),
-  own('clap', 'CLAP', 'arms'),
-  ual('cheer', 'CHEER', 'emote', 'body', false),
-  ual('dance', 'DANCE', 'emote', 'full', true),
-  own('bow', 'BOW', 'full'),
-  own('point', 'POINT', 'arms'),
-  own('shrug', 'SHRUG', 'body'),
-  own('think', 'THINK', 'body'),
-  ual('angry', 'ANGRY', 'emote', 'body', false),
-  ual('cry', 'CRY', 'emote', 'body', false),
-  ual('drink', 'DRINK', 'emote', 'arms', false),
-  ual('sit', 'SIT', 'emote', 'full', true),
+  ual('idle', t('motion.clip.idle'), 'idle', 'full', true),
+  ual('idle_look', t('motion.clip.idle_look'), 'idle', 'full', true),
+  ual('idle_talk', t('motion.clip.idle_talk'), 'idle', 'full', true),
+  ual('idle_arms_folded', t('motion.clip.idle_arms_folded'), 'idle', 'full', true),
+  own('wave', t('motion.clip.wave'), 'arms'),
+  ual('yes', t('motion.clip.yes'), 'emote', 'head', false),
+  ual('no', t('motion.clip.no'), 'emote', 'head', false),
+  own('clap', t('motion.clip.clap'), 'arms'),
+  ual('cheer', t('motion.clip.cheer'), 'emote', 'body', false),
+  ual('dance', t('motion.clip.dance'), 'emote', 'full', true),
+  own('bow', t('motion.clip.bow'), 'full'),
+  own('point', t('motion.clip.point'), 'arms'),
+  own('shrug', t('motion.clip.shrug'), 'body'),
+  own('think', t('motion.clip.think'), 'body'),
+  ual('angry', t('motion.clip.angry'), 'emote', 'body', false),
+  ual('cry', t('motion.clip.cry'), 'emote', 'body', false),
+  ual('drink', t('motion.clip.drink'), 'emote', 'arms', false),
+  ual('sit', t('motion.clip.sit'), 'emote', 'full', true),
 ];
 
 export const DEFAULT_IDLE = 'builtin:idle';

@@ -1,10 +1,10 @@
-// Does Puppet keep tracking, rendering and sending (virtual camera + VMC)
+// Does VPuppet keep tracking, rendering and sending (virtual camera + VMC)
 // while its window is hidden, minimized or covered? Runs a built desktop
 // binary on a clip (no webcam), with the virtual camera going into the file
 // sink and VMC into a local UDP listener, and reports the rates per phase.
 //
 //   PUPPET_MODEL=/abs/avatar.vrm PUPPET_CLIP=/abs/clip.mp4 \
-//     node scripts/background-test.mjs <path/to/puppet binary> [hide|offscreen] [seconds]
+//     node scripts/background-test.mjs <path/to/vpuppet binary> [hide|offscreen] [seconds]
 //
 // hide       the whole run goes through `private-run` (default mode): the app
 //            is hidden as soon as it starts, the worst case (no window on any

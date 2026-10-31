@@ -1,0 +1,44 @@
+---
+title: 从 VRoid 迁移
+description: 将 VRoid Studio 角色导出为 VRM、导入 VPuppet，并按需添加 perfect sync 以获得更丰富的表情。
+---
+
+[VRoid Studio](https://vroid.com/en/studio) 可以直接制作 VRM 模型，因此 VRoid 角色无需其他工具即可在 VPuppet 中使用。
+
+## 从 VRoid Studio 导出
+
+使用 VRoid Studio 的 VRM 导出功能。菜单和选项会随 VRoid Studio 版本变化，请查阅 [VRoid 官方文档](https://vroid.pixiv.help/) 了解你所用版本的具体步骤。导出对话框中需要注意：
+
+- **VRM 版本。** VPuppet 同时支持 **VRM 0.x** 和 **VRM 1.0**，两者都可以。许多其他 VTuber 应用仍要求 0.x；如果你也在使用这类应用，选择 0.x 更稳妥。
+- **表情和弹簧骨骼。** VRoid 的标准表情（眨眼、元音、情绪）以及头发和服装的弹簧骨骼都包含在常规导出中。VPuppet 会使用这两者。
+- **性能选项。** 导出时可以减少多边形、合并材质并限制纹理尺寸。模型越轻，留给追踪的计算资源就越多。VPuppet 中的模型卡片会显示三角面数和文件大小，方便你比较不同的导出结果。
+- **模型信息。** 填写作者和使用条款（谁可以扮演该模型、是否允许商业用途等）。VPuppet 会把这些显示为[许可徽章](../model-library.mdx#licence-badges)。
+
+## 导入 VPuppet
+
+把 `.vrm` 拖到 VPuppet 的 HOME 界面，或点击 **IMPORT .VRM**（`I`）。选中它并按 `Enter`。然后按 `C` 进行[校准](../getting-started.mdx#calibrate)。
+
+## VPuppet 为 VRoid 模型自动完成的工作
+
+VRoid 导出的模型带有标准 VRM 表情，但没有 52 个 ARKit 混合形状，因此底栏显示 `PRESETS n/13`。VPuppet 仍然会用面部追踪驱动它：
+
+- 用你的眼睛驱动 `blink`、`blinkLeft`、`blinkRight`；
+- 用你的下巴和嘴驱动元音 `aa`、`ih`、`ou`、`ee`、`oh`；
+- 用你的表情驱动 `happy`、`angry`、`sad`、`surprised`、`relaxed`。如果你更想用[快捷键](../motion.mdx#hotkeys)触发情绪，可以用 **EMOTIONS (PRESET MODELS)** 关闭它们。
+
+视线通过模型的注视（眼睛骨骼或注视表情）生效，[FACE 窗口](../tracking.mdx#face-window)可以调节每个形状的表现强度。
+
+## 添加 perfect sync（可选）
+
+使用 perfect sync 时，每一个被追踪的嘴部、脸颊和眉毛动作都在模型上有对应的形状，而不是被压缩成五个元音和一次眨眼。VRoid 模型不带这些形状，因此需要在导出后添加：
+
+- **现成工具。** 有第三方工具可以为 VRoid 模型添加以 ARKit 命名的混合形状；HANA_Tool 是一个知名的例子。请遵循该工具自己的说明和许可。
+- **Blender。** 借助 [VRM Add-on for Blender](https://vrm-addon-for-blender.info/)，你可以导入 VRM，雕刻或传递以 52 个 ARKit 混合形状命名的形态键，将其注册为表情，然后重新导出 VRM。混合形状传递类插件可以从拓扑相近的参考头部复制形状。
+
+VPuppet 匹配名称时忽略大小写和标点，因此 `eyeBlinkLeft`、`EyeBlinkLeft` 和 `eye_blink_left` 都可以。当模型拥有 52 个中的至少 40 个时，底栏会显示 `PERFECT SYNC n/52`。模型仍缺少的行会在 FACE 窗口中显示删除线。
+
+连接到 VPuppet 的 AI 智能体可以帮你检查：列出缺少的 ARKit 名称，并逐一测试每个形状。参见[连接 AI 智能体](../mcp.mdx#workflow)。
+
+## 物理
+
+VRoid 的弹簧骨骼会按原设定工作。VPuppet 的布料解算器还会连接相邻的骨骼链（一圈裙摆、刘海），让面片整体运动，并生成贴合身体的碰撞体。用 `8` / `9` / `0` 切换 OFF / STIFF / NORMAL，用 [PHYSICS 窗口](../physics.mdx)（`P`）调整单条骨骼链或碰撞体。你的修改会按模型保存。

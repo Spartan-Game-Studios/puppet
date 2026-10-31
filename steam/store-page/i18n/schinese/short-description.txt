@@ -1,0 +1,1 @@
+只需一个普通摄像头，就能实时驱动你的 VRM 模型：支持 52 个 BlendShape 的完美同步（Perfect Sync）面部捕捉，以及上半身、双手和手指追踪。VPuppet 可作为摄像头出现在 Zoom、Meet、Discord 和 OBS 中，向其他软件发送 VMC 数据，还提供衣物与头发物理、表情动作快捷键和 3D 场景。

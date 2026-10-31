@@ -5,9 +5,9 @@
  * WebKit stops requestAnimationFrame for a page it considers not visible
  * (minimized, hidden with Cmd-H, off every screen, or covered by other
  * windows), whatever the webview's background-throttling policy. Everything
- * in Puppet hangs off rAF: the render loop (src/main.ts `tick`), the tracker's
+ * in VPuppet hangs off rAF: the render loop (src/main.ts `tick`), the tracker's
  * frame pump (src/tracking/tracker.ts) and with them the virtual camera and
- * VMC output. So the feed froze as soon as the user minimized Puppet.
+ * VMC output. So the feed froze as soon as the user minimized VPuppet.
  *
  * `installBackgroundLoop` wraps window.requestAnimationFrame: every callback is
  * still requested from the real rAF, and a dedicated Worker ticks at the

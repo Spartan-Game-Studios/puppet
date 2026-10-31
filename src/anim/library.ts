@@ -1,10 +1,11 @@
 /**
- * Loads, retargets and caches clips: the bundled CC0 set, Puppet's authored
+ * Loads, retargets and caches clips: the bundled CC0 set, VPuppet's authored
  * emotes and the user's imported FBX / glTF files.
  */
 import type { AnimationClip, Object3D } from 'three';
 import type { Avatar } from '../scene/avatar';
 import { sha256Hex } from '../scene/avatar';
+import { t } from '../i18n';
 import { AUTHORED, bakeAuthored } from './authored';
 import { BUILTIN_CLIPS, guessKind, userClipDef, withOptions, type ClipDef, type ClipOptions, type UserClipEntry } from './catalog';
 import { clipBackend, type ClipBackend, type ClipExt } from './clipStore';
@@ -169,11 +170,11 @@ export class ClipLibrary {
    */
   async importFile(name: string, bytes: ArrayBuffer, path: string | null): Promise<UserClipEntry[]> {
     const ext = extOf(name);
-    if (!ext) throw new Error('clips must be .fbx or .glb');
+    if (!ext) throw new Error(t('motion.err.ext'));
     const file = await parseClipFile(bytes.slice(0), ext);
-    if (!file.clips.length) throw new Error(`${name}: no animations in the file`);
+    if (!file.clips.length) throw new Error(t('motion.err.noAnims', { name }));
     const { clips, errors } = extractAll(file);
-    if (!clips.length) throw new Error(`${name}: ${errors[0] ?? 'no usable animation'}`);
+    if (!clips.length) throw new Error(`${name}: ${errors[0] ?? t('motion.err.noUsable')}`);
     const id = await sha256Hex(bytes);
     if (path && this.backend.importPath) await this.backend.importPath(path, id, ext);
     else await this.backend.write(id, ext, new Uint8Array(bytes));

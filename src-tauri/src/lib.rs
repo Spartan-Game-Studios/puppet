@@ -1,16 +1,21 @@
-//! Puppet: Tauri shell. The app itself (rendering, tracking, solving) is the
+//! VPuppet: Tauri shell. The app itself (rendering, tracking, solving) is the
 //! web frontend; Rust provides file access, settings persistence, the VMC
 //! sender, the virtual camera output, the model library (library.rs), the
-//! imported animation clips (clips.rs), global hotkeys (plugin) and
-//! camera permission handling.
+//! imported animation clips (clips.rs), global hotkeys (plugin), camera
+//! permission handling, the local MCP server for AI agents (mcp/, off by
+//! default) and, in the Steam demo build, the usage clock that locks the
+//! outputs after 100 hours (demo.rs).
 
 mod clips;
+mod demo;
 mod library;
+mod mcp;
+mod migrate;
 mod vcam;
 mod vmc;
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri::{AppHandle, Manager, State};
 
@@ -37,6 +42,8 @@ fn keep_running_in_background(app: &tauri::App) {
     let _ = app;
 }
 
+struct DemoState(Arc<demo::Demo>);
+
 #[derive(Default)]
 struct VmcState(Mutex<vmc::Sender>);
 
@@ -55,12 +62,17 @@ fn read_file(path: String) -> Result<tauri::ipc::Response, String> {
         .map_err(|e| format!("{path}: {e}"))
 }
 
-fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
+/// settings.json, mcp-token and mcp.json live here.
+fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
     // PUPPET_SETTINGS_DIR: keep test runs away from the user's own settings.
-    let dir = match std::env::var_os("PUPPET_SETTINGS_DIR") {
-        Some(d) => PathBuf::from(d),
-        None => app.path().app_config_dir().map_err(|e| e.to_string())?,
-    };
+    match std::env::var_os("PUPPET_SETTINGS_DIR") {
+        Some(d) => Ok(PathBuf::from(d)),
+        None => app.path().app_config_dir().map_err(|e| e.to_string()),
+    }
+}
+
+fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = config_dir(app)?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join("settings.json"))
 }
@@ -100,16 +112,21 @@ fn dev_query() -> String {
 /// Print a line from the frontend to stdout (enabled with `debuglog=1`).
 #[tauri::command]
 fn debug_log(line: String) {
-    println!("[puppet] {line}");
+    println!("[vpuppet] {line}");
 }
 
 #[tauri::command]
-fn vmc_configure(state: State<VmcState>, enabled: bool, host: String, port: u16) -> Result<(), String> {
+fn vmc_configure(state: State<VmcState>, demo: State<DemoState>, enabled: bool, host: String, port: u16) -> Result<(), String> {
+    if enabled {
+        demo.0.check()?;
+    }
     state.0.lock().map_err(|e| e.to_string())?.configure(enabled, &host, port)
 }
 
 #[tauri::command]
-fn vmc_send(state: State<VmcState>, frame: vmc::Frame) -> Result<(), String> {
+fn vmc_send(state: State<VmcState>, demo: State<DemoState>, frame: vmc::Frame) -> Result<(), String> {
+    demo.0.check()?;
+    demo.0.touch();
     state.0.lock().map_err(|e| e.to_string())?.send(&frame)
 }
 
@@ -166,7 +183,8 @@ fn vcam_select_device(state: State<'_, VcamState>, device: Option<String>) -> Re
 }
 
 #[tauri::command(async)]
-fn vcam_start(state: State<'_, VcamState>, width: u32, height: u32, fps: u32) -> Result<(), String> {
+fn vcam_start(state: State<'_, VcamState>, demo: State<'_, DemoState>, width: u32, height: u32, fps: u32) -> Result<(), String> {
+    demo.0.check()?;
     state.cam.lock().map_err(|e| e.to_string())?.start(vcam::StreamConfig { width, height, fps })
 }
 
@@ -179,18 +197,49 @@ fn vcam_stop(state: State<'_, VcamState>) -> Result<(), String> {
 /// One frame as a raw binary body (no JSON): see `vcam::parse_frame`. Runs off
 /// the main thread; returns as soon as the frame is queued (or dropped).
 #[tauri::command(async)]
-fn vcam_frame(state: State<'_, VcamState>, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+fn vcam_frame(state: State<'_, VcamState>, demo: State<'_, DemoState>, request: tauri::ipc::Request<'_>) -> Result<(), String> {
     let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
         return Err("vcam_frame expects a binary body".into());
     };
+    if let Err(e) = demo.0.check() {
+        // The time ran out while streaming: take the camera down here too.
+        state.cam.lock().map_err(|e| e.to_string())?.stop();
+        return Err(e);
+    }
+    demo.0.touch();
     state.cam.lock().map_err(|e| e.to_string())?.push(body)
+}
+
+/// The demo's clock (`demo: false` in the full app).
+#[tauri::command]
+fn demo_status(demo: State<DemoState>) -> demo::Status {
+    demo.0.status()
+}
+
+/// The stage is in use (model loaded, tracking): counts toward the demo's hours.
+#[tauri::command]
+fn demo_heartbeat(demo: State<DemoState>) -> demo::Status {
+    demo.0.touch();
+    demo.0.status()
+}
+
+/// The full app's store page: in the Steam client when it's running (the
+/// overlay of a running demo can't buy another app), else on the web. The app
+/// ID comes from VPUPPET_STEAM_APP_ID at build time.
+#[tauri::command(async)]
+fn demo_buy() -> Result<(), String> {
+    match option_env!("VPUPPET_STEAM_APP_ID") {
+        Some(id) if cfg!(feature = "steam") => library::open_url(&format!("steam://store/{id}")),
+        Some(id) => library::open_url(&format!("https://store.steampowered.com/app/{id}/")),
+        None => library::open_url("https://store.steampowered.com/search/?term=VPuppet"),
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        // Emote / expression hotkeys that work while Puppet is in the background.
+        // Emote / expression hotkeys that work while VPuppet is in the background.
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(VmcState::default())
         // getUserMedia: grant the camera to our own webview without a second
@@ -203,6 +252,20 @@ pub fn run() {
             _ => PermissionResponse::Default,
         })
         .setup(|app| {
+            // Before anything reads settings or the library.
+            migrate::from_puppet(app.handle());
+            let demo_dir = match std::env::var_os("PUPPET_SETTINGS_DIR") {
+                Some(d) => Some(PathBuf::from(d)),
+                None => app.path().app_data_dir().ok(),
+            };
+            let demo = Arc::new(demo::Demo::new(demo_dir));
+            demo::spawn_ticker(demo.clone());
+            // MCP server state; the server itself starts when the webview
+            // calls mcp_configure with the setting on.
+            if let Ok(dir) = config_dir(app.handle()) {
+                app.manage(mcp::McpState::new(app.handle().clone(), dir, demo.clone()));
+            }
+            app.manage(DemoState(demo));
             keep_running_in_background(app);
             #[cfg(target_os = "linux")]
             if let Some(w) = app.get_webview_window("main") {
@@ -222,11 +285,11 @@ pub fn run() {
                 let h = handle.clone();
                 std::thread::spawn(move || {
                     if mode == "setup" {
-                        println!("[puppet] vcam selftest: setup -> {:?}", h.setup());
+                        println!("[vpuppet] vcam selftest: setup -> {:?}", h.setup());
                     }
                     for _ in 0..15 {
-                        println!("[puppet] vcam selftest: {}", serde_json::to_string(&h.status()).unwrap_or_default());
-                        println!("[puppet] vcam selftest ext: {}", serde_json::to_string(&h.extension()).unwrap_or_default());
+                        println!("[vpuppet] vcam selftest: {}", serde_json::to_string(&h.status()).unwrap_or_default());
+                        println!("[vpuppet] vcam selftest ext: {}", serde_json::to_string(&h.extension()).unwrap_or_default());
                         std::thread::sleep(std::time::Duration::from_secs(1));
                     }
                 });
@@ -241,6 +304,9 @@ pub fn run() {
             settings_location,
             dev_query,
             debug_log,
+            demo_status,
+            demo_heartbeat,
+            demo_buy,
             vmc_configure,
             vmc_send,
             vmc_stats,
@@ -271,15 +337,23 @@ pub fn run() {
             clips::clips_read,
             clips::clips_delete,
             clips::clips_index_load,
-            clips::clips_index_save
+            clips::clips_index_save,
+            mcp::mcp_configure,
+            mcp::mcp_status,
+            mcp::mcp_reply,
+            mcp::mcp_reset_token,
+            mcp::mcp_connect_command
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Puppet")
+        .expect("error while building VPuppet")
         .run(|app, event| {
             // Quitting: close the camera output, which also tells the macOS
             // camera extension to take its device down right away (instead
             // of after the heartbeat times out).
             if let tauri::RunEvent::Exit = event {
+                if let Some(d) = app.try_state::<DemoState>() {
+                    d.0.flush();
+                }
                 if let Some(s) = app.try_state::<VcamState>() {
                     if let Ok(mut cam) = s.cam.lock() {
                         cam.stop();

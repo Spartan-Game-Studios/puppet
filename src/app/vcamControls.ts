@@ -26,26 +26,27 @@ import {
   vcamExtUninstall,
   type VcamExtStatus,
 } from './platform';
+import { t } from '../i18n';
 
 const TEMPLATE = `
-<label class="check vc-switch"><input type="checkbox" id="vcam-enabled" /><span>CAMERA OUTPUT</span><b class="vc-onoff" aria-hidden="true"></b><kbd>W</kbd></label>
+<label class="check vc-switch"><input type="checkbox" id="vcam-enabled" /><span>${t('stage.camOutput')}</span><b class="vc-onoff" aria-hidden="true" data-on="${t('stage.on')}" data-off="${t('stage.off')}"></b><kbd>W</kbd></label>
 <div class="vc-ext hidden">
-  <div class="row"><span class="lbl">EXTENSION</span><span class="val vc-ext-detail" title="">-</span></div>
+  <div class="row"><span class="lbl">${t('stage.extension')}</span><span class="val vc-ext-detail" title="">-</span></div>
   <p class="note mute vc-ext-note"></p>
   <div class="row btns">
-    <button type="button" class="btn vc-install hidden">INSTALL</button>
-    <button type="button" class="btn vc-settings hidden">OPEN SETTINGS</button>
-    <button type="button" class="btn ghost vc-uninstall hidden">UNINSTALL</button>
+    <button type="button" class="btn vc-install hidden">${t('stage.install')}</button>
+    <button type="button" class="btn vc-settings hidden">${t('stage.openSettings')}</button>
+    <button type="button" class="btn ghost vc-uninstall hidden">${t('stage.uninstall')}</button>
   </div>
 </div>`;
 
 /** Plain-language follow-up for states that need the user to do something. */
 const NOTES: Partial<Record<VcamExtStatus['state'], string>> = {
-  not_installed: 'Install once; macOS then asks you to approve it in System Settings.',
-  awaiting_approval: 'System Settings > General > Login Items & Extensions > Camera Extensions: switch PUPPET on.',
-  needs_update: 'This Puppet ships a newer camera. Click UPDATE (macOS may ask you to approve it again).',
-  needs_reboot: 'Restart your Mac to finish.',
-  active: 'Other apps list "Puppet Virtual Camera" only while the output is ON.',
+  not_installed: t('stage.extNotInstalled'),
+  awaiting_approval: t('stage.extAwaiting'),
+  needs_update: t('stage.extNeedsUpdate'),
+  needs_reboot: t('stage.extNeedsReboot'),
+  active: t('stage.extActive'),
 };
 
 /** Seconds the UNINSTALL button waits for its confirming second press. */
@@ -82,7 +83,7 @@ export function mountVcamControls(container: HTMLElement): VcamControls {
   const disarm = () => {
     if (armed !== null) clearTimeout(armed);
     armed = null;
-    uninstall.textContent = 'UNINSTALL';
+    uninstall.textContent = t('stage.uninstall');
     uninstall.classList.remove('on');
   };
 
@@ -91,11 +92,11 @@ export function mountVcamControls(container: HTMLElement): VcamControls {
     ext.classList.toggle('hidden', !st);
     if (!st) return;
     detail.textContent = error || st.detail;
-    detail.title = st.installed_version || st.bundled_version ? `installed ${st.installed_version ?? '-'} / this app ${st.bundled_version ?? '-'}` : '';
+    detail.title = st.installed_version || st.bundled_version ? t('stage.extVersions', { installed: st.installed_version ?? '-', bundled: st.bundled_version ?? '-' }) : '';
     detail.classList.toggle('state-run', st.state === 'active');
     detail.classList.toggle('status-err', !!error || st.state === 'failed' || st.state === 'needs_update');
     note.textContent = NOTES[st.state] ?? '';
-    install.textContent = st.install ?? 'INSTALL';
+    install.textContent = st.install ?? t('stage.install');
     install.classList.toggle('hidden', !st.install);
     install.classList.toggle('accent', st.state === 'needs_update');
     settingsBtn.classList.toggle('hidden', !st.open_settings);
@@ -135,7 +136,7 @@ export function mountVcamControls(container: HTMLElement): VcamControls {
   settingsBtn.addEventListener('click', () => run(settingsBtn, vcamExtOpenSettings));
   uninstall.addEventListener('click', () => {
     if (armed === null) {
-      uninstall.textContent = 'CONFIRM UNINSTALL?';
+      uninstall.textContent = t('stage.confirmUninstall');
       uninstall.classList.add('on');
       armed = window.setTimeout(disarm, CONFIRM_S * 1000);
       return;

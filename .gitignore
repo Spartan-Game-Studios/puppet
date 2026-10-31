@@ -26,3 +26,6 @@ test-assets/cc0/*
 !test-assets/cc0/LICENSES.md
 !test-assets/cc0/devil.vrm
 !test-assets/cc0/the-worm.vrm
+
+# Demo build output (steam/steampipe/README.md)
+src-tauri/target-demo/

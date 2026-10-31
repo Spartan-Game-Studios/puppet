@@ -9,10 +9,11 @@
  */
 import './home.css';
 import { baseName, isTauri, readPath } from './platform';
+import { t } from '../i18n';
 import { pickVrmFiles, pickVrmPaths } from '../library/backend';
 import { Library, type Card, type ImportResult, type ImportSource, type ImportStep } from '../library/library';
-import { displayAuthor, displayName, formatBytes, formatCount, type LibraryQuery } from '../library/libraryIndex';
-import { LICENCE_LETTER, licenceLetterTitle, readVrmMeta, summarizeLicence, type LicenceSummary, type VrmMeta } from '../library/vrmMeta';
+import { displayAuthor, displayName, formatBytes, formatCount, tn, type LibraryQuery } from '../library/libraryIndex';
+import { badgeLabel, LICENCE_LETTER, licenceLetterTitle, readVrmMeta, summarizeLicence, type LicenceSummary, type VrmMeta } from '../library/vrmMeta';
 import { buildCard, CARD_WARNINGS, renderLicence, renderWarnings, syncLabel } from './homeView';
 import { getModal } from './modal';
 import { makeBadge } from './ui';
@@ -44,7 +45,12 @@ export interface Home {
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-const STEP_TEXT: Record<ImportStep, string> = { reading: 'READING', checking: 'CHECKING', rendering: 'RENDERING THUMBNAIL', saving: 'SAVING' };
+const STEP_TEXT: Record<ImportStep, () => string> = {
+  reading: () => t('library.step.reading'),
+  checking: () => t('library.step.checking'),
+  rendering: () => t('library.step.rendering'),
+  saving: () => t('library.step.saving'),
+};
 
 export async function mountHome(deps: HomeDeps): Promise<Home> {
   const library = await Library.open();
@@ -138,13 +144,13 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
   async function loadCard(id: string): Promise<void> {
     const c = library.cards.get(id);
     if (!c) return;
-    deps.setStatus(`LOADING ${displayName(c)}`);
+    deps.setStatus(t('library.status.loading', { name: displayName(c) }));
     try {
       const buf = await library.readModel(id);
       show(false);
       await deps.loadModel(buf, displayName(c), null);
     } catch (e) {
-      deps.setStatus(`LIBRARY: ${(e as Error).message}`, true);
+      deps.setStatus(t('library.status.libraryErr', { msg: (e as Error).message }), true);
     }
   }
 
@@ -171,7 +177,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     n.title = name;
     const state = document.createElement('span');
     state.className = 's';
-    state.textContent = 'QUEUED';
+    state.textContent = t('library.import.queued');
     li.append(n, state);
     $('home-import-list').append(li);
     li.scrollIntoView({ block: 'nearest' });
@@ -180,7 +186,10 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
 
   function importSummary(): void {
     const { added, dup, err } = importStats;
-    $('home-import-sum').textContent = `${importing ? ` · ${importing} LEFT` : ' · DONE'} · ${added} ADDED${dup ? ` · ${dup} ALREADY IN LIBRARY` : ''}${err ? ` · ${err} FAILED` : ''}`;
+    const parts = [importing ? t('library.import.left', { n: importing }) : t('library.import.done'), t('library.import.sumAdded', { n: added })];
+    if (dup) parts.push(t('library.import.sumDup', { n: dup }));
+    if (err) parts.push(t('library.import.sumFailed', { n: err }));
+    $('home-import-sum').textContent = ` · ${parts.join(' · ')}`;
   }
 
   async function runImports(srcs: ImportSource[]): Promise<ImportResult[]> {
@@ -193,7 +202,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
         const row = rows[i];
         const r = await library.import(s, (step) => {
           row.li.className = 'busy';
-          row.state.textContent = STEP_TEXT[step];
+          row.state.textContent = STEP_TEXT[step]();
         });
         importing--;
         if (r.status === 'error') {
@@ -205,7 +214,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
           if (r.status === 'added') importStats.added++;
           else importStats.dup++;
           row.li.className = r.status === 'added' ? 'ok' : 'dup';
-          row.state.textContent = r.status === 'added' ? 'ADDED' : 'ALREADY IN LIBRARY';
+          row.state.textContent = r.status === 'added' ? t('library.import.added') : t('library.import.dup');
           focusId = r.id;
         }
         importSummary();
@@ -256,7 +265,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     input.className = 'rename';
     input.value = displayName(c);
     input.placeholder = c.info.meta.name || c.info.fileName;
-    input.title = 'Enter to save, Esc to cancel, empty to reset';
+    input.title = t('library.renameTitle');
     input.spellcheck = false;
     nameEl.replaceWith(input);
     input.focus();
@@ -282,7 +291,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     const c = library.cards.get(id);
     if (!c) return;
     confirmId = id;
-    $('home-confirm-text').textContent = `REMOVE “${displayName(c)}” (${formatBytes(c.size)}) FROM THE LIBRARY?`;
+    $('home-confirm-text').textContent = t('library.confirmText', { name: displayName(c), size: formatBytes(c.size) });
     confirmDlg.showModal();
   }
   $('btn-confirm-cancel').addEventListener('click', () => confirmDlg.close());
@@ -295,10 +304,10 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     const next = shown[idx + 1]?.id ?? shown[idx - 1]?.id ?? null;
     try {
       await library.remove(id);
-      deps.setStatus('REMOVED FROM LIBRARY');
+      deps.setStatus(t('library.status.removed'));
       focusCard(next);
     } catch (e) {
-      deps.setStatus(`REMOVE FAILED: ${(e as Error).message}`, true);
+      deps.setStatus(t('library.status.removeFailed', { msg: (e as Error).message }), true);
     }
   });
   confirmDlg.addEventListener('close', () => {
@@ -312,12 +321,12 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     if (what === 'thumb') {
       const el = cardEl(id);
       el?.classList.add('busy');
-      deps.setStatus('RENDERING THUMBNAIL');
+      deps.setStatus(t('library.step.rendering'));
       try {
         await library.rerenderThumb(id);
-        deps.setStatus('THUMBNAIL UPDATED');
+        deps.setStatus(t('library.status.thumbUpdated'));
       } catch (e) {
-        deps.setStatus(`THUMBNAIL: ${(e as Error).message}`, true);
+        deps.setStatus(t('library.status.thumbErr', { msg: (e as Error).message }), true);
       }
       drawers.delete(id);
       render();
@@ -409,7 +418,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-link]');
     if (!a || !isTauri) return;
     e.preventDefault();
-    library.backend.openLink(a.dataset.link!, a.href).catch((err) => deps.setStatus(`LINK: ${err}`, true));
+    library.backend.openLink(a.dataset.link!, a.href).catch((err) => deps.setStatus(t('library.status.link', { msg: String(err) }), true));
   });
 
   // ---------------------------------------------------------------- migration (pre-library last model)
@@ -432,7 +441,7 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
       try {
         await runImports([{ name, bytes: await readPath(lastPath) }]);
       } catch (e) {
-        deps.setStatus(`LAST MODEL: ${(e as Error).message}`, true);
+        deps.setStatus(t('library.status.lastModel', { msg: (e as Error).message }), true);
       }
     }
   });
@@ -455,10 +464,12 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     letter.classList.add('lic-letter');
     $('model-lic').replaceChildren(letter);
     const bad = serious(stageMeta.warnings);
-    $('model-warn').replaceChildren(...(bad.length ? [makeBadge('!', 'warn', `MODEL CHECKS: ${bad.map((w) => w.text).join(' · ')}`)] : []));
+    $('model-warn').replaceChildren(...(bad.length ? [makeBadge('!', 'warn', t('library.checks.badge', { list: bad.map((w) => w.text).join(' · ') }))] : []));
     const btn = $<HTMLButtonElement>('btn-model-info');
     btn.disabled = false;
-    btn.title = `${s.badge}: ${s.headline}${bad.length ? ` ${bad.length} model check warning${bad.length > 1 ? 's' : ''}.` : ''} (I: model info and licence)`;
+    btn.title = bad.length
+      ? t('library.info.titleWarn', { badge: badgeLabel(s.badge), headline: s.headline, warns: tn('library.info.warns', bad.length) })
+      : t('library.info.title', { badge: badgeLabel(s.badge), headline: s.headline });
     const m = getModal('model-info');
     if (m) m.extra.replaceChildren(makeBadge(LICENCE_LETTER[s.badge], s.tone, licenceLetterTitle(s.badge)));
     renderModelInfo();
@@ -470,16 +481,16 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     body.innerHTML = '';
     const { meta, summary, card } = stageMeta;
     const facts: Array<[string, string]> = [
-      ['NAME', card ? displayName(card) : meta.name || '-'],
-      ['AUTHOR', card ? displayAuthor(card.info) || '-' : meta.authors.join(', ') || '-'],
+      [t('library.fact.name'), card ? displayName(card) : meta.name || '-'],
+      [t('library.lic.author'), card ? displayAuthor(card.info) || '-' : meta.authors.join(', ') || '-'],
       ['VRM', meta.spec],
     ];
     if (card) {
       const st = card.info.stats;
-      facts.push(['EXPRESSIONS', syncLabel(st).text]);
-      facts.push(['SPRING BONES', `${st.springChains} CHAINS · ${st.springJoints} JOINTS`]);
-      facts.push(['TRIANGLES', formatCount(st.polygons)]);
-      facts.push(['FILE', `${card.info.fileName} · ${formatBytes(card.size)}`]);
+      facts.push([t('library.fact.expressions'), syncLabel(st).text]);
+      facts.push([t('library.fact.springBones'), t('library.fact.springValue', { chains: st.springChains, joints: st.springJoints })]);
+      facts.push([t('library.fact.triangles'), formatCount(st.polygons)]);
+      facts.push([t('library.fact.file'), `${card.info.fileName} · ${formatBytes(card.size)}`]);
     }
     const dl = document.createElement('dl');
     dl.className = 'mi-facts';
@@ -521,9 +532,11 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     if (noticeTimer) clearTimeout(noticeTimer);
   }
   function showNotice(s: LicenceSummary, name: string): void {
-    $('lic-notice-badge').textContent = s.badge;
-    $('lic-notice-text').textContent =
-      `${name ? `“${name}”: ` : ''}${s.headline} Puppet has loaded it anyway: these are the model's terms, shown once so you know them. Puppet never blocks a model.`.toUpperCase();
+    $('lic-notice-badge').textContent = badgeLabel(s.badge);
+    $('lic-notice-text').textContent = [name ? t('library.notice.name', { name }) : '', s.headline, t('library.notice.body')]
+      .filter(Boolean)
+      .join(' ')
+      .toUpperCase();
     $('lic-notice').classList.remove('hidden');
     if (noticeTimer) clearTimeout(noticeTimer);
     noticeTimer = setTimeout(hideNotice, 20000);

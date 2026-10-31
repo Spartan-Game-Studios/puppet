@@ -3,94 +3,94 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Puppet</title>
+    <title>VPuppet</title>
   </head>
   <body>
     <div id="app" class="app">
       <header class="bar top">
-        <div class="brand">PUPPET<span class="ver">V0.1</span></div>
-        <button id="btn-home" class="btn home-btn" title="Model library (home)"><span class="home-to">HOME <kbd>L</kbd></span><span class="stage-to">STAGE <kbd>ESC</kbd></span></button>
-        <button id="btn-open" class="btn" title="Open a .vrm file"><span>OPEN<span class="wide-only"> VRM</span></span> <kbd>O</kbd></button>
+        <div class="brand">VPUPPET<span class="ver">V0.1</span></div>
+        <button id="btn-home" class="btn home-btn" title="Model library (home)" data-i18n-title="top.homeTitle"><span class="home-to"><span data-i18n="top.home">HOME</span> <kbd>L</kbd></span><span class="stage-to"><span data-i18n="top.stage">STAGE</span> <kbd>ESC</kbd></span></button>
+        <button id="btn-open" class="btn" title="Open a .vrm file" data-i18n-title="top.openTitle"><span><span data-i18n="top.open">OPEN</span><span class="wide-only"> VRM</span></span> <kbd>O</kbd></button>
         <!-- Settings: each button opens its modal (src/app/modal.ts, #tpl-modal). Contents live in #modal-src until mounted. -->
-        <nav class="settings-nav" id="settings-nav" aria-label="Settings">
-          <button class="btn" data-modal="scene" title="Background and 3D environment (B)">SCENE <kbd>B</kbd></button>
-          <button class="btn" data-modal="face" title="Blendshape readout, gains and curves (F)">FACE <kbd>F</kbd></button>
-          <button class="btn" data-modal="physics" title="Spring bones and cloth (P)">PHYSICS <kbd>P</kbd></button>
-          <button class="btn" data-modal="motion" title="Idle and emote clips (A)">MOTION <kbd>A</kbd></button>
-          <button class="btn" data-modal="hotkeys" title="Keyboard, gamepad and gesture bindings (K)">HOTKEYS <kbd>K</kbd></button>
-          <button class="btn" data-modal="lipsync" title="Microphone lip sync (S)">LIP SYNC <kbd>S</kbd></button>
-          <button class="btn" data-modal="vmc" title="VMC protocol output (N)">VMC <kbd>N</kbd></button>
+        <nav class="settings-nav" id="settings-nav" aria-label="Settings" data-i18n-aria="nav.aria">
+          <button class="btn" data-modal="scene" title="Background and 3D environment (B)" data-i18n-title="nav.sceneTitle"><span data-i18n="nav.scene">SCENE</span> <kbd>B</kbd></button>
+          <button class="btn" data-modal="face" title="Blendshape readout, gains and curves (F)" data-i18n-title="nav.faceTitle"><span data-i18n="nav.face">FACE</span> <kbd>F</kbd></button>
+          <button class="btn" data-modal="physics" title="Spring bones and cloth (P)" data-i18n-title="nav.physicsTitle"><span data-i18n="nav.physics">PHYSICS</span> <kbd>P</kbd></button>
+          <button class="btn" data-modal="motion" title="Idle and emote clips (A)" data-i18n-title="nav.motionTitle"><span data-i18n="nav.motion">MOTION</span> <kbd>A</kbd></button>
+          <button class="btn" data-modal="hotkeys" title="Keyboard, gamepad and gesture bindings (K)" data-i18n-title="nav.hotkeysTitle"><span data-i18n="nav.hotkeys">HOTKEYS</span> <kbd>K</kbd></button>
+          <button class="btn" data-modal="lipsync" title="Microphone lip sync (S)" data-i18n-title="nav.lipsyncTitle"><span data-i18n="nav.lipsync">LIP SYNC</span> <kbd>S</kbd></button>
+          <button class="btn" data-modal="vmc" title="VMC protocol output (N)" data-i18n-title="nav.vmcTitle"><span data-i18n="nav.vmc">VMC</span> <kbd>N</kbd></button>
         </nav>
         <div class="grow"></div>
-        <button id="btn-capture" class="btn accent" title="Hide all UI for OBS window capture"><span>CAPTURE<span class="wide-only"> VIEW</span></span> <kbd>H</kbd></button>
+        <button id="btn-capture" class="btn accent" title="Hide all UI for OBS window capture" data-i18n-title="top.captureTitle"><span><span data-i18n="top.capture">CAPTURE</span><span class="wide-only" data-i18n="top.captureWide"> VIEW</span></span> <kbd>H</kbd></button>
       </header>
 
       <aside class="panel left">
         <section class="block">
-          <h2><span class="idx">01</span>TRACKING</h2>
+          <h2><span class="idx">01</span><span data-i18n="track.title">TRACKING</span></h2>
           <div class="seg" id="mode" role="radiogroup">
-            <button data-value="face">FACE<kbd>1</kbd></button>
-            <button data-value="upper">+BODY<kbd>2</kbd></button>
-            <button data-value="hands">+HANDS<kbd>3</kbd></button>
+            <button data-value="face"><span data-i18n="track.face">FACE</span><kbd>1</kbd></button>
+            <button data-value="upper"><span data-i18n="track.body">+BODY</span><kbd>2</kbd></button>
+            <button data-value="hands"><span data-i18n="track.hands">+HANDS</span><kbd>3</kbd></button>
           </div>
-          <label class="row"><span class="lbl">POSE MODEL</span>
+          <label class="row"><span class="lbl" data-i18n="track.poseModel">POSE MODEL</span>
             <select id="pose-model">
-              <option value="lite">LITE (FAST)</option>
-              <option value="full">FULL (ACCURATE)</option>
+              <option value="lite" data-i18n="track.poseLite">LITE (FAST)</option>
+              <option value="full" data-i18n="track.poseFull">FULL (ACCURATE)</option>
             </select>
           </label>
-          <label class="slider"><span class="lbl">SMOOTHING</span><input type="range" id="smoothing" min="0" max="1" step="0.01" /><output id="smoothing-out"></output></label>
-          <label class="slider"><span class="lbl">GAZE GAIN</span><input type="range" id="gaze-gain" min="0" max="2" step="0.05" /><output id="gaze-gain-out"></output></label>
-          <label class="check"><input type="checkbox" id="emotions" /><span>EMOTIONS (PRESET MODELS)</span></label>
+          <label class="slider"><span class="lbl" data-i18n="track.smoothing">SMOOTHING</span><input type="range" id="smoothing" min="0" max="1" step="0.01" /><output id="smoothing-out"></output></label>
+          <label class="slider"><span class="lbl" data-i18n="track.gazeGain">GAZE GAIN</span><input type="range" id="gaze-gain" min="0" max="2" step="0.05" /><output id="gaze-gain-out"></output></label>
+          <label class="check"><input type="checkbox" id="emotions" /><span data-i18n="track.emotions">EMOTIONS (PRESET MODELS)</span></label>
           <div class="row btns">
-            <button id="btn-calibrate" class="btn">CALIBRATE <kbd>C</kbd></button>
-            <button id="btn-calib-clear" class="btn ghost" title="Clear calibration">CLR</button>
+            <button id="btn-calibrate" class="btn"><span data-i18n="track.calibrate">CALIBRATE</span> <kbd>C</kbd></button>
+            <button id="btn-calib-clear" class="btn ghost" title="Clear calibration" data-i18n-title="track.calibClearTitle" data-i18n="track.calibClear">CLR</button>
           </div>
-          <div class="row"><span class="lbl">CALIB</span><span id="calib-state" class="val">NONE</span></div>
+          <div class="row"><span class="lbl" data-i18n="track.calib">CALIB</span><span id="calib-state" class="val" data-i18n="track.calibNone">NONE</span></div>
         </section>
         <section class="block">
-          <h2><span class="idx">02</span>FRAMING</h2>
+          <h2><span class="idx">02</span><span data-i18n="framing.title">FRAMING</span></h2>
           <div class="seg" id="framing" role="radiogroup">
-            <button data-value="bust">BUST</button>
-            <button data-value="upper">UPPER</button>
-            <button data-value="full">FULL</button>
+            <button data-value="bust" data-i18n="framing.bust">BUST</button>
+            <button data-value="upper" data-i18n="framing.upper">UPPER</button>
+            <button data-value="full" data-i18n="framing.full">FULL</button>
           </div>
           <div class="row btns">
-            <button id="btn-env-toggle" class="btn ghost" title="3D environment on / off">3D ENVIRONMENT <kbd>E</kbd></button>
+            <button id="btn-env-toggle" class="btn ghost" title="3D environment on / off" data-i18n-title="framing.envTitle"><span data-i18n="framing.env">3D ENVIRONMENT</span> <kbd>E</kbd></button>
           </div>
         </section>
         <section class="block keys-help">
-          <h2><span class="idx">?</span>CONTROLS</h2>
-          <p class="note mute"><kbd>TAB</kbd> MOVES BETWEEN CONTROLS. GAMEPAD: <kbd>LT</kbd> MENU, <kbd>✚</kbd> MOVE, <kbd>A</kbd> PRESS, <kbd>B</kbd> BACK. <kbd>G</kbd> / <kbd>RB</kbd> EMOTE PICKER.</p>
+          <h2><span class="idx">?</span><span data-i18n="controls.title">CONTROLS</span></h2>
+          <p class="note mute" data-i18n-html="controls.note"><kbd>TAB</kbd> MOVES BETWEEN CONTROLS. GAMEPAD: <kbd>LT</kbd> MENU, <kbd>✚</kbd> MOVE, <kbd>A</kbd> PRESS, <kbd>B</kbd> BACK. <kbd>G</kbd> / <kbd>RB</kbd> EMOTE PICKER.</p>
         </section>
       </aside>
 
       <main class="stage" id="stage">
         <div class="grid-overlay" aria-hidden="true"></div>
-        <div class="empty" id="empty"><div>NO MODEL LOADED<br /><kbd>O</kbd> OPEN, OR DROP A .VRM ANYWHERE</div></div>
-        <div class="drop" id="drop">DROP .VRM</div>
+        <div class="empty" id="empty"><div data-i18n-html="stage.empty">NO MODEL LOADED<br /><kbd>O</kbd> OPEN, OR DROP A .VRM ANYWHERE</div></div>
+        <div class="drop" id="drop" data-i18n="stage.drop">DROP .VRM</div>
 
         <!-- Camera card: preview + source buttons + virtual camera. Minimize (T) keeps tracking running. -->
-        <figure class="preview" id="preview-box" aria-label="Camera">
+        <figure class="preview" id="preview-box" aria-label="Camera" data-i18n-aria="cam.aria">
           <figcaption class="cam-head">
-            <span class="cam-title">CAM <span id="preview-info"></span></span>
+            <span class="cam-title"><span data-i18n="cam.title">CAM</span> <span id="preview-info"></span></span>
             <span class="cam-flags" id="cam-flags"></span>
-            <button type="button" id="btn-preview-min" class="ibtn" aria-pressed="false" title="Minimize the preview (T). Tracking keeps running."><span class="min-on">▁</span><span class="min-off">▢</span><kbd>T</kbd></button>
+            <button type="button" id="btn-preview-min" class="ibtn" aria-pressed="false" title="Minimize the preview (T). Tracking keeps running." data-i18n-title="cam.minTitle"><span class="min-on">▁</span><span class="min-off">▢</span><kbd>T</kbd></button>
           </figcaption>
           <canvas id="preview-canvas" width="320" height="180"></canvas>
           <div class="cam-scroll" id="cam-sections">
-            <div class="csec-mount" data-csec="source" data-idx="SRC" data-title="SOURCE">
+            <div class="csec-mount" data-csec="source" data-idx="SRC" data-title="SOURCE" data-i18n-attr="data-title=cam.source">
               <div class="cam-src">
-                <label class="cam-pick" id="cam-pick" title="Camera"><span class="lbl">CAM</span><select id="camera"></select></label>
-                <span class="cam-file hidden" id="cam-file" title="Recorded clip source"></span>
-                <label title="Camera resolution"><span class="lbl">RES</span>
+                <label class="cam-pick" id="cam-pick" title="Camera" data-i18n-title="cam.cameraTitle"><span class="lbl" data-i18n="cam.camera">CAM</span><select id="camera"></select></label>
+                <span class="cam-file hidden" id="cam-file" title="Recorded clip source" data-i18n-title="cam.fileTitle"></span>
+                <label title="Camera resolution" data-i18n-title="cam.resTitle"><span class="lbl" data-i18n="cam.res">RES</span>
                   <select id="resolution">
                     <option value="640x480">640×480</option>
                     <option value="1280x720">1280×720</option>
                     <option value="1920x1080">1920×1080</option>
                   </select>
                 </label>
-                <label title="Tracking rate"><span class="lbl">FPS</span>
+                <label title="Tracking rate" data-i18n-title="cam.fpsTitle"><span class="lbl" data-i18n="cam.fps">FPS</span>
                   <select id="track-fps">
                     <option value="15">15</option>
                     <option value="24">24</option>
@@ -100,32 +100,32 @@
                 </label>
               </div>
               <div class="cam-btns">
-                <label class="tog" title="Mirror the camera (M)"><input type="checkbox" id="mirror" /><span>MIRROR</span><kbd>M</kbd></label>
-                <button id="btn-camera" class="btn" title="Restart the camera">START CAMERA</button>
+                <label class="tog" title="Mirror the camera (M)" data-i18n-title="cam.mirrorTitle"><input type="checkbox" id="mirror" /><span data-i18n="cam.mirror">MIRROR</span><kbd>M</kbd></label>
+                <button id="btn-camera" class="btn" title="Restart the camera" data-i18n-title="cam.startTitle" data-i18n="cam.start">START CAMERA</button>
               </div>
-              <div class="row cam-actual"><span class="lbl">ACTUAL</span><span id="cam-actual" class="val">-</span></div>
+              <div class="row cam-actual"><span class="lbl" data-i18n="cam.actual">ACTUAL</span><span id="cam-actual" class="val">-</span></div>
             </div>
-            <div class="csec-mount" data-csec="vcam" data-idx="OUT" data-title="VIRTUAL CAM" data-key="W">
+            <div class="csec-mount" data-csec="vcam" data-idx="OUT" data-title="VIRTUAL CAM" data-key="W" data-i18n-attr="data-title=vcam.title">
               <!-- Single mount point for the virtual camera settings. The ON/OFF switch and the
                    macOS camera extension controls: src/app/vcamControls.ts (mountVcamControls). -->
               <div class="vcam-mount" id="vcam-mount">
                 <div id="vcam-controls"></div>
-                <label class="row"><span class="lbl">RES</span>
+                <label class="row"><span class="lbl" data-i18n="vcam.res">RES</span>
                   <select id="vcam-res">
                     <option value="1280x720">1280×720 @30</option>
                     <option value="1920x1080">1920×1080 @30</option>
                   </select>
                 </label>
-                <label class="row hidden" id="vcam-device-row"><span class="lbl">DEVICE</span><select id="vcam-device"></select></label>
-                <div class="row"><span class="lbl">STATE</span><span id="vcam-state" class="val" title="">-</span></div>
-                <div class="row"><span class="lbl">TX</span><span id="vcam-stats" class="val">OFF</span></div>
+                <label class="row hidden" id="vcam-device-row"><span class="lbl" data-i18n="vcam.device">DEVICE</span><select id="vcam-device"></select></label>
+                <div class="row"><span class="lbl" data-i18n="vcam.state">STATE</span><span id="vcam-state" class="val" title="">-</span></div>
+                <div class="row"><span class="lbl" data-i18n="vcam.tx">TX</span><span id="vcam-stats" class="val" data-i18n="vcam.off">OFF</span></div>
                 <p class="note" id="vcam-hint"></p>
-                <code class="cmd hidden" id="vcam-cmd" title="Click to copy"></code>
+                <code class="cmd hidden" id="vcam-cmd" title="Click to copy" data-i18n-title="vcam.cmdTitle"></code>
                 <div class="row btns">
-                  <button id="btn-vcam-setup" class="btn hidden">INSTALL CAMERA</button>
-                  <button id="btn-vcam-refresh" class="btn ghost">REFRESH</button>
+                  <button id="btn-vcam-setup" class="btn hidden" data-i18n="vcam.install">INSTALL CAMERA</button>
+                  <button id="btn-vcam-refresh" class="btn ghost" data-i18n="vcam.refresh">REFRESH</button>
                 </div>
-                <p class="note mute" id="vcam-obs">NO NATIVE CAMERA? <kbd>H</kbd> CAPTURE VIEW → OBS WINDOW CAPTURE → START VIRTUAL CAMERA. CAMERAS HAVE NO ALPHA: CLEAR IS SENT AS THE CHOSEN COLOUR.</p>
+                <p class="note mute" id="vcam-obs" data-i18n-html="vcam.obs">NO NATIVE CAMERA? <kbd>H</kbd> CAPTURE VIEW → OBS WINDOW CAPTURE → START VIRTUAL CAMERA. CAMERAS HAVE NO ALPHA: CLEAR IS SENT AS THE CHOSEN COLOUR.</p>
               </div>
             </div>
           </div>
@@ -145,207 +145,212 @@
           <div><b>GAZE Y/P</b><i id="gaze-readout">-</i></div>
         </aside>
 
-        <div class="capture-hint" id="capture-hint">CAPTURE VIEW: <kbd>H</kbd> / <kbd>ESC</kbd> TO EXIT</div>
+        <div class="capture-hint" id="capture-hint" data-i18n-html="stage.captureHint">CAPTURE VIEW: <kbd>H</kbd> / <kbd>ESC</kbd> TO EXIT</div>
         <div class="lic-notice hidden" id="lic-notice" role="status">
           <span class="lic warn" id="lic-notice-badge">AUTHOR ONLY</span>
           <p id="lic-notice-text"></p>
-          <div class="row btns"><button class="btn" id="btn-lic-notice-info">LICENCE <kbd>I</kbd></button><button class="btn accent" id="btn-lic-notice-ok">GOT IT</button></div>
+          <div class="row btns"><button class="btn" id="btn-lic-notice-info"><span data-i18n="stage.licence">LICENCE</span> <kbd>I</kbd></button><button class="btn accent" id="btn-lic-notice-ok" data-i18n="stage.gotIt">GOT IT</button></div>
         </div>
       </main>
 
       <!-- Bottom bar: the model on stage and how it is being driven. -->
       <footer class="bar bottom" id="statusbar">
-        <button id="btn-model-info" class="btn mname" disabled title="Model info and licence (I)">
-          <span id="model-lic" class="badge-slot"></span><span id="model-name" class="val">NO MODEL</span><span id="model-warn" class="badge-slot"></span><kbd>I</kbd>
+        <button id="btn-model-info" class="btn mname" disabled title="Model info and licence (I)" data-i18n-title="bar.modelTitle">
+          <span id="model-lic" class="badge-slot"></span><span id="model-name" class="val" data-i18n="bar.noModel">NO MODEL</span><span id="model-warn" class="badge-slot"></span><kbd>I</kbd>
         </button>
-        <div class="cell"><span class="lbl">TRACK</span><span id="track-state" class="val">-</span></div>
-        <div class="cell"><span class="lbl">EXPR</span><span id="expr-state" class="val">-</span></div>
-        <div class="cell"><span class="lbl">SYNC</span><span id="sync-mode" class="val">-</span></div>
-        <div class="cell"><span class="lbl">OUT</span><span id="out-state" class="val">-</span></div>
-        <div class="cell grow"><span class="lbl">STATUS</span><span id="status" class="val">BOOTING</span></div>
-        <div class="cell hint"><kbd>D</kbd>DEBUG</div>
+        <div class="cell"><span class="lbl" data-i18n="bar.track">TRACK</span><span id="track-state" class="val">-</span></div>
+        <div class="cell"><span class="lbl" data-i18n="bar.expr">EXPR</span><span id="expr-state" class="val">-</span></div>
+        <div class="cell"><span class="lbl" data-i18n="bar.sync">SYNC</span><span id="sync-mode" class="val">-</span></div>
+        <div class="cell"><span class="lbl" data-i18n="bar.out">OUT</span><span id="out-state" class="val">-</span></div>
+        <div class="cell grow"><span class="lbl" data-i18n="bar.status">STATUS</span><span id="status" class="val" data-i18n="bar.booting">BOOTING</span></div>
+        <div class="cell hint"><kbd>D</kbd><span data-i18n="bar.debug">DEBUG</span></div>
       </footer>
 
       <!-- Modal contents (moved into #tpl-modal dialogs by main.ts at boot). -->
       <div class="modal-src" id="modal-src" hidden>
-        <div data-modal="scene" data-idx="B" data-title="SCENE">
+        <div data-modal="scene" data-idx="B" data-title="SCENE" data-i18n-attr="data-title=scene.title">
           <section class="block">
-            <h2><span class="idx">B1</span>BACKGROUND</h2>
+            <h2><span class="idx">B1</span><span data-i18n="scene.background">BACKGROUND</span></h2>
             <div class="seg" id="bg-kind" role="radiogroup">
-              <button data-value="color">COLOUR</button>
-              <button data-value="transparent">CLEAR</button>
-              <button data-value="image">IMAGE</button>
-              <button data-value="environment" title="3D environment (below)">3D<kbd>E</kbd></button>
+              <button data-value="color" data-i18n="scene.colour">COLOUR</button>
+              <button data-value="transparent" data-i18n="scene.clear">CLEAR</button>
+              <button data-value="image" data-i18n="scene.image">IMAGE</button>
+              <button data-value="environment" title="3D environment (below)" data-i18n-title="scene.envTitle">3D<kbd>E</kbd></button>
             </div>
             <div class="row swatches" id="swatches">
-              <button data-color="#00ff00" style="background:#00ff00" title="Chroma green"></button>
-              <button data-color="#0000ff" style="background:#0000ff" title="Chroma blue"></button>
-              <button data-color="#ff00ff" style="background:#ff00ff" title="Magenta"></button>
-              <button data-color="#000000" style="background:#000000" title="Black"></button>
-              <button data-color="#ffffff" style="background:#ffffff" title="White"></button>
-              <input type="color" id="bg-color" title="Custom colour" />
+              <button data-color="#00ff00" style="background:#00ff00" title="Chroma green" data-i18n-title="scene.green"></button>
+              <button data-color="#0000ff" style="background:#0000ff" title="Chroma blue" data-i18n-title="scene.blue"></button>
+              <button data-color="#ff00ff" style="background:#ff00ff" title="Magenta" data-i18n-title="scene.magenta"></button>
+              <button data-color="#000000" style="background:#000000" title="Black" data-i18n-title="scene.black"></button>
+              <button data-color="#ffffff" style="background:#ffffff" title="White" data-i18n-title="scene.white"></button>
+              <input type="color" id="bg-color" title="Custom colour" data-i18n-title="scene.custom" />
             </div>
-            <div class="row btns"><button id="btn-bg-image" class="btn">PICK IMAGE</button></div>
+            <div class="row btns"><button id="btn-bg-image" class="btn" data-i18n="scene.pickImage">PICK IMAGE</button></div>
           </section>
           <section class="block env" id="env-block">
-            <h2><span class="idx">B2</span>ENVIRONMENT</h2>
-            <label class="row"><span class="lbl">SCENE</span>
+            <h2><span class="idx">B2</span><span data-i18n="scene.environment">ENVIRONMENT</span></h2>
+            <label class="row"><span class="lbl" data-i18n="scene.scene">SCENE</span>
               <select id="env-id">
-                <option value="studio">STUDIO CYCLORAMA</option>
-                <option value="room">COSY ROOM</option>
-                <option value="moor">MOOR AT DUSK</option>
-                <option value="forest">NIGHT CLEARING</option>
-                <option value="neon">NEON GRID</option>
-                <option value="hall">CONCRETE HALL</option>
-                <option value="custom">CUSTOM (GLB + HDR)</option>
+                <option value="studio" data-i18n="env.studio">STUDIO CYCLORAMA</option>
+                <option value="room" data-i18n="env.room">COSY ROOM</option>
+                <option value="moor" data-i18n="env.moor">MOOR AT DUSK</option>
+                <option value="forest" data-i18n="env.forest">NIGHT CLEARING</option>
+                <option value="neon" data-i18n="env.neon">NEON GRID</option>
+                <option value="hall" data-i18n="env.hall">CONCRETE HALL</option>
+                <option value="custom" data-i18n="env.custom">CUSTOM (GLB + HDR)</option>
               </select>
             </label>
-            <div class="row"><span class="lbl">QUALITY</span>
+            <div class="row"><span class="lbl" data-i18n="scene.quality">QUALITY</span>
               <div class="seg" id="env-quality" role="radiogroup">
-                <button data-value="low">LOW</button>
-                <button data-value="high">HIGH</button>
+                <button data-value="low" data-i18n="scene.low">LOW</button>
+                <button data-value="high" data-i18n="scene.high">HIGH</button>
               </div>
             </div>
             <div class="env-custom" id="env-custom">
               <div class="row btns">
-                <button id="btn-env-scene" class="btn" title="Load a .glb / .gltf scene (or drop one on the window)">SCENE</button>
-                <button id="btn-env-sky" class="btn" title="Load an equirectangular .hdr / .exr sky (lights the scene)">SKY</button>
-                <button id="btn-env-sky-clear" class="btn ghost" title="Remove the custom sky">NO SKY</button>
+                <button id="btn-env-scene" class="btn" title="Load a .glb / .gltf scene (or drop one on the window)" data-i18n-title="scene.sceneBtnTitle" data-i18n="scene.sceneBtn">SCENE</button>
+                <button id="btn-env-sky" class="btn" title="Load an equirectangular .hdr / .exr sky (lights the scene)" data-i18n-title="scene.skyTitle" data-i18n="scene.sky">SKY</button>
+                <button id="btn-env-sky-clear" class="btn ghost" title="Remove the custom sky" data-i18n-title="scene.noSkyTitle" data-i18n="scene.noSky">NO SKY</button>
               </div>
-              <div class="row"><span class="lbl">SCENE FILE</span><span id="env-scene-name" class="val">NONE</span></div>
-              <div class="row"><span class="lbl">SKY FILE</span><span id="env-sky-name" class="val">NONE</span></div>
-              <label class="slider"><span class="lbl">SCALE</span><input type="range" id="env-scale" min="-2" max="2" step="0.01" /><output id="env-scale-out"></output></label>
+              <div class="row"><span class="lbl" data-i18n="scene.sceneFile">SCENE FILE</span><span id="env-scene-name" class="val" data-i18n="scene.none">NONE</span></div>
+              <div class="row"><span class="lbl" data-i18n="scene.skyFile">SKY FILE</span><span id="env-sky-name" class="val" data-i18n="scene.none">NONE</span></div>
+              <label class="slider"><span class="lbl" data-i18n="scene.scale">SCALE</span><input type="range" id="env-scale" min="-2" max="2" step="0.01" /><output id="env-scale-out"></output></label>
               <label class="slider"><span class="lbl">POS X</span><input type="range" id="env-x" min="-10" max="10" step="0.05" /><output id="env-x-out"></output></label>
               <label class="slider"><span class="lbl">POS Y</span><input type="range" id="env-y" min="-10" max="10" step="0.05" /><output id="env-y-out"></output></label>
               <label class="slider"><span class="lbl">POS Z</span><input type="range" id="env-z" min="-10" max="10" step="0.05" /><output id="env-z-out"></output></label>
-              <label class="slider"><span class="lbl">ROTATE °</span><input type="range" id="env-rot" min="-180" max="180" step="1" /><output id="env-rot-out"></output></label>
+              <label class="slider"><span class="lbl" data-i18n="scene.rotate">ROTATE °</span><input type="range" id="env-rot" min="-180" max="180" step="1" /><output id="env-rot-out"></output></label>
             </div>
-            <h3>LIGHT</h3>
+            <h3 data-i18n="scene.light">LIGHT</h3>
             <div class="seg" id="env-style" role="radiogroup">
-              <button data-value="scene" title="The scene's own lighting">SCENE</button>
-              <button data-value="key" title="Strong key, soft fill">KEY</button>
-              <button data-value="rim" title="Back-lit rim, low key">RIM</button>
-              <button data-value="soft" title="Even ambient light">SOFT</button>
+              <button data-value="scene" title="The scene's own lighting" data-i18n-title="scene.lightSceneTitle" data-i18n="scene.lightScene">SCENE</button>
+              <button data-value="key" title="Strong key, soft fill" data-i18n-title="scene.lightKeyTitle" data-i18n="scene.lightKey">KEY</button>
+              <button data-value="rim" title="Back-lit rim, low key" data-i18n-title="scene.lightRimTitle" data-i18n="scene.lightRim">RIM</button>
+              <button data-value="soft" title="Even ambient light" data-i18n-title="scene.lightSoftTitle" data-i18n="scene.lightSoft">SOFT</button>
             </div>
-            <label class="slider"><span class="lbl">INTENSITY</span><input type="range" id="env-intensity" min="0.25" max="2" step="0.01" /><output id="env-intensity-out"></output></label>
-            <label class="slider"><span class="lbl">TEMP K</span><input type="range" id="env-temp" min="2000" max="12000" step="100" /><output id="env-temp-out"></output></label>
-            <h3>ATMOSPHERE</h3>
-            <label class="slider"><span class="lbl">FOG</span><input type="range" id="env-fog" min="0" max="1" step="0.01" /><output id="env-fog-out"></output></label>
-            <label class="check"><input type="checkbox" id="env-shadow" /><span>GROUND SHADOW</span></label>
-            <label class="slider"><span class="lbl">FLOOR M</span><input type="range" id="env-floor" min="-1" max="1" step="0.01" /><output id="env-floor-out"></output></label>
-            <h3>CAMERA</h3>
-            <label class="check"><input type="checkbox" id="env-sway" /><span>IDLE SWAY</span></label>
-            <label class="check"><input type="checkbox" id="env-dof" /><span>DEPTH OF FIELD (HIGH ONLY)</span></label>
-            <div class="row btns"><button id="btn-env-reset" class="btn ghost" title="Reset this scene's look and placement">RESET THIS SCENE</button></div>
+            <label class="slider"><span class="lbl" data-i18n="scene.intensity">INTENSITY</span><input type="range" id="env-intensity" min="0.25" max="2" step="0.01" /><output id="env-intensity-out"></output></label>
+            <label class="slider"><span class="lbl" data-i18n="scene.temp">TEMP K</span><input type="range" id="env-temp" min="2000" max="12000" step="100" /><output id="env-temp-out"></output></label>
+            <h3 data-i18n="scene.atmosphere">ATMOSPHERE</h3>
+            <label class="slider"><span class="lbl" data-i18n="scene.fog">FOG</span><input type="range" id="env-fog" min="0" max="1" step="0.01" /><output id="env-fog-out"></output></label>
+            <label class="check"><input type="checkbox" id="env-shadow" /><span data-i18n="scene.shadow">GROUND SHADOW</span></label>
+            <label class="slider"><span class="lbl" data-i18n="scene.floor">FLOOR M</span><input type="range" id="env-floor" min="-1" max="1" step="0.01" /><output id="env-floor-out"></output></label>
+            <h3 data-i18n="scene.camera">CAMERA</h3>
+            <label class="check"><input type="checkbox" id="env-sway" /><span data-i18n="scene.sway">IDLE SWAY</span></label>
+            <label class="check"><input type="checkbox" id="env-dof" /><span data-i18n="scene.dof">DEPTH OF FIELD (HIGH ONLY)</span></label>
+            <div class="row btns"><button id="btn-env-reset" class="btn ghost" title="Reset this scene's look and placement" data-i18n-title="scene.resetTitle" data-i18n="scene.reset">RESET THIS SCENE</button></div>
           </section>
         </div>
-        <div data-modal="face" data-idx="F" data-title="FACE">
+        <div data-modal="face" data-idx="F" data-title="FACE" data-i18n-attr="data-title=face.title">
           <section class="block" id="tab-face">
-            <div class="bs-head"><span>BLENDSHAPE</span><span>OUT <i>│RAW</i></span><span>GAIN</span><span>CURVE</span></div>
+            <div class="bs-head"><span data-i18n="face.blendshape">BLENDSHAPE</span><span><span data-i18n="face.out">OUT</span> <i data-i18n="face.raw">│RAW</i></span><span data-i18n="face.gain">GAIN</span><span data-i18n="face.curve">CURVE</span></div>
             <div id="bs-list" class="bs-list"></div>
           </section>
         </div>
-        <div data-modal="physics" data-idx="P" data-title="PHYSICS">
+        <div data-modal="physics" data-idx="P" data-title="PHYSICS" data-i18n-attr="data-title=phys.title">
           <section class="block" id="tab-physics">
             <div class="seg" id="phys-mode" role="radiogroup">
-              <button data-value="off">OFF<kbd>8</kbd></button>
-              <button data-value="stiff">STIFF<kbd>9</kbd></button>
-              <button data-value="normal">NORMAL<kbd>0</kbd></button>
+              <button data-value="off"><span data-i18n="phys.off">OFF</span><kbd>8</kbd></button>
+              <button data-value="stiff"><span data-i18n="phys.stiff">STIFF</span><kbd>9</kbd></button>
+              <button data-value="normal"><span data-i18n="phys.normal">NORMAL</span><kbd>0</kbd></button>
             </div>
-            <label class="check"><input type="checkbox" id="phys-stabilise" /><span>STABILISER (FIXED STEP + CLAMPS)</span></label>
-            <label class="slider"><span class="lbl">MAX SPEED M/S</span><input type="range" id="phys-maxspeed" min="0.5" max="10" step="0.1" /><output id="phys-maxspeed-out"></output></label>
-            <label class="slider"><span class="lbl">INERTIA</span><input type="range" id="phys-inertia" min="0" max="1" step="0.01" /><output id="phys-inertia-out"></output></label>
-            <label class="slider"><span class="lbl">COLLIDE DAMP</span><input type="range" id="phys-coldamp" min="0" max="1" step="0.01" /><output id="phys-coldamp-out"></output></label>
-            <label class="row"><span class="lbl">SUBSTEPS</span>
+            <label class="check"><input type="checkbox" id="phys-stabilise" /><span data-i18n="phys.stabilise">STABILISER (FIXED STEP + CLAMPS)</span></label>
+            <label class="slider"><span class="lbl" data-i18n="phys.maxSpeed">MAX SPEED M/S</span><input type="range" id="phys-maxspeed" min="0.5" max="10" step="0.1" /><output id="phys-maxspeed-out"></output></label>
+            <label class="slider"><span class="lbl" data-i18n="phys.inertia">INERTIA</span><input type="range" id="phys-inertia" min="0" max="1" step="0.01" /><output id="phys-inertia-out"></output></label>
+            <label class="slider"><span class="lbl" data-i18n="phys.colDamp">COLLIDE DAMP</span><input type="range" id="phys-coldamp" min="0" max="1" step="0.01" /><output id="phys-coldamp-out"></output></label>
+            <label class="row"><span class="lbl" data-i18n="phys.substeps">SUBSTEPS</span>
               <select id="phys-substeps"><option value="1">1 (60 HZ)</option><option value="2">2 (120 HZ)</option><option value="3">3 (180 HZ)</option><option value="4">4 (240 HZ)</option></select>
             </label>
-            <div class="row btns"><button id="btn-phys-reset" class="btn">SETTLE <kbd>R</kbd></button><button id="btn-phys-clear" class="btn ghost">RESET OVERRIDES</button></div>
+            <div class="row btns"><button id="btn-phys-reset" class="btn"><span data-i18n="phys.settle">SETTLE</span> <kbd>R</kbd></button><button id="btn-phys-clear" class="btn ghost" data-i18n="phys.resetOverrides">RESET OVERRIDES</button></div>
             <div id="cloth-ui"></div>
-            <h3>CHAINS <span id="chain-count"></span></h3>
-            <div class="chain-head"><span>ON</span><span>CHAIN</span><span>STIF</span><span>DRAG</span><span>GRAV</span></div>
+            <h3><span data-i18n="phys.chains">CHAINS</span> <span id="chain-count"></span></h3>
+            <div class="chain-head"><span data-i18n="phys.colOn">ON</span><span data-i18n="phys.colChain">CHAIN</span><span data-i18n="phys.colStiff">STIF</span><span data-i18n="phys.colDrag">DRAG</span><span data-i18n="phys.colGrav">GRAV</span></div>
             <div id="chain-list" class="chain-list"></div>
-            <h3>COLLIDERS <span id="collider-count"></span></h3>
+            <h3><span data-i18n="phys.colliders">COLLIDERS</span> <span id="collider-count"></span></h3>
             <div id="collider-list" class="collider-list"></div>
           </section>
         </div>
         <!-- MOTION, HOTKEYS, LIP SYNC: built by src/anim/features.ts -->
-        <div data-modal="motion" data-idx="A" data-title="MOTION"><section class="block" id="motion-block"></section></div>
-        <div data-modal="hotkeys" data-idx="K" data-title="HOTKEYS"><section class="block" id="hotkeys-block"></section></div>
-        <div data-modal="lipsync" data-idx="S" data-title="LIP SYNC"><section class="block" id="lipsync-block"></section></div>
-        <div data-modal="vmc" data-idx="N" data-title="VMC OUT">
+        <div data-modal="motion" data-idx="A" data-title="MOTION" data-i18n-attr="data-title=modal.motion"><section class="block" id="motion-block"></section></div>
+        <div data-modal="hotkeys" data-idx="K" data-title="HOTKEYS" data-i18n-attr="data-title=modal.hotkeys"><section class="block" id="hotkeys-block"></section></div>
+        <div data-modal="lipsync" data-idx="S" data-title="LIP SYNC" data-i18n-attr="data-title=modal.lipsync"><section class="block" id="lipsync-block"></section></div>
+        <div data-modal="vmc" data-idx="N" data-title="VMC OUT" data-i18n-attr="data-title=modal.vmc">
           <section class="block">
-            <h2><span class="idx">N</span>VMC OUT</h2>
-            <label class="check"><input type="checkbox" id="vmc-enabled" /><span>SEND VMC (OSC/UDP)</span><kbd>V</kbd></label>
-            <label class="row"><span class="lbl">HOST</span><input id="vmc-host" type="text" spellcheck="false" /></label>
-            <label class="row"><span class="lbl">PORT</span><input id="vmc-port" type="number" min="1" max="65535" /></label>
-            <label class="check" title="Blink, A/I/U/E/O, Joy... derived from the ARKit values, for receivers that only read presets"><input type="checkbox" id="vmc-presets" /><span>ALSO SEND VRM PRESETS</span></label>
-            <div class="row"><span class="lbl">TX</span><span id="vmc-stats" class="val">OFF</span></div>
+            <h2><span class="idx">N</span><span data-i18n="modal.vmc">VMC OUT</span></h2>
+            <label class="check"><input type="checkbox" id="vmc-enabled" /><span data-i18n="vmc.send">SEND VMC (OSC/UDP)</span><kbd>V</kbd></label>
+            <label class="row"><span class="lbl" data-i18n="vmc.host">HOST</span><input id="vmc-host" type="text" spellcheck="false" /></label>
+            <label class="row"><span class="lbl" data-i18n="vmc.port">PORT</span><input id="vmc-port" type="number" min="1" max="65535" /></label>
+            <label class="check" title="Blink, A/I/U/E/O, Joy... derived from the ARKit values, for receivers that only read presets" data-i18n-title="vmc.presetsTitle"><input type="checkbox" id="vmc-presets" /><span data-i18n="vmc.presets">ALSO SEND VRM PRESETS</span></label>
+            <div class="row"><span class="lbl" data-i18n="vcam.tx">TX</span><span id="vmc-stats" class="val" data-i18n="vcam.off">OFF</span></div>
+          </section>
+          <section class="block">
+            <h2><span class="idx">N</span><span data-i18n="mcp.title">AI AGENTS (MCP)</span></h2>
+            <div id="mcp-controls"></div>
           </section>
         </div>
-        <div data-modal="model-info" data-idx="I" data-title="MODEL INFO">
+        <div data-modal="model-info" data-idx="I" data-title="MODEL INFO" data-i18n-attr="data-title=modal.modelInfo">
           <div class="mi-body" id="model-info-body"></div>
         </div>
       </div>
 
       <!-- 00 LIBRARY: the home screen (src/app/home.ts). Cards come from #tpl-card. -->
-      <section class="home" id="home" aria-label="Model library">
+      <section class="home" id="home" aria-label="Model library" data-i18n-aria="home.aria">
         <div class="home-bar">
-          <h2 class="home-title"><span class="idx">00</span>LIBRARY<span class="home-count" id="home-count"></span></h2>
-          <div class="seg home-filter" id="home-filter" role="radiogroup" aria-label="Filter">
-            <button data-value="all">ALL<span class="n" id="home-n-all"></span></button>
-            <button data-value="favourites">★ FAVOURITES<span class="n" id="home-n-fav"></span></button>
+          <h2 class="home-title"><span class="idx">00</span><span data-i18n="home.library">LIBRARY</span><span class="home-count" id="home-count"></span></h2>
+          <div class="seg home-filter" id="home-filter" role="radiogroup" aria-label="Filter" data-i18n-aria="home.filterAria">
+            <button data-value="all"><span data-i18n="home.all">ALL</span><span class="n" id="home-n-all"></span></button>
+            <button data-value="favourites"><span data-i18n="home.favourites">★ FAVOURITES</span><span class="n" id="home-n-fav"></span></button>
           </div>
-          <label class="home-search"><span class="lbl">SEARCH</span><input id="home-search" type="text" spellcheck="false" autocomplete="off" placeholder="NAME OR AUTHOR" /><kbd>/</kbd></label>
-          <label class="home-sort"><span class="lbl">SORT</span>
+          <label class="home-search"><span class="lbl" data-i18n="home.search">SEARCH</span><input id="home-search" type="text" spellcheck="false" autocomplete="off" placeholder="NAME OR AUTHOR" data-i18n-placeholder="home.searchPlaceholder" /><kbd>/</kbd></label>
+          <label class="home-sort"><span class="lbl" data-i18n="home.sort">SORT</span>
             <select id="home-sort">
-              <option value="used">LAST USED</option>
-              <option value="name">NAME</option>
-              <option value="added">DATE ADDED</option>
+              <option value="used" data-i18n="home.sortUsed">LAST USED</option>
+              <option value="name" data-i18n="home.sortName">NAME</option>
+              <option value="added" data-i18n="home.sortAdded">DATE ADDED</option>
             </select>
           </label>
-          <button id="btn-import" class="btn accent" title="Import .vrm files into the library (or drop them here)">IMPORT .VRM <kbd>I</kbd></button>
+          <button id="btn-import" class="btn accent" title="Import .vrm files into the library (or drop them here)" data-i18n-title="home.importTitle"><span data-i18n="home.import">IMPORT .VRM</span> <kbd>I</kbd></button>
+          <label class="home-lang" data-i18n-title="home.langTitle"><span class="lbl" data-i18n="home.lang">LANG</span><select id="lang"></select></label>
         </div>
         <div class="home-migrate hidden" id="home-migrate">
-          <span class="lbl">FROM BEFORE THE LIBRARY</span>
+          <span class="lbl" data-i18n="home.migrate">FROM BEFORE THE LIBRARY</span>
           <span class="val" id="home-migrate-name"></span>
-          <button class="btn accent" id="btn-migrate-yes">IMPORT IT</button>
-          <button class="btn ghost" id="btn-migrate-no">NO THANKS</button>
+          <button class="btn accent" id="btn-migrate-yes" data-i18n="home.migrateYes">IMPORT IT</button>
+          <button class="btn ghost" id="btn-migrate-no" data-i18n="home.migrateNo">NO THANKS</button>
         </div>
         <div class="home-scroll" id="home-scroll">
-          <div class="home-grid" id="home-grid" role="grid" aria-label="Models"></div>
-          <div class="home-nomatch hidden" id="home-nomatch">NO MODELS MATCH. <button class="btn ghost" id="btn-home-clear">CLEAR FILTERS</button></div>
+          <div class="home-grid" id="home-grid" role="grid" aria-label="Models" data-i18n-aria="home.modelsAria"></div>
+          <div class="home-nomatch hidden" id="home-nomatch"><span data-i18n="home.noMatch">NO MODELS MATCH.</span> <button class="btn ghost" id="btn-home-clear" data-i18n="home.clearFilters">CLEAR FILTERS</button></div>
           <div class="home-empty hidden" id="home-empty">
             <div class="he-drop">
-              <strong>NO MODELS YET</strong>
-              <span><kbd>I</kbd> IMPORT, OR DROP ONE OR MORE .VRM FILES ANYWHERE ON THIS SCREEN.</span>
-              <span class="mute">PUPPET KEEPS ITS OWN COPY OF EACH MODEL, SO MOVING OR DELETING THE ORIGINAL IS FINE.</span>
+              <strong data-i18n="home.emptyTitle">NO MODELS YET</strong>
+              <span data-i18n-html="home.emptyImport"><kbd>I</kbd> IMPORT, OR DROP ONE OR MORE .VRM FILES ANYWHERE ON THIS SCREEN.</span>
+              <span class="mute" data-i18n="home.emptyCopy">VPUPPET KEEPS ITS OWN COPY OF EACH MODEL, SO MOVING OR DELETING THE ORIGINAL IS FINE.</span>
             </div>
             <div class="he-where">
-              <h3>WHERE TO GET A MODEL</h3>
+              <h3 data-i18n="home.where">WHERE TO GET A MODEL</h3>
               <ol>
-                <li><a href="https://hub.vroid.com/en" target="_blank" rel="noopener" data-link="vroid-hub">VROID HUB</a><span>THOUSANDS OF VRM MODELS. EACH SETS ITS OWN TERMS: LOOK FOR “AVATAR USE” AND DOWNLOAD ONLY THOSE THAT ALLOW IT.</span><code>hub.vroid.com</code></li>
-                <li><a href="https://www.opensourceavatars.com/" target="_blank" rel="noopener" data-link="open-source-avatars">OPEN SOURCE AVATARS</a><span>FREE CC0 (PUBLIC DOMAIN) VRM MODELS: USE THEM FOR ANYTHING, INCLUDING COMMERCIAL STREAMS.</span><code>opensourceavatars.com</code></li>
-                <li><a href="https://vroid.com/en/studio" target="_blank" rel="noopener" data-link="vroid-studio">VROID STUDIO</a><span>MAKE YOUR OWN ANIME-STYLE AVATAR FOR FREE, THEN EXPORT IT AS .VRM.</span><code>vroid.com/en/studio</code></li>
+                <li><a href="https://hub.vroid.com/en" target="_blank" rel="noopener" data-link="vroid-hub">VROID HUB</a><span data-i18n="home.whereHub">THOUSANDS OF VRM MODELS. EACH SETS ITS OWN TERMS: LOOK FOR “AVATAR USE” AND DOWNLOAD ONLY THOSE THAT ALLOW IT.</span><code>hub.vroid.com</code></li>
+                <li><a href="https://www.opensourceavatars.com/" target="_blank" rel="noopener" data-link="open-source-avatars">OPEN SOURCE AVATARS</a><span data-i18n="home.whereOsa">FREE CC0 (PUBLIC DOMAIN) VRM MODELS: USE THEM FOR ANYTHING, INCLUDING COMMERCIAL STREAMS.</span><code>opensourceavatars.com</code></li>
+                <li><a href="https://vroid.com/en/studio" target="_blank" rel="noopener" data-link="vroid-studio">VROID STUDIO</a><span data-i18n="home.whereStudio">MAKE YOUR OWN ANIME-STYLE AVATAR FOR FREE, THEN EXPORT IT AS .VRM.</span><code>vroid.com/en/studio</code></li>
               </ol>
             </div>
           </div>
         </div>
         <div class="home-imports hidden" id="home-imports" aria-live="polite">
-          <h3>IMPORT<span id="home-import-sum"></span><button class="x" id="btn-imports-close" title="Close">×</button></h3>
+          <h3><span data-i18n="home.imports">IMPORT</span><span id="home-import-sum"></span><button class="x" id="btn-imports-close" title="Close" data-i18n-title="home.close">×</button></h3>
           <ol id="home-import-list"></ol>
         </div>
-        <div class="home-dropzone" id="home-drop">DROP .VRM FILES TO IMPORT</div>
+        <div class="home-dropzone" id="home-drop" data-i18n="home.dropzone">DROP .VRM FILES TO IMPORT</div>
         <footer class="home-keys">
-          <span><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> MOVE</span>
-          <span><kbd>ENTER</kbd> LOAD</span>
-          <span><kbd>S</kbd> STAR</span>
-          <span><kbd>L</kbd> LICENCE</span>
-          <span><kbd>F2</kbd> RENAME</span>
-          <span><kbd>DEL</kbd> REMOVE</span>
-          <span><kbd>/</kbd> SEARCH</span>
-          <span><kbd>I</kbd> IMPORT</span>
+          <span><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> <span data-i18n="home.keyMove">MOVE</span></span>
+          <span><kbd>ENTER</kbd> <span data-i18n="home.keyLoad">LOAD</span></span>
+          <span><kbd>S</kbd> <span data-i18n="home.keyStar">STAR</span></span>
+          <span><kbd>L</kbd> <span data-i18n="home.keyLicence">LICENCE</span></span>
+          <span><kbd>F2</kbd> <span data-i18n="home.keyRename">RENAME</span></span>
+          <span><kbd>DEL</kbd> <span data-i18n="home.keyRemove">REMOVE</span></span>
+          <span><kbd>/</kbd> <span data-i18n="home.keySearch">SEARCH</span></span>
+          <span><kbd>I</kbd> <span data-i18n="home.keyImport">IMPORT</span></span>
           <span class="grow"></span>
-          <span id="home-esc"><kbd>ESC</kbd> STAGE</span>
+          <span id="home-esc"><kbd>ESC</kbd> <span data-i18n="home.keyStage">STAGE</span></span>
         </footer>
       </section>
 
@@ -354,10 +359,10 @@
       <article class="card" role="gridcell" tabindex="-1">
         <div class="thumb">
           <img alt="" draggable="false" />
-          <span class="no-thumb">NO THUMBNAIL</span>
+          <span class="no-thumb" data-i18n="card.noThumb">NO THUMBNAIL</span>
           <span class="spec"></span>
-          <span class="on-stage">ON STAGE</span>
-          <button class="star" aria-pressed="false" title="Favourite (S)">★</button>
+          <span class="on-stage" data-i18n="card.onStage">ON STAGE</span>
+          <button class="star" aria-pressed="false" title="Favourite (S)" data-i18n-title="card.favTitle">★</button>
         </div>
         <div class="card-body">
           <div class="name"></div>
@@ -367,27 +372,27 @@
         </div>
         <div class="card-foot">
           <span class="used"></span>
-          <button class="act lic-toggle" title="Licence (L)">LICENCE</button>
-          <button class="act more" title="More">•••</button>
+          <button class="act lic-toggle" title="Licence (L)" data-i18n-title="card.licenceTitle" data-i18n="card.licence">LICENCE</button>
+          <button class="act more" title="More" data-i18n-title="card.more">•••</button>
         </div>
-        <button class="use" data-act="load">USE MODEL <kbd>ENTER</kbd></button>
-        <div class="drawer lic-drawer"><h4>LICENCE<button class="x close-drawer" title="Close">×</button></h4><div class="lic-body"></div></div>
+        <button class="use" data-act="load"><span data-i18n="card.use">USE MODEL</span> <kbd>ENTER</kbd></button>
+        <div class="drawer lic-drawer"><h4><span data-i18n="card.licence">LICENCE</span><button class="x close-drawer" title="Close" data-i18n-title="home.close">×</button></h4><div class="lic-body"></div></div>
         <div class="drawer menu">
-          <h4>MODEL<button class="x close-drawer" title="Close">×</button></h4>
-          <button class="act" data-act="load">LOAD ONTO STAGE <kbd>ENTER</kbd></button>
-          <button class="act" data-act="rename">RENAME <kbd>F2</kbd></button>
-          <button class="act" data-act="thumb">RE-RENDER THUMBNAIL</button>
-          <button class="act" data-act="reveal">SHOW IN FOLDER</button>
-          <button class="act danger" data-act="remove">REMOVE FROM LIBRARY <kbd>DEL</kbd></button>
+          <h4><span data-i18n="card.model">MODEL</span><button class="x close-drawer" title="Close" data-i18n-title="home.close">×</button></h4>
+          <button class="act" data-act="load"><span data-i18n="card.load">LOAD ONTO STAGE</span> <kbd>ENTER</kbd></button>
+          <button class="act" data-act="rename"><span data-i18n="card.rename">RENAME</span> <kbd>F2</kbd></button>
+          <button class="act" data-act="thumb" data-i18n="card.rethumb">RE-RENDER THUMBNAIL</button>
+          <button class="act" data-act="reveal" data-i18n="card.reveal">SHOW IN FOLDER</button>
+          <button class="act danger" data-act="remove"><span data-i18n="card.remove">REMOVE FROM LIBRARY</span> <kbd>DEL</kbd></button>
         </div>
       </article>
     </template>
     <!-- Reusable stage components (src/app/ui.ts, src/app/modal.ts). -->
     <template id="tpl-modal">
       <dialog class="pm">
-        <h2><span class="idx"></span><span class="pm-title"></span><span class="pm-extra"></span><button type="button" class="x pm-close" title="Close (Esc / gamepad B)">×</button></h2>
+        <h2><span class="idx"></span><span class="pm-title"></span><span class="pm-extra"></span><button type="button" class="x pm-close" title="Close (Esc / gamepad B)" data-i18n-title="modal.close">×</button></h2>
         <div class="pm-body"></div>
-        <footer class="pm-keys"><span><kbd>TAB</kbd> / <kbd>✚</kbd> MOVE</span><span><kbd>ESC</kbd> / <kbd>B</kbd> CLOSE</span></footer>
+        <footer class="pm-keys"><span><kbd>TAB</kbd> / <kbd>✚</kbd> <span data-i18n="modal.move">MOVE</span></span><span><kbd>ESC</kbd> / <kbd>B</kbd> <span data-i18n="modal.closeKey">CLOSE</span></span></footer>
       </dialog>
     </template>
     <template id="tpl-badge"><span class="badge" role="img"></span></template>
@@ -398,10 +403,10 @@
       </section>
     </template>
     <dialog class="modal" id="home-confirm">
-      <h2><span class="idx">!</span>REMOVE FROM LIBRARY</h2>
+      <h2><span class="idx">!</span><span data-i18n="confirm.title">REMOVE FROM LIBRARY</span></h2>
       <p id="home-confirm-text"></p>
-      <p class="mute">THIS DELETES PUPPET'S COPY ONLY. THE FILE YOU IMPORTED FROM IS NOT TOUCHED.</p>
-      <div class="row btns"><button class="btn" id="btn-confirm-cancel" autofocus>CANCEL</button><button class="btn accent" id="btn-confirm-ok">REMOVE</button></div>
+      <p class="mute" data-i18n="confirm.note">THIS DELETES VPUPPET'S COPY ONLY. THE FILE YOU IMPORTED FROM IS NOT TOUCHED.</p>
+      <div class="row btns"><button class="btn" id="btn-confirm-cancel" autofocus data-i18n="confirm.cancel">CANCEL</button><button class="btn accent" id="btn-confirm-ok" data-i18n="confirm.ok">REMOVE</button></div>
     </dialog>
     <video id="video" muted playsinline></video>
     <script type="module" src="/src/main.ts"></script>

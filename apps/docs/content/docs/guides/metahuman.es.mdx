@@ -1,0 +1,42 @@
+---
+title: Crear un avatar con MetaHuman
+description: La ruta general de MetaHuman a VRM pasando por Unreal Engine y Blender, y la cuestión de licencia que debes resolver antes.
+---
+
+<Callout type="warn" title="Revisa primero la licencia">
+Los MetaHumans están sujetos a las condiciones de licencia de MetaHuman y Unreal Engine de Epic Games, y originalmente se licenciaban para usarse con Unreal Engine. Usar un MetaHuman fuera de Unreal Engine, como VRM en otra app, **puede no estar permitido** según las condiciones que se te apliquen. Epic ha revisado estas condiciones con el tiempo, así que lee el EULA actual de MetaHuman y Unreal Engine antes de hacer nada de esto. Esta página no es asesoramiento legal.
+</Callout>
+
+Esta es la ruta más compleja de estas guías. Los pasos siguientes son un esquema; las herramientas cambian entre versiones, así que sigue la documentación actual de cada una para los detalles.
+
+## 1. De MetaHuman a FBX
+
+Crea el personaje con MetaHuman Creator y llévalo a un proyecto de Unreal Engine. Desde Unreal, exporta las mallas esqueléticas del cuerpo y de la cara (FBX), con sus texturas.
+
+## 2. De FBX a Blender
+
+Importa los archivos FBX en Blender y une el cuerpo y la cara en un solo esqueleto.
+
+## 3. La cara
+
+Una cara de MetaHuman se controla con un rig basado en huesos con formas correctivas, no con un conjunto sencillo de blendshapes con nombre. El flujo de trabajo de Live Link Face de Unreal asigna los 52 nombres de blendshapes de ARKit a poses faciales de MetaHuman, lo que demuestra que la correspondencia existe, pero un VRM necesita esas poses como **shape keys**.
+
+Para tener **perfect sync** en VPuppet, cada pose de ARKit debe convertirse (bake) en una shape key con su nombre (`eyeBlinkLeft`, `jawOpen`, `mouthSmileLeft`...). VPuppet compara los nombres sin tener en cuenta mayúsculas ni signos de puntuación y necesita al menos 40 de los 52. Si es demasiado trabajo, convierte al menos los presets de VRM (parpadeo, `aa` `ih` `ou` `ee` `oh`, emociones); VPuppet los deriva del seguimiento para cualquier modelo.
+
+## 4. Convertirlo en VRM
+
+Con el [VRM Add-on for Blender](https://vrm-addon-for-blender.info/):
+
+- asigna los huesos humanoides y comprueba la pose de reposo (la pose en T es la más segura);
+- registra las shape keys de la cara como expresiones;
+- añade cadenas de spring bones y colisionadores para el pelo y la ropa suelta.
+
+## 5. Hazlo más ligero
+
+Las mallas y texturas de MetaHuman están hechas para renderizado en tiempo real de gama alta y resultan pesadas para un avatar que comparte el ordenador con el seguimiento. Usa un nivel de detalle inferior si está disponible, reduce la malla, elimina la geometría oculta y reduce el tamaño de las texturas (las texturas de MetaHuman suelen ser de 4K o más).
+
+## 6. Compruébalo en VPuppet
+
+Importa el `.vrm`, abre **MODEL INFO** (`I`) y lee **MODEL CHECKS**. La barra inferior muestra `PERFECT SYNC n/52` o `PRESETS n/13`, y la ventana FACE (`F`) tacha las filas de ARKit que le faltan al modelo.
+
+Un agente de IA conectado a VPuppet puede hacer esta comprobación contigo: inspeccionar el modelo, volver a importar cada nueva exportación y probar cada forma de perfect sync. Consulta [Conectar un agente de IA](../mcp.mdx#workflow).

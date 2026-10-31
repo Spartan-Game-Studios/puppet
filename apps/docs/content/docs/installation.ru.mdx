@@ -1,0 +1,60 @@
+---
+title: Установка
+description: Купите VPuppet в Steam, попробуйте бесплатную демоверсию или соберите из исходников.
+---
+
+Получить VPuppet можно тремя способами. Это одно и то же приложение с одинаковыми функциями; различаются способ обновления и, для демоверсии, срок использования.
+
+## Steam (полная версия)
+
+Полная версия продаётся в Steam за **$19.99**. Сборки из Steam подписаны и обновляются автоматически.
+
+<Steps>
+<Step>
+Откройте [страницу VPuppet в магазине](https://store.steampowered.com/app/<FULL_APP_ID>/) и купите приложение.
+</Step>
+<Step>
+Установите его из библиотеки Steam и запустите.
+</Step>
+<Step>
+Разрешите доступ к камере, когда система об этом спросит. См. [Первые шаги](./getting-started.mdx).
+</Step>
+</Steps>
+
+<Callout title="macOS: виртуальная камера">
+Встроенной виртуальной камере macOS нужна подписанная сборка — сборка из Steam подписана. macOS устанавливает расширения камеры только из приложений в папке **/Applications**; см. [Виртуальная камера](./virtual-camera.mdx#setup).
+</Callout>
+
+## Бесплатная демоверсия
+
+Демоверсия — это полное приложение со всеми функциями на **100 часов использования**.
+
+После 100 часов:
+
+- трекинг на сцене, виртуальная камера и вывод VMC блокируются;
+- **библиотека моделей по-прежнему открывается** и хранит все импортированные модели.
+
+Если затем купить полную версию, она подхватит ту же библиотеку: ничего не придётся импортировать заново.
+
+## Сборка из исходников
+
+VPuppet — открытое ПО под лицензией MIT: [github.com/Spartan-Game-Studios/puppet](https://github.com/Spartan-Game-Studios/puppet).
+
+Понадобятся Node.js 22 или новее, [pnpm](https://pnpm.io), Rust (stable) и [зависимости Tauri 2](https://v2.tauri.app/start/prerequisites/) для вашей ОС (инструменты командной строки Xcode на macOS, WebView2 на Windows, `libwebkit2gtk-4.1-dev` и связанные пакеты на Linux).
+
+```sh
+git clone https://github.com/Spartan-Game-Studios/puppet.git
+cd puppet
+pnpm install
+pnpm tauri dev      # run the desktop app
+pnpm tauri build    # make an installer for your OS
+```
+
+`pnpm tauri build` создаёт `.app` и `.dmg` на macOS, `.msi` / `.exe` на Windows и `.deb` / `.rpm` / `.AppImage` на Linux. Для первой сборки нужен интернет: она скачивает модели трекинга MediaPipe с серверов Google.
+
+<Callout type="warn" title="Неподписанные сборки">
+Сборки, которые вы делаете сами, не подписаны, если вы не настроили собственную подпись.
+
+- На macOS при первом запуске щёлкните приложение правой кнопкой и выберите **Открыть** либо выполните `xattr -dr com.apple.quarantine /Applications/VPuppet.app`.
+- Неподписанная сборка для macOS не может установить встроенную виртуальную камеру. Используйте [вариант через OBS](./virtual-camera.mdx#obs-route).
+</Callout>

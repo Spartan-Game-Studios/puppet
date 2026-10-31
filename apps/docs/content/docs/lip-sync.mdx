@@ -1,0 +1,27 @@
+---
+title: Lip sync
+description: Drive the mouth from your microphone when the camera can't see it, or together with tracking.
+---
+
+Open **LIP SYNC** (`S`). Lip sync is off by default; VPuppet asks for microphone access only when you choose a mode.
+
+## Modes
+
+| Mode | What drives the mouth |
+|---|---|
+| **OFF** | Face tracking only. |
+| **FALLBACK** | Your voice, only while your face isn't tracked (eased in and out). |
+| **BLEND** | The larger of tracking and voice, shape by shape. |
+| **AUDIO** | Your voice only. |
+
+## Settings
+
+- Pick the **microphone**.
+- **GATE DB** sets the level below which sound is ignored. Raise it if background noise moves the mouth.
+- The meter shows the input level, the gate and each mouth shape as it's detected.
+
+VPuppet matches your voice against five vowels. Preset models get `aa` `ih` `ou` `ee` `oh`; perfect-sync models get `jawOpen`, `mouthFunnel`, `mouthPucker` and `mouthStretch`. The mouth opens quickly (30 ms) and closes a little more slowly (90 ms).
+
+<Callout title="FALLBACK and weak tracking">
+FALLBACK switches over only when the face is lost. It can't tell when mouth tracking is merely weak; use BLEND for that.
+</Callout>

@@ -20,6 +20,7 @@ import { isHeadBone, maskHas, maskMovesHips, type BoneMask } from './masks';
 import { sampleBone, sampleHips, toVrmBone, toVrmDir, type BoundClip } from './retarget';
 import type { LipSync } from '../audio/lipsync';
 import { DEFAULT_IDLE } from './catalog';
+import { t } from '../i18n';
 
 interface Track {
   id: string;
@@ -111,7 +112,7 @@ export class AnimLayer implements AvatarLayer {
         const w = this.idle?.w ?? 0;
         this.idle = { id, clip, mask: def.mask, loop: true, t: 0, w, target: 0, fadeIn: 0.6, fadeOut: 0.6 };
       })
-      .catch((e) => this.onError(`IDLE CLIP: ${(e as Error).message}`))
+      .catch((e) => this.onError(t('motion.err.idleClip', { error: (e as Error).message })))
       .finally(() => {
         if (this.loadingIdle === id) this.loadingIdle = null;
       });
@@ -146,7 +147,7 @@ export class AnimLayer implements AvatarLayer {
       });
       this.onPlaying(this.playing);
     } catch (e) {
-      this.onError(`CLIP: ${(e as Error).message}`);
+      this.onError(t('motion.err.clip', { error: (e as Error).message }));
     }
   }
 

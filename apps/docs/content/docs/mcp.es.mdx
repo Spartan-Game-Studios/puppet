@@ -1,0 +1,143 @@
+---
+title: Conectar un agente de IA (MCP)
+description: Deja que un agente de IA como Claude Code, Claude Desktop o Cursor vea y maneje la app VPuppet mientras se ejecuta.
+---
+
+## Qué es
+
+VPuppet puede alojar un servidor [MCP](https://modelcontextprotocol.io) (Model Context Protocol) local, para que los agentes de IA de tu ordenador (Claude Code, Claude Desktop, Cursor y otros clientes MCP) trabajen con la app en ejecución. Un agente puede:
+
+- inspeccionar el modelo del escenario mientras lo construyes en Blender, incluida su cobertura de perfect sync;
+- hacer capturas de pantalla del escenario;
+- probar expresiones y clips de animación;
+- leer estadísticas de seguimiento, mensajes de estado recientes y errores.
+
+Es útil para construir un avatar con la ayuda de un agente y para averiguar por qué algo no funciona.
+
+## Actívalo
+
+<Steps>
+<Step>
+Abre la ventana **VMC** (`N`) y busca la sección **AI AGENTS (MCP)** (agentes de IA).
+</Step>
+<Step>
+Marca **ALLOW AI AGENTS (LOCAL MCP SERVER)** (permitir agentes de IA, servidor MCP local). Viene desactivada por defecto.
+
+La primera vez, VPuppet crea un token de acceso aleatorio. El puerto (**PORT**) es `39540` salvo que lo cambies ahí.
+</Step>
+</Steps>
+
+El servidor solo funciona mientras VPuppet está abierto y esta opción está activada.
+
+## Registra tus clientes de IA [#install]
+
+Ejecuta el instalador con VPuppet abierto y la opción activada. Busca Claude Code, Cursor y Claude Desktop en tu ordenador y añade a cada uno un servidor `vpuppet`.
+
+<Tabs items={['macOS / Linux', 'Windows']}>
+<Tab value="macOS / Linux">
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.sh | sh
+```
+
+Para volver a quitar las entradas:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.sh | sh -s -- --uninstall
+```
+
+</Tab>
+<Tab value="Windows">
+
+En PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.ps1 | iex
+```
+
+Para volver a quitar las entradas:
+
+```powershell
+$env:VPUPPET_MCP_UNINSTALL = 1; irm https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.ps1 | iex
+```
+
+</Tab>
+</Tabs>
+
+Qué hace el instalador:
+
+- lee el token de la carpeta de configuración de VPuppet (nunca lo muestra);
+- **Claude Code:** ejecuta `claude mcp add --transport http --scope user`;
+- **Cursor:** añade el servidor a `~/.cursor/mcp.json`;
+- **Claude Desktop:** lo añade a `claude_desktop_config.json` a través del puente [`mcp-remote`](https://www.npmjs.com/package/mcp-remote), que necesita Node.js (`npx`);
+- combina sus cambios con los archivos de configuración existentes y antes hace una copia de seguridad. Puedes ejecutarlo varias veces sin problema.
+
+**Vuelve a ejecutarlo** después de pulsar **NEW TOKEN** (nuevo token) o cambiar el puerto, para que tus clientes reciban los nuevos valores. Reinicia un cliente después de que el instalador haya cambiado su configuración.
+
+Opciones, como variables de entorno:
+
+| Variable | Efecto |
+|---|---|
+| `VPUPPET_CONFIG_DIR` | La carpeta de configuración de VPuppet, si no está en el lugar habitual |
+| `VPUPPET_MCP_PORT` | El puerto, si el instalador no puede leerlo |
+| `VPUPPET_MCP_CLIENTS` | Qué clientes configurar, p. ej. `"claude-code cursor"` (por defecto: `claude-code cursor claude-desktop`) |
+
+<Callout title="¿Solo Claude Code?">
+**COPY CLAUDE CODE COMMAND** (copiar comando de Claude Code), en la sección AI AGENTS, copia un comando `claude mcp add` listo para usar con el puerto y el token actuales. Pégalo en una terminal.
+</Callout>
+
+## Otros clientes
+
+Cualquier cliente MCP compatible con Streamable HTTP puede conectarse:
+
+- **URL:** `http://127.0.0.1:39540/mcp` (o el puerto que hayas configurado)
+- **Cabecera:** `Authorization: Bearer <token>`, donde el token es el contenido del archivo `mcp-token` de la carpeta de configuración de VPuppet:
+  - macOS: `~/Library/Application Support/com.spartangamestudios.vpuppet/`
+  - Windows: `%APPDATA%\com.spartangamestudios.vpuppet\`
+  - Linux: `~/.config/com.spartangamestudios.vpuppet/`
+
+## Herramientas
+
+| Herramienta | Qué hace |
+|---|---|
+| `app_status` | Resumen de la app: versión, estado de la demo, el modelo del escenario, si HOME está a la vista, modo y estado del seguimiento, salidas y frecuencias de imagen. Los agentes la llaman primero. |
+| `library_list` | Lista los modelos de la biblioteca con sus estadísticas, avisos de comprobación del modelo e insignia de licencia. |
+| `library_load` | Carga un modelo de la biblioteca en el escenario. |
+| `library_import` | Importa un archivo `.vrm` desde una ruta a la biblioteca (miniatura, comprobaciones) y opcionalmente lo carga. |
+| `model_inspect` | Todo sobre el modelo del escenario: versión y metadatos VRM, huesos humanoides asignados o que faltan, cada expresión, cobertura de perfect sync de ARKit (incluidos los nombres presentes con otra grafía), presets, look-at, cadenas de spring bones y colisionadores, estadísticas de mallas / materiales / texturas, licencia y avisos de comprobación del modelo. |
+| `stage_screenshot` | Un PNG del escenario tal como lo ves, o del avatar encuadrado de frente en face / bust / upper / full, sin mover tu cámara. |
+| `expression_set` | Mantiene una expresión con un peso por encima del seguimiento, o restablece las expresiones mantenidas. |
+| `expression_sweep` | Activa cada expresión por turnos con la pose congelada e informa de las formas que no hacen nada y de las formas izquierda / derecha intercambiadas, con una hoja de contactos. |
+| `clip_list` | Lista los clips de animación integrados e importados. |
+| `clip_play` | Reproduce o detiene un clip en el avatar. |
+| `tracking_stats` | Estado del seguimiento: modo, estado, frecuencias de imagen, latencia y tiempo de inferencia por cada canal, búsqueda de manos por lado y gestos actuales. |
+| `logs_recent` | Líneas de estado, avisos y errores recientes. |
+| `settings_get` | Lee los ajustes que un agente puede cambiar. |
+| `settings_set` | Cambia el modo de seguimiento, el suavizado, el encuadre, el fondo o el modo de física, en directo. |
+
+## Un flujo de trabajo típico [#workflow]
+
+Construir o arreglar un avatar con un agente suele seguir este ciclo:
+
+<Steps>
+<Step>
+**Inspeccionar.** El agente ejecuta `model_inspect` sobre el modelo del escenario: huesos que faltan, expresiones que no hacen nada, qué nombres de ARKit faltan para perfect sync.
+</Step>
+<Step>
+**Corregir en Blender** (o en la herramienta con la que hiciste el modelo) y volver a exportar el `.vrm`.
+</Step>
+<Step>
+**Volver a importar.** El agente ejecuta `library_import` con el nuevo archivo. Un archivo reexportado se convierte en una nueva entrada de la biblioteca.
+</Step>
+<Step>
+**Verificar.** El agente ejecuta `expression_sweep` sobre el conjunto de ARKit para comprobar que cada forma de perfect sync mueve la cara, y en el lado correcto.
+</Step>
+</Steps>
+
+## Seguridad
+
+- **Solo local.** El servidor escucha únicamente en `127.0.0.1`, así que otros ordenadores no pueden acceder a él. Se rechazan las peticiones que llevan una cabecera `Origin` de navegador o un nombre de host distinto de este ordenador, de modo que las páginas web tampoco pueden acceder.
+- **Token.** Cada petición necesita el token. Es aleatorio, se crea cuando activas el servidor por primera vez y se guarda como `mcp-token` en la carpeta de configuración de VPuppet (en macOS y Linux solo tú puedes leerlo). Trátalo como una contraseña. **NEW TOKEN** lo sustituye; después, vuelve a ejecutar el instalador.
+- **Qué puede cambiar un agente.** Un agente puede cargar e importar modelos y cambiar un subconjunto seguro de ajustes: modo de seguimiento, suavizado, encuadre, fondo y modo de física. **No puede** cambiar los ajustes de VMC, de la cámara virtual ni de MCP. Solo lee los archivos que tú o el agente indiquéis para importar.
+- **Demo.** Cuando se agotan las 100 horas de la demo, se rechaza la carga de modelos a través de MCP, igual que en la app.
+- Un agente actúa con los permisos que le concedes en tu cliente. Revisa lo que propone antes de aprobarlo.

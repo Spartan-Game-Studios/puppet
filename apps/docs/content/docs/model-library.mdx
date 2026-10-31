@@ -1,0 +1,85 @@
+---
+title: Model library
+description: HOME keeps every model you import, with thumbnails, details and licence badges.
+---
+
+**HOME** is the first screen at launch. `L` or `Esc` on the stage goes back to it.
+
+## Import
+
+- **IMPORT .VRM** (`I`) imports one or several files at once, or drop `.vrm` files on HOME.
+- Opening a model from the stage (`O`, or dropping a file) imports it too.
+- Each file shows its progress and, if something is wrong, its own error (for example "NOT A VRM").
+- The same file imported twice is kept once.
+
+VPuppet stores its own copy of each model, so moving or deleting the original file is fine.
+
+## The cards
+
+Each card shows:
+
+- a bust thumbnail rendered at import, the name and the author;
+- VRM 0.x or 1.0;
+- `PERFECT SYNC n/52` or `PRESETS n/13` (see [Tracking](./tracking.mdx#face));
+- spring-bone chains, triangle count and file size;
+- a licence badge, a favourite star and when you last used it;
+- a `!` marker when VPuppet found a serious authoring problem (see [Model checks](#model-checks)).
+
+Each card also has **RENAME**, **RE-RENDER THUMBNAIL**, **SHOW IN FOLDER** and **REMOVE FROM LIBRARY**. Removing asks first and deletes only VPuppet's copy, never your original file.
+
+## Find a model
+
+- Filter **ALL** or **FAVOURITES**. Favourites always sort first in ALL.
+- Search by name or author (`/`).
+- Sort by last used, name or date added.
+
+## Keyboard
+
+| Key | Action |
+|---|---|
+| `←` `↑` `↓` `→` | Move between cards |
+| `Enter` | Load the model |
+| `S` | Favourite |
+| `L` | Licence |
+| `F2` | Rename |
+| `Del` | Remove from library |
+| `/` | Search |
+| `I` | Import |
+| `Esc` | Back to the stage |
+
+## Licence badges [#licence-badges]
+
+Every VRM carries its author's terms of use in its metadata. VPuppet reads them (VRM 1.0 and 0.x) and shows them in plain language in the card's **LICENCE** drawer and in the stage's **MODEL INFO** window (`I`, or click the model name in the bottom bar). The badge summarises them:
+
+| Badge | Meaning |
+|---|---|
+| **A** AUTHOR ONLY | Only the author may perform as this model. |
+| **L** LICENSED ONLY | Only the author and people they licensed may perform as this model. |
+| **C** CC0 | Public domain. |
+| **B** COMMERCIAL OK | Business use is allowed, companies included. |
+| **S** SOLO COMMERCIAL | Individuals may earn money with it. |
+| **P** PERSONAL | Non-profit use only. |
+| **N** NO TERMS | The file states no terms. |
+
+AUTHOR ONLY and LICENSED ONLY show in the accent colour, and loading such a model shows a one-time notice.
+
+<Callout title="Information, not DRM">
+VPuppet never refuses to load a model. The badge tells you what the author wrote; following those terms is up to you.
+</Callout>
+
+## Model checks [#model-checks]
+
+When a model loads, VPuppet looks for authoring problems it can detect reliably and lists them under **MODEL CHECKS** in MODEL INFO. The serious ones also appear on the library card:
+
+- FACE POINTS AWAY FROM SKELETON
+- MODEL FACES AWAY FROM THE CAMERA
+- MISSING BONES
+- FACE EXPRESSIONS ARE EMPTY (expressions are listed but do nothing)
+- NO FACE EXPRESSIONS
+- a rest pose that isn't a T-pose (MODEL INFO only)
+
+VPuppet never edits your model to "fix" these; fix them in the tool you made the model with.
+
+## Where the library lives
+
+The library is stored in VPuppet's app data folder, for example `~/Library/Application Support/com.spartangamestudios.vpuppet` on macOS. **SHOW IN FOLDER** on a card opens it.

@@ -1,0 +1,60 @@
+---
+title: Installation
+description: Buy VPuppet on Steam, try the free demo, or build it from source.
+---
+
+There are three ways to get VPuppet. They are the same app with the same features; they differ in how you get updates and, for the demo, how long you can use it.
+
+## Steam (full app)
+
+The full app is sold on Steam for **$19.99**. Steam builds are signed and update automatically.
+
+<Steps>
+<Step>
+Open the [VPuppet store page](https://store.steampowered.com/app/<FULL_APP_ID>/) and buy the app.
+</Step>
+<Step>
+Install it from your Steam library and launch it.
+</Step>
+<Step>
+Allow camera access when your operating system asks. See [Getting started](./getting-started.mdx).
+</Step>
+</Steps>
+
+<Callout title="macOS: virtual camera">
+The native macOS virtual camera needs a signed build, which the Steam build is. macOS installs camera extensions only from apps in **/Applications**; see [Virtual camera](./virtual-camera.mdx#setup).
+</Callout>
+
+## Free demo
+
+The demo is the full app, fully featured, for **100 hours of use**.
+
+After 100 hours:
+
+- tracking on the stage, the virtual camera and VMC output lock;
+- the **model library still opens** and keeps every model you imported.
+
+If you then buy the full app, it picks up the same library: nothing has to be imported again.
+
+## Build from source
+
+VPuppet is open source under the MIT licence: [github.com/Spartan-Game-Studios/puppet](https://github.com/Spartan-Game-Studios/puppet).
+
+You need Node.js 22 or later, [pnpm](https://pnpm.io), Rust (stable) and the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS (Xcode command line tools on macOS, WebView2 on Windows, `libwebkit2gtk-4.1-dev` and related packages on Linux).
+
+```sh
+git clone https://github.com/Spartan-Game-Studios/puppet.git
+cd puppet
+pnpm install
+pnpm tauri dev      # run the desktop app
+pnpm tauri build    # make an installer for your OS
+```
+
+`pnpm tauri build` produces a `.app` and `.dmg` on macOS, `.msi` / `.exe` on Windows and `.deb` / `.rpm` / `.AppImage` on Linux. The first build needs internet access: it downloads the MediaPipe tracking models from Google.
+
+<Callout type="warn" title="Unsigned builds">
+Builds you make yourself are unsigned unless you set up your own signing.
+
+- On macOS, right-click the app and choose **Open** the first time, or run `xattr -dr com.apple.quarantine /Applications/VPuppet.app`.
+- An unsigned macOS build can't install the native virtual camera. Use the [OBS route](./virtual-camera.mdx#obs-route) instead.
+</Callout>

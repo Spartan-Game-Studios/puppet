@@ -1,0 +1,4 @@
+# Rejected AI generations (kept locally for reference, not shipped)
+rejects/
+# Review aid written by make_capsules.py --sheet
+out/_contact_sheet.png

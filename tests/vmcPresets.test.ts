@@ -5,7 +5,7 @@ import { derivePresetBlends, withPresetBlends } from '../src/vmc/presets';
 const NAMES = ['Blink', 'Blink_L', 'Blink_R', 'A', 'I', 'U', 'E', 'O', 'Joy', 'Angry', 'Sorrow', 'Surprised', 'Fun'];
 const asMap = (b: Array<[string, number]>) => new Map(b);
 
-/** A perfect-sync frame as Puppet sends it: the 52 ARKit names, model spelling. */
+/** A perfect-sync frame as VPuppet sends it: the 52 ARKit names, model spelling. */
 function arkitFrame(over: Record<string, number>, spell = (s: string) => s): Array<[string, number]> {
   return ARKIT_NAMES.map((n) => [spell(n), over[n] ?? 0]);
 }

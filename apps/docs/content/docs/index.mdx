@@ -1,0 +1,42 @@
+---
+title: Introduction
+description: What VPuppet is, what it does, and what you need to run it.
+---
+
+VPuppet is a webcam VTuber app. It loads a VRM avatar and drives it live from an ordinary webcam: your face (52 ARKit blendshapes, head pose and gaze), your upper body and your hands. The avatar can go straight into Zoom, Meet, Discord, FaceTime or OBS as a virtual camera, or out to other VTuber software over the VMC protocol.
+
+VPuppet is a desktop app for macOS, Windows and Linux. Tracking runs on your own computer with Google MediaPipe; nothing is sent to a server. The source code is open (MIT).
+
+## What it does
+
+- **Face and perfect sync.** 52 ARKit blendshapes and the head transform from your webcam. Models with ARKit-named expressions ("perfect sync" models) are driven one to one; other models get the standard VRM expressions (blink, the vowels `aa` `ih` `ou` `ee` `oh`, and emotions) derived from the same data.
+- **Upper body and hands.** Spine, chest, shoulders, arms and every finger bone. Seven hand gestures are recognised (fist, open palm, point, peace, thumbs up, OK, rock).
+- **Virtual camera.** VPuppet appears as a webcam called **VPuppet Virtual Camera**.
+- **VMC output.** Bones and blendshapes over OSC/UDP to receivers such as VSeeFace, Warudo or VNyan.
+- **Cloth and hair physics** built on the model's own spring bones.
+- **Motion and hotkeys.** Idle loops, emotes and your own FBX / glTF clips, triggered from the keyboard, a gamepad or hand gestures.
+- **Mic lip sync** as a fallback, a blend or the only mouth source.
+- **3D environments.** Six built-in lit scenes, or your own `.glb` / `.gltf` with an HDR sky.
+- **Model library** with thumbnails and plain-language licence badges.
+
+## Requirements
+
+| | |
+|---|---|
+| **Operating system** | macOS, Windows 10/11 or Linux. The native virtual camera needs macOS 12.3 or later. |
+| **Webcam** | Any webcam the operating system can see. Tracking runs at up to 30 fps. |
+| **Avatar** | A `.vrm` file (VRM 0.x or 1.0). VPuppet ships no avatar: use your own, for example one exported from [VRoid Studio](https://vroid.com/en/studio), or any model whose licence allows your use. |
+| **Optional** | A microphone (lip sync), a gamepad (hotkeys and menu navigation), OBS or a video-call app (virtual camera), a VMC receiver. |
+
+<Callout title="Legs are not tracked">
+VPuppet tracks the face, upper body and hands. Legs stay in an idle stance or follow an emote clip; there is no walking.
+</Callout>
+
+## Where to next
+
+<Cards>
+  <Card title="Installation" href="./installation.mdx" description="Steam, the free demo, or build from source." />
+  <Card title="Getting started" href="./getting-started.mdx" description="Import a model, calibrate and pick a tracking mode." />
+  <Card title="Virtual camera" href="./virtual-camera.mdx" description="Use the avatar as a webcam in Zoom, Meet, Discord and OBS." />
+  <Card title="Keyboard shortcuts" href="./shortcuts.mdx" description="Every key on one page." />
+</Cards>

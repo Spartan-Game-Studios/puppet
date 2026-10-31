@@ -1,0 +1,44 @@
+---
+title: Coming from VRoid
+description: Export a VRoid Studio character as VRM, bring it into VPuppet, and add perfect sync if you want more expression.
+---
+
+[VRoid Studio](https://vroid.com/en/studio) makes VRM avatars directly, so a VRoid character works in VPuppet without any other tool.
+
+## Export from VRoid Studio
+
+Use VRoid Studio's VRM export. Menus and options change between VRoid Studio versions, so check [VRoid's own documentation](https://vroid.pixiv.help/) for the exact steps in yours. Things to look at in the export dialog:
+
+- **VRM version.** VPuppet loads both **VRM 0.x** and **VRM 1.0**, so either works. Many other VTuber apps still expect 0.x; if you also use one of those, 0.x is the safe choice.
+- **Expressions and spring bones.** VRoid's standard expressions (blink, vowels, emotions) and its hair and clothing spring bones are part of a normal export. VPuppet uses both.
+- **Performance options.** The export can reduce polygons, merge materials and limit texture size. A lighter model leaves more of your computer for tracking. The model's card in VPuppet shows its triangle count and file size, so you can compare exports.
+- **Avatar information.** Fill in the author and usage terms (who may perform as the avatar, commercial use and so on). VPuppet shows these as the [licence badge](../model-library.mdx#licence-badges).
+
+## Import into VPuppet
+
+Drop the `.vrm` on VPuppet's HOME screen, or click **IMPORT .VRM** (`I`). Select it and press `Enter`. Then [calibrate](../getting-started.mdx#calibrate) with `C`.
+
+## What VPuppet does for a VRoid model automatically
+
+A VRoid export has the standard VRM expressions but not the 52 ARKit blendshapes, so it shows as `PRESETS n/13` in the bottom bar. VPuppet drives it from face tracking anyway:
+
+- `blink`, `blinkLeft`, `blinkRight` from your eyes;
+- the vowels `aa`, `ih`, `ou`, `ee`, `oh` from your jaw and mouth;
+- `happy`, `angry`, `sad`, `surprised`, `relaxed` from your expression. Switch these off with **EMOTIONS (PRESET MODELS)** if you'd rather trigger emotions with [hotkeys](../motion.mdx#hotkeys).
+
+Gaze works through the model's look-at (eye bones or look expressions), and the [FACE window](../tracking.mdx#face-window) lets you tune how strongly each shape reads.
+
+## Add perfect sync (optional)
+
+With perfect sync, every tracked mouth, cheek and brow movement has its own shape on the model, instead of being squeezed into five vowels and a blink. VRoid models don't come with these shapes, so they have to be added after export:
+
+- **Ready-made tools.** Third-party tools exist that add ARKit-named blendshapes to VRoid models; HANA_Tool is one well-known example. Follow the tool's own instructions and licence.
+- **Blender.** With the [VRM Add-on for Blender](https://vrm-addon-for-blender.info/) you can import the VRM, sculpt or transfer shape keys named after the 52 ARKit blendshapes, register them as expressions, and export a VRM again. Blendshape-transfer add-ons can copy shapes from a reference head with a similar topology.
+
+VPuppet matches the names ignoring case and punctuation, so `eyeBlinkLeft`, `EyeBlinkLeft` and `eye_blink_left` all work. Once the model has at least 40 of the 52, the bottom bar shows `PERFECT SYNC n/52`. Rows the model still lacks are struck through in the FACE window.
+
+An AI agent connected to VPuppet can check your work for you: it can list missing ARKit names and test every shape. See [Connect an AI agent](../mcp.mdx#workflow).
+
+## Physics
+
+VRoid's spring bones work as authored. VPuppet's cloth solver also links neighbouring chains (a skirt ring, a hair fringe) so panels move together, and fits colliders to the body. Use `8` / `9` / `0` for OFF / STIFF / NORMAL, and the [PHYSICS window](../physics.mdx) (`P`) to adjust single chains or colliders. Your changes are saved per model.
