@@ -6,7 +6,7 @@ VPuppet is an open-source (MIT) webcam VTuber app. It loads a VRM avatar and dri
 
 ## Steam
 
-The signed, auto-updating builds are sold on Steam ($19.99). There is a free demo: fully featured for 100 hours of use, after which tracking on the stage, the virtual camera and VMC lock; the model library still opens and keeps everything imported, and the full app picks up the same library. The demo is the cargo feature `demo` (`src-tauri/src/demo.rs`, `src/app/demo.ts`), built with `pnpm tauri:demo`; the source stays MIT. Store page copy, assets checklist and SteamPipe scripts are in [steam/](steam/README.md).
+The signed, auto-updating builds are sold on Steam ($19.99). There is a free demo: fully featured for 100 hours of use, after which tracking on the stage, the virtual camera and VMC lock (at the next launch, never mid-session); the model library still opens and keeps everything imported, and the full app picks up the same library. The demo is the cargo feature `demo` (`src-tauri/src/demo.rs`, `src/app/demo.ts`), built with `pnpm tauri:demo`; the source stays MIT. Store page copy, assets checklist and SteamPipe scripts are in [steam/](steam/README.md).
 
 Renamed from Puppet: the first launch moves the old `com.spartangamestudios.puppet` config and data folders to the new identifier (`src-tauri/src/migrate.rs`). Environment variables keep their `PUPPET_` names and the test hooks stay on `window.__puppet`.
 

@@ -1,5 +1,7 @@
 //! The free Steam demo (cargo feature `demo`): fully featured for 100 hours of
-//! use, then the outputs lock. Tracking on the stage, the virtual camera and
+//! use, then the outputs lock, but only when the app starts: hours running out
+//! mid-stream never cuts the stream (players hate that), the session carries on
+//! and the next launch is locked. Tracking on the stage, the virtual camera and
 //! VMC stop; the model library (HOME) stays open, so nothing the user imported
 //! is lost, and buying the full app (same identifier, same data folder) picks
 //! it all up.
@@ -34,6 +36,9 @@ pub const EXPIRED: &str = "DEMO_EXPIRED";
 const TICK_S: u64 = 5;
 const ACTIVE_S: u64 = 15;
 const SAVE_EVERY_S: u64 = 60;
+/// Steam's copy of the clock can arrive a few seconds after launch; it may still
+/// lock the app this early, before the user has started anything.
+const STARTUP_GRACE_S: u64 = 30;
 const KEY: &[u8] = b"vpuppet/demo/v1/7c2f0e9a4b1d";
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,6 +47,8 @@ pub struct Status {
     pub used_s: u64,
     pub limit_s: u64,
     pub locked: bool,
+    /// The hours are used up; if not `locked` yet, the app locks at its next start.
+    pub expired: bool,
     /// The Steam stat has been read (feature `steam`, Steam running).
     pub steam: bool,
 }
@@ -52,6 +59,9 @@ struct Clock {
     last_active: Option<Instant>,
     saved_s: u64,
     steam_read: bool,
+    /// Decided at launch (and by Steam's stat within STARTUP_GRACE_S), never later.
+    locked: bool,
+    started: Instant,
 }
 
 pub struct Demo {
@@ -64,15 +74,27 @@ pub struct Demo {
 impl Demo {
     /// `dir`: where demo.json lives (None: memory only, as in the browser harness).
     pub fn new(dir: Option<PathBuf>) -> Self {
-        let path = dir.map(|d| d.join("demo.json"));
-        let used_s = path.as_deref().map(load).unwrap_or(0);
         // Debug builds only: shorten the limit to test the lock.
         #[cfg(debug_assertions)]
         let limit_s = std::env::var("PUPPET_DEMO_LIMIT_S").ok().and_then(|v| v.parse().ok()).unwrap_or(LIMIT_S);
         #[cfg(not(debug_assertions))]
         let limit_s = LIMIT_S;
+        Self::with_limit(dir, limit_s)
+    }
+
+    fn with_limit(dir: Option<PathBuf>, limit_s: u64) -> Self {
+        let path = dir.map(|d| d.join("demo.json"));
+        let used_s = path.as_deref().map(load).unwrap_or(0);
         Demo {
-            clock: Mutex::new(Clock { used_s, limit_s, last_active: None, saved_s: used_s, steam_read: false }),
+            clock: Mutex::new(Clock {
+                used_s,
+                limit_s,
+                last_active: None,
+                saved_s: used_s,
+                steam_read: false,
+                locked: used_s >= limit_s,
+                started: Instant::now(),
+            }),
             path,
             #[cfg(feature = "steam")]
             steam: if ENABLED { steam::Stat::init() } else { None },
@@ -100,7 +122,8 @@ impl Demo {
             demo: ENABLED,
             used_s: c.used_s.min(c.limit_s),
             limit_s: c.limit_s,
-            locked: ENABLED && c.used_s >= c.limit_s,
+            locked: ENABLED && c.locked,
+            expired: ENABLED && c.used_s >= c.limit_s,
             steam: c.steam_read,
         }
     }
@@ -116,6 +139,10 @@ impl Demo {
                 if let Some(v) = s.read() {
                     c.used_s = c.used_s.max(v);
                     c.steam_read = true;
+                    // Steam remembers hours a reinstall or another machine forgot.
+                    if c.used_s >= c.limit_s && now.duration_since(c.started) < Duration::from_secs(STARTUP_GRACE_S) {
+                        c.locked = true;
+                    }
                 }
             }
         }
@@ -269,10 +296,9 @@ mod tests {
     }
 
     #[test]
-    fn clock_counts_only_while_active_and_stops_at_the_limit() {
+    fn clock_counts_only_while_active_and_locks_at_the_next_start() {
         let d = tmp("clock");
-        let demo = Demo::new(Some(d.clone()));
-        demo.clock.lock().unwrap().limit_s = 20;
+        let demo = Demo::with_limit(Some(d.clone()), 20);
         let t0 = Instant::now();
         let step = Duration::from_secs(TICK_S);
         demo.tick(t0, step);
@@ -286,10 +312,15 @@ mod tests {
         }
         let s = demo.status();
         assert_eq!(s.used_s, 20);
-        assert_eq!(s.locked, ENABLED);
-        assert_eq!(demo.check().is_err(), ENABLED);
+        // Used up mid-session: the session carries on, the next start is locked.
+        assert_eq!(s.expired, ENABLED);
+        assert!(!s.locked);
+        assert!(demo.check().is_ok());
         // Hitting the limit saves right away.
         assert_eq!(load(&d.join("demo.json")), 20);
+        let next = Demo::with_limit(Some(d.clone()), 20);
+        assert_eq!(next.status().locked, ENABLED);
+        assert_eq!(next.check().is_err(), ENABLED);
         // Use long ago doesn't count.
         let demo2 = Demo::new(None);
         demo2.clock.lock().unwrap().last_active = Some(t0);
