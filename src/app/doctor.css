@@ -1,0 +1,19 @@
+/* MODEL DOCTOR window (src/app/doctorUi.ts). */
+.doctor .doc-fixes { display: flex; flex-direction: column; max-height: 260px; overflow-y: auto; border: var(--thin); margin: 6px 0; }
+.doctor .doc-fixes:empty { display: none; }
+.doctor .doc-fixes > .note { padding: 8px; }
+.doctor .doc-fix {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  padding: 4px 8px; border-bottom: var(--thin); font-size: 11px; cursor: pointer;
+}
+.doctor .doc-fix:last-child { border-bottom: 0; }
+.doctor .doc-fix:hover { background: var(--paper); }
+.doctor .doc-fix b { font-weight: 800; overflow: hidden; text-overflow: ellipsis; }
+.doctor .doc-fix .from { color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doctor .doc-fix i { font-style: normal; font-size: 9px; font-weight: 800; padding: 1px 5px; border: var(--thin); }
+.doctor .doc-fix i.create { background: var(--accent); }
+.doctor fieldset { border: 0; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.doctor fieldset:disabled { opacity: 0.45; }
+.doctor .doc-out { margin-top: 12px; }
+.doctor .doc-result { margin-top: 8px; word-break: break-all; }
+.doctor .hidden { display: none; }

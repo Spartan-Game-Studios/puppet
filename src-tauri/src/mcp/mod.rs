@@ -422,7 +422,7 @@ mod tests {
         assert_eq!(st, 200, "{body}");
         let v: Value = serde_json::from_str(&body).unwrap();
         let names: Vec<&str> = v["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-        assert_eq!(names.len(), 14);
+        assert_eq!(names.len(), 15);
         assert!(names.contains(&"expression_sweep"));
 
         let (st, body) = post(port, &rpc(3, "tools/call", json!({ "name": "library_list", "arguments": { "search": "te" } })), &[V]).await;

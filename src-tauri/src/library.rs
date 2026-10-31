@@ -182,6 +182,29 @@ pub fn library_write(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result
     write_atomic(&path, body)
 }
 
+/// Save an edited model (the model doctor) where the user picks in the system
+/// Save dialog. The webview never names a path: Rust asks, then writes there.
+/// Returns the chosen path, or None if the user cancelled.
+#[tauri::command(async)]
+pub fn save_vrm_as(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
+        return Err("save_vrm_as expects a binary body".into());
+    };
+    let name = request.headers().get("x-name").and_then(|v| v.to_str().ok()).unwrap_or("model.vrm");
+    // A file name only, never a path.
+    let name: String = name.rsplit(['/', '\\']).next().unwrap_or("model.vrm").chars().filter(|c| !c.is_control()).collect();
+    let Some(picked) = app.dialog().file().set_file_name(&name).add_filter("VRM", &["vrm"]).blocking_save_file() else {
+        return Ok(None);
+    };
+    let mut path = picked.into_path().map_err(|e| e.to_string())?;
+    if path.extension().and_then(|e| e.to_str()).map(|e| !e.eq_ignore_ascii_case("vrm")).unwrap_or(true) {
+        path.set_extension("vrm");
+    }
+    write_atomic(&path, body)?;
+    Ok(Some(path.display().to_string()))
+}
+
 #[tauri::command(async)]
 pub fn library_read(app: AppHandle, id: String, file: String) -> Result<tauri::ipc::Response, String> {
     let p = entry_file(&root(&app)?, &id, &file)?;

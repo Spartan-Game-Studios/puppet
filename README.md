@@ -105,7 +105,9 @@ The desktop app asks for the microphone only when you pick a mode: `NSMicrophone
 
 ## Model library
 
-HOME shows every imported model as a card: a bust thumbnail rendered at import, the name and author, VRM 0.x / 1.0, `PERFECT SYNC n/52` or `PRESETS n/13`, spring-bone chains, triangles, file size, a licence badge, a favourite star and when it was last used. Filter ALL / FAVOURITES (favourites always sort first in ALL), search by name or author, sort by last used, name or date added. Each card also has RENAME, RE-RENDER THUMBNAIL, SHOW IN FOLDER and REMOVE FROM LIBRARY (asks first, and deletes only VPuppet's copy).
+HOME shows every imported model as a card: a bust thumbnail rendered at import, the name and author, VRM 0.x / 1.0, `PERFECT SYNC n/52` or `PRESETS n/13`, spring-bone chains, triangles, file size, a licence badge, a favourite star and when it was last used. Filter ALL / FAVOURITES (favourites always sort first in ALL), search by name or author, sort by last used, name or date added. Each card also has RENAME, RE-RENDER THUMBNAIL, MODEL DOCTOR, SHOW IN FOLDER and REMOVE FROM LIBRARY (asks first, and deletes only VPuppet's copy).
+
+**MODEL DOCTOR** (`src/app/doctorUi.ts`, `src/vrm/`) fixes a model by editing only the VRM's glTF JSON (the binary chunk is written back byte for byte) and saves the result as a new library model or exports a `.vrm`: ARKit shapes spelled differently (`eyeBlink_L`, `blendShape1.jawOpen`) or present only as morph targets become the expressions perfect sync tracks (renamed, or new expressions bound to the morph on every mesh that has it), and the owner of a model can set its licence terms (CC0 / CC BY / personal / only me) in its own VRM version. AI agents get the same through the `model_doctor` MCP tool.
 
 Import with **IMPORT .VRM** (`I`, several files at once) or by dropping `.vrm` files on HOME; each file shows its progress and its own error ("NOT A VRM ..."). Opening a model from the stage (`O`, drop) imports it as well. Models are deduplicated by SHA-256.
 

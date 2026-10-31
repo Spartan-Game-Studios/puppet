@@ -326,6 +326,7 @@ pub fn run() {
             library::library_import_path,
             library::library_write,
             library::library_read,
+            library::save_vrm_as,
             library::library_delete,
             library::library_index_load,
             library::library_index_save,
