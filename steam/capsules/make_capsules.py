@@ -164,27 +164,38 @@ def crop_fit(im, box, W, H):
 GRID = 75  # the plates' paper grid period, px (vertical lines at x = 37 + 75k)
 
 
-def widen(pl, extra, calm_x):
+ROW = 80   # the paper's horizontal grid period, px (lines at y = 1327, 1407, ...)
+STRIP = 8 * GRID  # width of the calm paper strip that widen() repeats
+
+
+def widen(pl, extra, calm_x, below=0):
     """Prepend `extra` px (a whole number of grid cells) of the plate's own
-    calm paper on the left, so the grid runs on unbroken into the original."""
-    assert extra % GRID == 0 and 2 * GRID + extra <= calm_x - 40
-    out = Image.new("RGB", (pl.width + extra, pl.height))
-    out.paste(pl.crop((2 * GRID, 0, 2 * GRID + extra, pl.height)), (0, 0))
+    calm paper on the left, repeating one strip, so the grid runs on unbroken
+    into the original; then add `below` px (whole grid rows) of the bottom
+    band of clean paper under it, which lets the art be scaled down further."""
+    assert extra % GRID == 0 and below % ROW == 0 and 2 * GRID + STRIP <= calm_x - 40
+    strip = pl.crop((2 * GRID, 0, 2 * GRID + STRIP, pl.height))
+    out = Image.new("RGB", (pl.width + extra, pl.height + below))
+    for x in range(extra - STRIP, -STRIP, -STRIP):     # right to left, aligned at `extra`
+        out.paste(strip, (x, 0))
     out.paste(pl, (extra, 0))
+    band = out.crop((0, pl.height - ROW, out.width, pl.height))  # clean paper (CRT ends at y=1340)
+    for y in range(pl.height, pl.height + below, ROW):
+        out.paste(band, (0, y))
     return out
 
 
-def landscape(src, pl, W, H, logo_frac, tagline=True, name="", extra=0, cut=0):
+def landscape(src, pl, W, H, logo_frac, tagline=True, name="", extra=0, cut=0, below=0):
     """landscape_right, full width (or full height if narrower), logo on the left
     calm paper, vertically centred on the band above the CRT's bottom. `extra`
-    widens the paper on the left (see widen) and `cut` crops that many plate px
+    widens the paper on the left and `below` under the art (see widen) and `cut` crops that many plate px
     off the CRT's right edge, together making room for a bigger logo."""
     calm_x = 1030                         # CRT/avatar start at x=1058 in the plate
     # The plate's few decorative squares sit at the far left, where the crops
     # cut them in half: clear the whole calm area first.
     pl = clear_specks(pl, (0, 0, calm_x - 40, pl.height))
-    if extra:
-        pl = widen(pl, extra, calm_x)
+    if extra or below:
+        pl = widen(pl, extra, calm_x, below)
     calm_x += extra
     PW, PH = pl.size
     if PW / PH < W / H:                   # wider than the plate: crop height
@@ -200,7 +211,8 @@ def landscape(src, pl, W, H, logo_frac, tagline=True, name="", extra=0, cut=0):
     calm_w = (calm_x - box[0]) * s
     margin, gap = round(W * 0.035), round(W * 0.015)   # left edge, gap to the CRT
     logo = render_logo(src, round(min(calm_w - margin - gap, W * logo_frac)), tagline)
-    y = round(H * 0.44 - logo.height / 2)
+    # Centred on the CRT (plate y 160..1300), or a little low on uncropped plates.
+    y = round(((160 + 1300) / 2 - box[1]) * s - logo.height / 2) if below else round(H * 0.44 - logo.height / 2)
     return put_logo(canvas, logo, (margin, y), name)
 
 
@@ -284,14 +296,14 @@ def main():
 
     # Store and library capsules: Valve allows only the logo as text on these
     # (no tagline), and the header's logo must fill at least a third of it.
-    save("header_capsule", landscape(src, lr, 920, 430, 0.60, tagline=False, name="header_capsule", extra=825, cut=250))
+    save("header_capsule", landscape(src, lr, 920, 430, 0.70, tagline=False, name="header_capsule", extra=1500, cut=250, below=320))
     save("small_capsule", small(src, lr, 462, 174))
-    save("main_capsule", landscape(src, lr, 1232, 706, 0.60, tagline=False, name="main_capsule", extra=300, cut=300))
+    save("main_capsule", landscape(src, lr, 1232, 706, 0.70, tagline=False, name="main_capsule", extra=825, cut=300, below=320))
     save("vertical_capsule", portrait(src, por, 748, 896, y0=150, band=600, logo_frac=0.80, name="vertical_capsule", tagline=False))
     save("page_background", page_background(plate("clean_landscape"), 1438, 810))
     # Library
     save("library_capsule", portrait(src, peace, 600, 900, y0=0, band=740, logo_frac=0.84, name="library_capsule", tagline=False))
-    save("library_header", landscape(src, lr, 920, 430, 0.60, tagline=False, name="library_header", extra=825, cut=250))
+    save("library_header", landscape(src, lr, 920, 430, 0.70, tagline=False, name="library_header", extra=1500, cut=250, below=320))
     # Hero: native crop of the wide plate (3840 wide), no logo (Steam overlays library_logo).
     save("library_hero", wide.crop((0, 20, 3840, 1260)))
     logo = render_logo(src, 1200, tagline=False)
