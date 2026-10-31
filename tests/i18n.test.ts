@@ -7,6 +7,7 @@ import * as mcp from '../src/i18n/strings/mcp';
 import * as motion from '../src/i18n/strings/motion';
 import * as shell from '../src/i18n/strings/shell';
 import * as stage from '../src/i18n/strings/stage';
+import * as vmcin from '../src/i18n/strings/vmcin';
 
 const en = catalogs.en;
 const keys = Object.keys(en) as Key[];
@@ -18,7 +19,7 @@ describe('i18n catalogs', () => {
   it('no key is defined by two areas (the merge would hide one)', () => {
     const seen = new Map<string, string>();
     const dups: string[] = [];
-    for (const [name, area] of Object.entries({ shell, stage, library, motion, mcp, doctor })) {
+    for (const [name, area] of Object.entries({ shell, stage, library, motion, mcp, doctor, vmcin })) {
       for (const k of Object.keys(area.en)) {
         if (seen.has(k)) dups.push(`${k}: ${seen.get(k)} + ${name}`);
         seen.set(k, name);

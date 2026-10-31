@@ -35,3 +35,18 @@ To use the ARKit blendshapes in VSeeFace, enable perfect sync on the receiving m
 </Callout>
 
 Packets are kept small enough to cross a real network, not only the local machine.
+
+## Receive VMC (body trackers, phone apps) [#vmc-in]
+
+VPuppet can also **receive** VMC, so body trackers or a phone app drive part of the avatar while the webcam keeps the rest.
+
+1. In the VMC window (`N`), section **VMC IN**, tick **RECEIVE VMC**. The default port is 39539. If VPuppet's own VMC output also sends to port 39539 on this computer, give one of them another port.
+2. Point the sender at this computer and port:
+   - **SlimeVR:** in the SlimeVR server, turn on VMC output to `127.0.0.1` and the same port.
+   - **mocopi:** send VMC from the mocopi PC link to this computer.
+   - **iPhone face apps** that send VMC: tick **ALLOW OTHER DEVICES ON MY NETWORK** and send to this computer's local IP address.
+3. Under **WHAT DRIVES WHAT**, choose WEBCAM or VMC for FACE, HEAD, TORSO, ARMS, FINGERS and LEGS. The default is TORSO and LEGS from VMC (body trackers), everything else from the webcam.
+
+STATE shows RECEIVING with the rate and the sender, and GETTING shows how many bones and blend shapes arrive. If the sender stops for half a second, those body parts hand back to the webcam or the idle pose. VMC bones take priority over idle and emote animations. Blend shapes are matched by ARKit name, VRM 0.x clip name (A, Joy, Blink_L) or the model's own expression names.
+
+No trackers yet? `node scripts/vmc-send.mjs sit` (or `walk`, `squat`, `lean`, `face`, `all`) in the source repository sends a test motion.

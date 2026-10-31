@@ -13,6 +13,7 @@ mod mcp;
 mod migrate;
 mod vcam;
 mod vmc;
+mod vmc_in;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -46,6 +47,10 @@ struct DemoState(Arc<demo::Demo>);
 
 #[derive(Default)]
 struct VmcState(Mutex<vmc::Sender>);
+
+/// VMC input (body trackers, iPhone apps): see vmc_in.rs.
+#[derive(Default)]
+struct VmcInState(Mutex<vmc_in::Receiver>);
 
 /// Virtual camera: the frame path takes `cam` briefly per frame; status and
 /// setup go through `handle` so a slow device probe never stalls frames.
@@ -128,6 +133,26 @@ fn vmc_send(state: State<VmcState>, demo: State<DemoState>, frame: vmc::Frame) -
     demo.0.check()?;
     demo.0.touch();
     state.0.lock().map_err(|e| e.to_string())?.send(&frame)
+}
+
+/// Start / stop listening for VMC input. `lan`: also accept other devices on the network.
+#[tauri::command]
+fn vmc_in_configure(state: State<VmcInState>, demo: State<DemoState>, enabled: bool, port: u16, lan: bool) -> Result<vmc_in::InStatus, String> {
+    if enabled {
+        demo.0.check()?;
+    }
+    state.0.lock().map_err(|e| e.to_string())?.configure(enabled, port, lan)
+}
+
+#[tauri::command]
+fn vmc_in_status(state: State<VmcInState>) -> Result<vmc_in::InStatus, String> {
+    state.0.lock().map_err(|e| e.to_string())?.status()
+}
+
+/// The latest received pose if anything arrived after `since` (its seq), polled per render tick.
+#[tauri::command]
+fn vmc_in_poll(state: State<VmcInState>, since: u64) -> Result<Option<vmc_in::InFrame>, String> {
+    state.0.lock().map_err(|e| e.to_string())?.poll(since)
 }
 
 #[tauri::command]
@@ -242,6 +267,7 @@ pub fn run() {
         // Emote / expression hotkeys that work while VPuppet is in the background.
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(VmcState::default())
+        .manage(VmcInState::default())
         // getUserMedia: grant the camera to our own webview without a second
         // in-webview prompt. The OS still asks (macOS TCC via
         // NSCameraUsageDescription in Info.plist; Windows privacy settings).
@@ -310,6 +336,9 @@ pub fn run() {
             vmc_configure,
             vmc_send,
             vmc_stats,
+            vmc_in_configure,
+            vmc_in_status,
+            vmc_in_poll,
             vcam_status,
             vcam_stats,
             vcam_setup,
