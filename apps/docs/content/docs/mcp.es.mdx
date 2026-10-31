@@ -105,6 +105,7 @@ Cualquier cliente MCP compatible con Streamable HTTP puede conectarse:
 | `library_load` | Carga un modelo de la biblioteca en el escenario. |
 | `library_import` | Importa un archivo `.vrm` desde una ruta a la biblioteca (miniatura, comprobaciones) y opcionalmente lo carga. |
 | `model_inspect` | Todo sobre el modelo del escenario: versión y metadatos VRM, huesos humanoides asignados o que faltan, cada expresión, cobertura de perfect sync de ARKit (incluidos los nombres presentes con otra grafía), presets, look-at, cadenas de spring bones y colisionadores, estadísticas de mallas / materiales / texturas, licencia y avisos de comprobación del modelo. |
+| `model_doctor` | Planifica y luego guarda como nuevo modelo de la biblioteca una copia con los nombres de perfect sync corregidos (formas ARKit escritas de otra manera o que solo existen como morph targets) y, para un modelo del usuario, nuevas condiciones de licencia. Nunca cambia el original. |
 | `stage_screenshot` | Un PNG del escenario tal como lo ves, o del avatar encuadrado de frente en face / bust / upper / full, sin mover tu cámara. |
 | `expression_set` | Mantiene una expresión con un peso por encima del seguimiento, o restablece las expresiones mantenidas. |
 | `expression_sweep` | Activa cada expresión por turnos con la pose congelada e informa de las formas que no hacen nada y de las formas izquierda / derecha intercambiadas, con una hoja de contactos. |
@@ -122,6 +123,9 @@ Construir o arreglar un avatar con un agente suele seguir este ciclo:
 <Steps>
 <Step>
 **Inspeccionar.** El agente ejecuta `model_inspect` sobre el modelo del escenario: huesos que faltan, expresiones que no hacen nada, qué nombres de ARKit faltan para perfect sync.
+</Step>
+<Step>
+**Primero las correcciones rápidas.** Si las formas solo tienen el nombre equivocado, el agente ejecuta `model_doctor` (plan y luego `apply`) y se ahorra Blender para eso.
 </Step>
 <Step>
 **Corregir en Blender** (o en la herramienta con la que hiciste el modelo) y volver a exportar el `.vrm`.

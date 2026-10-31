@@ -105,6 +105,7 @@ AI AGENTS 部分中的 **COPY CLAUDE CODE COMMAND**（复制 Claude Code 命令�
 | `library_load` | 把模型库中的模型加载到舞台上。 |
 | `library_import` | 按路径把 `.vrm` 文件导入模型库（生成缩略图、运行检查），并可选择直接加载。 |
 | `model_inspect` | 舞台上模型的全部信息：VRM 版本和元数据、已映射或缺少的人形骨骼、每个表情、ARKit perfect sync 覆盖情况（包括以其他拼写存在的名称）、预设、注视、弹簧骨骼链和碰撞体、网格 / 材质 / 纹理统计、许可、模型检查警告。 |
+| `model_doctor` | 先给出计划，再把修复了完美同步命名（写法不同或仅作为变形目标存在的 ARKit 形态键）的副本另存为模型库中的新模型；对于用户自己的模型还可以写入新的许可条款。不会修改原模型。 |
 | `stage_screenshot` | 你所看到的舞台画面的 PNG，或从正面以脸部 / 半身 / 上半身 / 全身取景的虚拟形象，不会移动你的镜头。 |
 | `expression_set` | 在追踪之上以指定权重保持某个表情，或重置已保持的表情。 |
 | `expression_sweep` | 冻结姿势，依次驱动每个表情，报告不起作用的形状和左右颠倒的形状，并生成对照图。 |
@@ -122,6 +123,9 @@ AI AGENTS 部分中的 **COPY CLAUDE CODE COMMAND**（复制 Claude Code 命令�
 <Steps>
 <Step>
 **检查。** 智能体对舞台上的模型运行 `model_inspect`：缺少的骨骼、不起作用的表情、perfect sync 还缺哪些 ARKit 名称。
+</Step>
+<Step>
+**先做快速修复。** 如果形态键只是名字不对，智能体会运行 `model_doctor`（先计划，再 `apply`），这些问题就不必进 Blender。
 </Step>
 <Step>
 **在 Blender 中修复**（或在你制作模型的工具中），然后重新导出 `.vrm`。

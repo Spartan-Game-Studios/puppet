@@ -80,6 +80,15 @@ VPuppet 从不拒绝加载模型。徽章告诉你作者写了什么；是否遵
 
 VPuppet 从不修改你的模型来"修复"这些问题；请在制作模型的工具中修复。
 
+## 模型医生 [#model-doctor]
+
+卡片菜单（`•••`）→ **模型医生** 无需打开 Blender 即可修复模型。它只修改 VRM 的设置，不动网格，并把结果另存为模型库中的**新**模型：原模型保持不变。
+
+- **完美同步：** 找出写法不同的 ARKit 形态键（`eyeBlink_L`、`blendShape1.jawOpen`、`facs_bs_cheekPuff`），或只作为变形目标存在、没有 VRM 表情的形态键（Blender、Daz 和 MetaHuman 导出的模型中很常见），并改成 VPuppet 追踪的 ARKit 名称。每项修复都标为“改名”或“新建”，不需要的可以取消勾选。模型中完全没有的形态键仍需在 Blender 中制作。
+- **许可：** 对于你自己制作或拥有权利的模型，勾选 **这个模型是我制作的，或我拥有其权利**，然后选择条款（CC0、CC BY、个人使用、仅限本人），并填写名称、作者和版本。修改别人模型的许可并不会改变原作者允许的范围。
+
+**另存为新模型** 会把修复后的副本加入模型库；**导出 .VRM…** 会把它保存为文件。AI 智能体也可以通过 `model_doctor` 工具完成同样的操作（见[连接 AI 智能体](./mcp.mdx#workflow)）。
+
 ## 模型库的存放位置
 
 模型库保存在 VPuppet 的应用数据文件夹中，例如 macOS 上的 `~/Library/Application Support/com.spartangamestudios.vpuppet`。卡片上的 **SHOW IN FOLDER** 会打开它。

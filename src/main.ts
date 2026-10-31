@@ -57,6 +57,7 @@ import { loadSettings, saveSettings, type Settings } from './app/settings';
 import { bindEnvironmentUi } from './app/environmentUi';
 import { mountHome } from './app/home';
 import { mountDemo } from './app/demo';
+import { mountDoctor, type Doctor } from './app/doctorUi';
 import { mountMotion, type MotionFeatures } from './anim/features';
 import { withPresetBlends } from './vmc/presets';
 import type { PhysicsMode } from './physics/stableSprings';
@@ -936,15 +937,19 @@ $('btn-env-toggle').addEventListener('click', () => envUi.toggle());
 motion = await mountMotion({ settings, persist, setStatus, stage: $('stage'), gestures, debug: params.get('debuglog') === '1' ? debugLog : undefined });
 
 // ---------------------------------------------------------------- home (model library, src/app/home.ts)
+let doctorUi: Doctor | null = null;
 const home = await mountHome({
   loadModel,
   setStatus,
+  openDoctor: (id) => doctorUi?.open(id),
   lastModelPath: settings.lastModelPath,
   onShow: (on) => {
     if (on) openModal()?.close();
     requestAnimationFrame(() => viewer.resize());
   },
 });
+doctorUi = mountDoctor({ library: home.library, setStatus });
+
 
 // ---------------------------------------------------------------- Steam demo (src/app/demo.ts)
 const demo = await mountDemo({

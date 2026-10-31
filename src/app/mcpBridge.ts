@@ -36,6 +36,8 @@ import type { PhysicsMode } from '../physics/stableSprings';
 import type { Card } from '../library/library';
 import { displayAuthor, displayName } from '../library/libraryIndex';
 import { baseName, isTauri } from './platform';
+import { doctor, planArkit, TERMS_PRESETS, type Terms } from '../vrm/doctor';
+import { readGlb, writeGlb } from '../vrm/glb';
 
 // ---------------------------------------------------------------- UI strings (move into the i18n catalog)
 
@@ -356,6 +358,46 @@ export function createMcpTools(deps: McpBridgeDeps): Record<string, ToolFn> {
       const a = needAvatar();
       const sections = Array.isArray(args.sections) ? new Set(args.sections.map(String)) : null;
       return { data: inspectModel(a, card(), deps.modelHash(), sections) };
+    },
+
+    model_doctor: async (args) => {
+      const id = str(args.id, 'id') ?? deps.modelHash() ?? fail('no model on the stage: pass a library id (see library_list)');
+      const c = findCard(id);
+      const glb = readGlb(await deps.home.library.readModel(c.id));
+      const plan = planArkit(glb.json);
+      const planOut = {
+        model: cardRow(c),
+        vrm: plan.spec,
+        ready: plan.have,
+        fixable: plan.fixes.map((f) => (f.kind === 'rename' ? { arkit: f.arkit, action: 'rename expression', from: f.expression } : { arkit: f.arkit, action: 'new expression', morphTarget: f.morph, meshes: f.binds.length })),
+        missing: plan.missing,
+      };
+      if (args.apply !== true) return { data: { plan: planOut, next: 'call again with apply=true to save the fixed copy as a new library model' } };
+      const want = Array.isArray(args.arkit) ? new Set(args.arkit.map(String)) : null;
+      const fixes = plan.fixes.filter((f) => !want || want.has(f.arkit));
+      let terms: Terms | undefined;
+      if (args.terms !== undefined) {
+        const t = args.terms as Record<string, unknown>;
+        if (t.userOwnsModel !== true) fail('terms need userOwnsModel=true: only set the licence of a model the user made or owns');
+        terms = {
+          preset: oneOf(t.preset, 'terms.preset', TERMS_PRESETS) ?? fail('terms.preset is required'),
+          name: str(t.name, 'terms.name') ?? '',
+          authors: Array.isArray(t.authors) ? t.authors.map(String) : [],
+          version: str(t.version, 'terms.version') ?? '',
+        };
+      }
+      if (!fixes.length && !terms) fail('nothing to change: no fixable ARKit shapes selected and no terms');
+      const bytes = writeGlb(doctor(glb, { arkit: fixes, terms }));
+      const name = `${c.info.fileName.replace(/\.vrm$/i, '').replace(/-doctor$/, '')}-doctor.vrm`;
+      const r = await deps.home.library.import({ name, bytes });
+      if (r.status === 'error') return fail(`saving failed: ${r.error}`);
+      const saved = deps.home.library.cards.get(r.id);
+      const out: Record<string, unknown> = { status: r.status, id: r.id, fixed: fixes.map((f) => f.arkit), terms: terms?.preset ?? null, model: saved ? cardRow(saved) : null };
+      if (args.load !== false && saved) {
+        if (deps.demoLocked()) out.loaded = 'refused: the demo has ended';
+        else Object.assign(out, (await load(saved)).data as object);
+      }
+      return { data: out };
     },
 
     stage_screenshot: (args) => {

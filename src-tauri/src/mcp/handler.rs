@@ -30,6 +30,10 @@ library_import (an absolute .vrm path; load defaults to true).
 the 52 ARKit names ignoring case and punctuation, and counts a model as perfect sync at 40+), presets, \
 springs, mesh stats, licence and VPuppet's own model checks. stage_screenshot (framing face/bust/upper/full) \
 shows the result.
+- Fix naming without Blender: model_doctor plans (apply=false) and then saves (apply=true) a fixed copy as a \
+new library model: ARKit shapes spelled differently (eyeBlink_L, blendShape1.jawOpen) or present only as morph \
+targets become the expressions VPuppet tracks. It can also set licence terms, but only when the user says they \
+made or own the model. It never changes the original.
 - Build or fix in Blender (or the user's editor), export the .vrm, then library_import the new file \
 (a changed file is a new library entry with a new id) and compare model_inspect before and after.
 - Verify perfect sync: expression_sweep set='arkit' drives each of the model's ARKit expressions to 1 with \
@@ -89,7 +93,7 @@ pub fn has_tool(name: &str) -> bool {
 /// How long the webview gets per tool (imports and sweeps render a lot).
 pub fn timeout_for(tool: &str) -> Duration {
     Duration::from_secs(match tool {
-        "library_import" => 180,
+        "library_import" | "model_doctor" => 180,
         "expression_sweep" => 120,
         "library_load" => 90,
         "model_inspect" | "stage_screenshot" | "clip_play" => 30,
@@ -234,14 +238,14 @@ pub mod tests {
     #[test]
     fn tools_json_is_well_formed() {
         let t = tools();
-        assert_eq!(t.len(), 14);
+        assert_eq!(t.len(), 15);
         let mut names: Vec<&str> = t.iter().map(|t| t.name.as_ref()).collect();
         for n in &names {
             assert!(n.chars().all(|c| c.is_ascii_lowercase() || c == '_'), "{n} is snake_case");
         }
         names.sort();
         names.dedup();
-        assert_eq!(names.len(), 14, "names are unique");
+        assert_eq!(names.len(), t.len(), "names are unique");
         for tool in t {
             assert_eq!(tool.input_schema.get("type").and_then(|v| v.as_str()), Some("object"), "{}", tool.name);
             assert!(tool.description.as_deref().is_some_and(|d| d.len() > 40), "{} has a description", tool.name);

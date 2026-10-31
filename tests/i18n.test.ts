@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { catalogs, type Key } from '../src/i18n/catalogs';
 import html from '../index.html?raw';
+import * as doctor from '../src/i18n/strings/doctor';
 import * as library from '../src/i18n/strings/library';
 import * as mcp from '../src/i18n/strings/mcp';
 import * as motion from '../src/i18n/strings/motion';
@@ -17,7 +18,7 @@ describe('i18n catalogs', () => {
   it('no key is defined by two areas (the merge would hide one)', () => {
     const seen = new Map<string, string>();
     const dups: string[] = [];
-    for (const [name, area] of Object.entries({ shell, stage, library, motion, mcp })) {
+    for (const [name, area] of Object.entries({ shell, stage, library, motion, mcp, doctor })) {
       for (const k of Object.keys(area.en)) {
         if (seen.has(k)) dups.push(`${k}: ${seen.get(k)} + ${name}`);
         seen.set(k, name);

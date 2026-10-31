@@ -80,6 +80,15 @@ When a model loads, VPuppet looks for authoring problems it can detect reliably 
 
 VPuppet never edits your model to "fix" these; fix them in the tool you made the model with.
 
+## Model doctor [#model-doctor]
+
+Card menu (`•••`) → **MODEL DOCTOR** fixes a model without opening Blender. It edits only the VRM's settings, never the mesh, and saves the result as a **new** library model: the original stays as it was.
+
+- **Perfect sync:** finds ARKit shapes that are spelled differently (`eyeBlink_L`, `blendShape1.jawOpen`, `facs_bs_cheekPuff`) or that exist only as morph targets with no VRM expression (common in Blender, Daz and MetaHuman exports), and gives them the ARKit names VPuppet tracks. Each fix is listed as RENAME or NEW; untick any you don't want. Shapes the model doesn't have at all still have to be sculpted in Blender.
+- **Licence:** for a model you made or own, tick **I MADE THIS MODEL OR OWN ITS RIGHTS** and pick terms (CC0, CC BY, personal use, only me), with name, authors and version. Changing the licence of someone else's model doesn't change what its author allows.
+
+**SAVE AS NEW MODEL** adds the fixed copy to the library; **EXPORT .VRM…** saves it as a file. An AI agent can do the same through the `model_doctor` tool (see [Connect an AI agent](./mcp.mdx#workflow)).
+
 ## Where the library lives
 
 The library is stored in VPuppet's app data folder, for example `~/Library/Application Support/com.spartangamestudios.vpuppet` on macOS. **SHOW IN FOLDER** on a card opens it.

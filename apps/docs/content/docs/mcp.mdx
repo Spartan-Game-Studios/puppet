@@ -105,6 +105,7 @@ Any MCP client that supports Streamable HTTP can connect:
 | `library_load` | Loads a library model onto the stage. |
 | `library_import` | Imports a `.vrm` file from a path into the library (thumbnail, checks) and optionally loads it. |
 | `model_inspect` | Everything about the model on the stage: VRM version and meta, humanoid bones mapped or missing, every expression, ARKit perfect-sync coverage (including names present under another spelling), presets, look-at, spring chains and colliders, mesh / material / texture stats, licence, model-check warnings. |
+| `model_doctor` | Plans, then saves as a new library model, a copy with perfect-sync naming fixed (ARKit shapes spelled differently or present only as morph targets) and, for a model the user owns, new licence terms. Never changes the original. |
 | `stage_screenshot` | A PNG of the stage as you see it, or the avatar framed face / bust / upper / full from the front, without moving your camera. |
 | `expression_set` | Holds an expression at a weight over tracking, or resets held expressions. |
 | `expression_sweep` | Drives each expression in turn with the pose frozen and reports shapes that do nothing and swapped left / right shapes, with a contact sheet. |
@@ -122,6 +123,9 @@ Building or fixing an avatar with an agent usually goes round this loop:
 <Steps>
 <Step>
 **Inspect.** The agent runs `model_inspect` on the model on the stage: missing bones, expressions that do nothing, which ARKit names are missing for perfect sync.
+</Step>
+<Step>
+**Quick fixes first.** If shapes only have the wrong names, the agent runs `model_doctor` (plan, then `apply`) and skips Blender for those.
 </Step>
 <Step>
 **Fix in Blender** (or the tool you made the model with), then export the `.vrm` again.

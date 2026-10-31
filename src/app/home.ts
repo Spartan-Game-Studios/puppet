@@ -27,6 +27,8 @@ export interface HomeDeps {
   lastModelPath: string | null;
   /** Called after the screen switches (the stage canvas needs a resize). */
   onShow?(home: boolean): void;
+  /** Card menu → MODEL DOCTOR (src/app/doctorUi.ts). */
+  openDoctor?(id: string): void;
 }
 
 export interface Home {
@@ -318,6 +320,11 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
     if (what === 'load') return loadCard(id);
     if (what === 'rename') return startRename(id);
     if (what === 'remove') return askRemove(id);
+    if (what === 'doctor') {
+      drawers.delete(id);
+      render();
+      return deps.openDoctor?.(id);
+    }
     if (what === 'thumb') {
       const el = cardEl(id);
       el?.classList.add('busy');
