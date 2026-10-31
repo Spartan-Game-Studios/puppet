@@ -1,0 +1,37 @@
+---
+title: VMC output
+description: Send your tracking to other VTuber software over the VMC protocol.
+---
+
+VPuppet can send the avatar's bones and blendshapes over the **VMC protocol** (OSC over UDP) to another app, for example one that renders the avatar or a 3D scene. It's off by default.
+
+## Set up
+
+<Steps>
+<Step>
+Open **VMC** (`N`) in VPuppet. Set the receiver's **HOST** and **PORT**.
+
+- The default, `127.0.0.1:39539`, is the usual VMC receive port (used by VSeeFace, Warudo, VNyan, VMC4U and others) on the same computer.
+- For a receiver on another PC, enter that PC's local network IP address.
+</Step>
+<Step>
+Tick **SEND VMC (OSC/UDP)** (`V`).
+</Step>
+<Step>
+In the receiving app, enable VMC / OSC receiving on the same port, and load the same avatar there.
+</Step>
+</Steps>
+
+The **TX** readout shows the frames and bytes sent. "Nothing listening" errors are counted but don't stop sending, so you can start the receiver later.
+
+## What is sent
+
+- **Bones:** the root and every humanoid bone, in the form receivers expect from a VRM.
+- **Blendshapes:** under the model's own expression names. Preset models use the VRM 0.x names (`Blink`, `Blink_L`, `A`, `I`, `U`, `E`, `O`, `Joy`, `Angry`, `Sorrow`, `Fun`, `Surprised`...); perfect-sync models send the ARKit names.
+- **ALSO SEND VRM PRESETS** (on by default): perfect-sync models also send the 13 VRM presets (`Blink`, `Blink_L`, `Blink_R`, `A`, `I`, `U`, `E`, `O`, `Joy`, `Angry`, `Sorrow`, `Fun`, `Surprised`), derived from the ARKit values, so receivers that read only presets don't see a frozen face. The ARKit values are still sent.
+
+<Callout title="VSeeFace and perfect sync">
+To use the ARKit blendshapes in VSeeFace, enable perfect sync on the receiving model there.
+</Callout>
+
+Packets are kept small enough to cross a real network, not only the local machine.

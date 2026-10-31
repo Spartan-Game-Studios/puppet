@@ -5,6 +5,10 @@
  * Pure: resolution, conflicts, formatting and the default set.
  */
 import type { ExpressionMode } from '../anim/expressions';
+import { t } from '../i18n';
+
+/** i18n t() under another name, for functions whose trigger parameter is called `t`. */
+const tr = t;
 
 export type Hand = 'left' | 'right' | 'any';
 /** Hand gestures the tracker can report (see gestures.ts). */
@@ -84,15 +88,27 @@ const codeLabel = (code: string) =>
     .replace(/^Arrow/, '')
     .toUpperCase();
 
-export const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'BACK', 'START', 'LS', 'RS', 'UP', 'DOWN', 'LEFT', 'RIGHT', 'HOME'];
+/** Button names as printed on the controller (the d-pad directions are words, so translated). */
+export const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'BACK', 'START', 'LS', 'RS', t('motion.pad.up'), t('motion.pad.down'), t('motion.pad.left'), t('motion.pad.right'), 'HOME'];
+
+const GESTURE_LABEL: Record<GestureName, string> = {
+  fist: t('motion.gesture.fist'),
+  open_palm: t('motion.gesture.open_palm'),
+  point: t('motion.gesture.point'),
+  peace: t('motion.gesture.peace'),
+  thumbs_up: t('motion.gesture.thumbs_up'),
+  ok: t('motion.gesture.ok'),
+  horns: t('motion.gesture.horns'),
+};
 
 export function formatTrigger(t: Trigger, mac = false): string {
   if (t.kind === 'key') {
     const mods = MODS.filter(([m]) => t[m]).map(([m, n]) => (mac ? { ctrl: '⌃', alt: '⌥', shift: '⇧', meta: '⌘' }[m as string] : n.toUpperCase() + '+'));
     return mods.join('') + codeLabel(t.code);
   }
-  if (t.kind === 'pad') return `PAD ${PAD_NAMES[t.button] ?? t.button}`;
-  return `${t.gesture.replace('_', ' ').toUpperCase()}${t.hand === 'any' ? '' : t.hand === 'left' ? ' L' : ' R'}`;
+  if (t.kind === 'pad') return tr('motion.trig.pad', { button: PAD_NAMES[t.button] ?? t.button });
+  const name = GESTURE_LABEL[t.gesture] ?? t.gesture.replace('_', ' ').toUpperCase();
+  return `${name}${t.hand === 'any' ? '' : ` ${tr(t.hand === 'left' ? 'motion.trig.left' : 'motion.trig.right')}`}`;
 }
 
 /** Tauri global-shortcut accelerator for a key trigger ('Alt+Digit1', 'F3'). */
@@ -129,18 +145,19 @@ export function resolve(all: Binding[], trigger: Trigger, model: string | null):
 }
 
 /**
- * Puppet's own single-key shortcuts (src/main.ts, src/app/home.ts). The app's
+ * VPuppet's own single-key shortcuts (src/main.ts, src/app/home.ts). The app's
  * handler ignores keys with Ctrl/Alt/Meta held but not Shift, so a binding
  * collides with these when it has no modifier or only Shift.
  */
 export const APP_KEYS: Record<string, string> = {
-  KeyO: 'OPEN VRM', KeyE: '3D ENVIRONMENT', KeyH: 'CAPTURE VIEW', Escape: 'LEAVE CAPTURE / HOME', KeyC: 'CALIBRATE',
-  KeyM: 'MIRROR', KeyT: 'PREVIEW', KeyV: 'VMC', KeyW: 'VIRTUAL CAM', KeyD: 'DEBUG BAR', KeyF: 'FACE TAB', KeyP: 'PHYSICS TAB',
-  KeyR: 'SETTLE PHYSICS', KeyL: 'HOME', KeyI: 'MODEL INFO', Digit1: 'FACE MODE', Digit2: 'BODY MODE', Digit3: 'HANDS MODE',
-  Digit8: 'PHYSICS OFF', Digit9: 'PHYSICS STIFF', Digit0: 'PHYSICS NORMAL',
+  KeyO: t('motion.app.open'), KeyE: t('motion.app.env'), KeyH: t('motion.app.capture'), Escape: t('motion.app.leave'), KeyC: t('motion.app.calibrate'),
+  KeyM: t('motion.app.mirror'), KeyT: t('motion.app.preview'), KeyV: t('motion.app.vmc'), KeyW: t('motion.app.vcam'), KeyD: t('motion.app.debug'),
+  KeyF: t('motion.app.faceTab'), KeyP: t('motion.app.physicsTab'), KeyR: t('motion.app.settle'), KeyL: t('motion.app.home'), KeyI: t('motion.app.modelInfo'),
+  Digit1: t('motion.app.faceMode'), Digit2: t('motion.app.bodyMode'), Digit3: t('motion.app.handsMode'),
+  Digit8: t('motion.app.physOff'), Digit9: t('motion.app.physStiff'), Digit0: t('motion.app.physNormal'),
   // HOME screen
-  ArrowUp: 'HOME NAV', ArrowDown: 'HOME NAV', ArrowLeft: 'HOME NAV', ArrowRight: 'HOME NAV', Enter: 'HOME OPEN',
-  KeyS: 'HOME SORT', F2: 'HOME RENAME', Delete: 'HOME DELETE', Slash: 'HOME SEARCH',
+  ArrowUp: t('motion.app.homeNav'), ArrowDown: t('motion.app.homeNav'), ArrowLeft: t('motion.app.homeNav'), ArrowRight: t('motion.app.homeNav'),
+  Enter: t('motion.app.homeOpen'), KeyS: t('motion.app.homeSort'), F2: t('motion.app.homeRename'), Delete: t('motion.app.homeDelete'), Slash: t('motion.app.homeSearch'),
 };
 
 export function appKeyConflict(t: Trigger): string | null {
@@ -223,12 +240,15 @@ export function defaultBindings(): Binding[] {
   return list.map(([trigger, action], i) => ({ id: `d${i}`, trigger, action }));
 }
 
+/** An expression mode as shown (the stored value stays 'toggle' / 'on' / 'momentary'). */
+export const modeLabel = (m: ExpressionMode): string => t(m === 'momentary' ? 'motion.mode.hold' : m === 'on' ? 'motion.mode.on' : 'motion.mode.toggle');
+
 export function describeAction(a: Action, clipLabel: (id: string) => string = (s) => s): string {
   if (a.kind === 'emote') return clipLabel(a.clip);
-  if (a.kind === 'expression') return `${a.name.toUpperCase()} ${a.mode === 'momentary' ? 'HOLD' : a.mode === 'on' ? 'ON' : 'TOGGLE'}`;
-  if (a.kind === 'reset') return 'RESET';
-  if (a.kind === 'camera') return 'CAMERA ON/OFF';
-  return 'PICKER';
+  if (a.kind === 'expression') return `${a.name.toUpperCase()} ${modeLabel(a.mode)}`;
+  if (a.kind === 'reset') return t('motion.act.reset');
+  if (a.kind === 'camera') return t('motion.act.camera');
+  return t('motion.act.picker');
 }
 
 /** Light validation for bindings read from settings. */

@@ -1,4 +1,4 @@
-//! Model library storage: Puppet's own copies of imported VRMs.
+//! Model library storage: VPuppet's own copies of imported VRMs.
 //!
 //! ```text
 //! <appData>/library/library.json          index (favourites, names, times), written atomically
@@ -113,7 +113,7 @@ pub fn list(root: &Path) -> Result<Vec<Entry>, String> {
     Ok(out)
 }
 
-/// Delete one entry's directory (Puppet's copy only).
+/// Delete one entry's directory (VPuppet's copy only).
 pub fn remove(root: &Path, id: &str) -> Result<(), String> {
     if !valid_id(id) {
         return Err(format!("not a library id: {id:?}"));
@@ -235,6 +235,11 @@ pub const HELP_LINKS: [(&str, &str); 3] = [
 #[tauri::command(async)]
 pub fn library_open_link(which: String) -> Result<(), String> {
     let url = HELP_LINKS.iter().find(|(k, _)| *k == which).map(|(_, u)| *u).ok_or("unknown link")?;
+    open_url(url)
+}
+
+/// Open a fixed URL in the system browser (or Steam, for steam:// links).
+pub fn open_url(url: &str) -> Result<(), String> {
     use std::process::Command;
     #[cfg(target_os = "macos")]
     let r = Command::new("open").arg(url).spawn();

@@ -1,0 +1,51 @@
+// TEMPLATE: adjust before use. Fill in every <PLACEHOLDER>, check every path
+// against what the build actually produced (the binary name changes with the
+// Puppet -> VPuppet rename), then run with steamcmd (see README.md).
+// Paths are relative to this file (steam/steampipe/); "../../" is the repo root.
+
+// Linux x86_64 depot (demo). Tauri names the AppImage with the version
+// (bundle/appimage/VPuppet_<VERSION>_amd64.AppImage), but the Steam launch
+// option needs a fixed name, so copy it to the staging folder first:
+//   mkdir -p steam/steampipe/staging/demo/linux
+//   cp src-tauri/target-demo/release/bundle/appimage/VPuppet_*_amd64.AppImage \
+//      steam/steampipe/staging/demo/linux/VPuppet.AppImage
+//   chmod +x steam/steampipe/staging/demo/linux/VPuppet.AppImage
+// The AppImage carries its own WebKitGTK. Inside Steam's runtime container
+// FUSE may be unavailable: set the launch option's environment to
+// APPIMAGE_EXTRACT_AND_RUN=1 (or pass --appimage-extract-and-run) and test.
+"DepotBuild"
+{
+	"DepotID" "<DEMO_DEPOT_ID_LINUX>"
+	"ContentRoot" "../../"
+
+	"FileMapping"
+	{
+		"LocalPath" "steam/steampipe/staging/demo/linux/VPuppet.AppImage"
+		"DepotPath" "."
+	}
+	// Steamworks runtime for the `steam` cargo feature. It must be found at
+	// runtime: next to the AppImage with LD_LIBRARY_PATH set in the launch
+	// option, or bundled inside the AppImage (preferred; then delete this).
+	"FileMapping"
+	{
+		"LocalPath" "src-tauri/vendor/steam/libsteam_api.so"
+		"DepotPath" "."
+	}
+
+	// Licence files, required with every copy (MIT + third-party notices).
+	"FileMapping"
+	{
+		"LocalPath" "LICENSE"
+		"DepotPath" "."
+	}
+	"FileMapping"
+	{
+		"LocalPath" "THIRD_PARTY_NOTICES.md"
+		"DepotPath" "."
+	}
+
+	// Never ship these.
+	"FileExclusion" "*.pdb"
+	"FileExclusion" "steam_appid.txt"
+	"FileExclusion" ".DS_Store"
+}

@@ -1,4 +1,4 @@
-/* PUPPET — brutalist UI. Hard black/white, one accent, 3px rules, no radius,
+/* VPUPPET — brutalist UI. Hard black/white, one accent, 3px rules, no radius,
    no shadow, no gradient. Everything is a box on the grid. */
 :root {
   --ink: #0a0a0a;
@@ -11,7 +11,7 @@
   --left: 248px;
   --top: 46px;
   --bottom: 30px;
-  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', monospace;
   font-size: 12px;
   color: var(--ink);
 }

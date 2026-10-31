@@ -1,0 +1,37 @@
+---
+title: VMC 输出
+description: 通过 VMC 协议把追踪数据发送给其他 VTuber 软件。
+---
+
+VPuppet 可以通过 **VMC 协议**（基于 UDP 的 OSC）把模型的骨骼和混合形状发送给其他应用，例如负责渲染模型或 3D 场景的应用。该功能默认关闭。
+
+## 设置
+
+<Steps>
+<Step>
+在 VPuppet 中打开 **VMC**（`N`）。设置接收端的 **HOST** 和 **PORT**。
+
+- 默认值 `127.0.0.1:39539` 是常用的 VMC 接收端口（VSeeFace、Warudo、VNyan、VMC4U 等均使用），用于同一台电脑。
+- 如果接收端在另一台电脑上，请填写那台电脑的局域网 IP 地址。
+</Step>
+<Step>
+勾选 **SEND VMC (OSC/UDP)**（`V`）。
+</Step>
+<Step>
+在接收端应用中，于同一端口启用 VMC / OSC 接收，并在其中加载同一个模型。
+</Step>
+</Steps>
+
+**TX** 读数显示已发送的帧数和字节数。"Nothing listening"（无人监听）错误会被计数，但不会停止发送，因此你可以稍后再启动接收端。
+
+## 发送的内容
+
+- **骨骼：** 根节点和所有人形骨骼，采用接收端对 VRM 所期望的格式。
+- **混合形状：** 使用模型自己的表情名称。预设模型使用 VRM 0.x 名称（`Blink`、`Blink_L`、`A`、`I`、`U`、`E`、`O`、`Joy`、`Angry`、`Sorrow`、`Fun`、`Surprised`……）；perfect sync 模型发送 ARKit 名称。
+- **ALSO SEND VRM PRESETS**（同时发送 VRM 预设，默认开启）：perfect sync 模型还会发送由 ARKit 值推导出的 13 个 VRM 预设（`Blink`、`Blink_L`、`Blink_R`、`A`、`I`、`U`、`E`、`O`、`Joy`、`Angry`、`Sorrow`、`Fun`、`Surprised`），让只读取预设的接收端不会看到一张僵住的脸。ARKit 值仍会照常发送。
+
+<Callout title="VSeeFace 与 perfect sync">
+要在 VSeeFace 中使用 ARKit 混合形状，请在那里为接收模型启用 perfect sync。
+</Callout>
+
+数据包保持足够小，因此不仅能在本机传输，也能跨越真实网络。

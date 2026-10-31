@@ -4,10 +4,12 @@
  *
  * Storage layout (see src/library/backend.ts):
  *   <appData>/library/library.json            this index
- *   <appData>/library/<sha256>/model.vrm      Puppet's own copy of the file
+ *   <appData>/library/<sha256>/model.vrm      VPuppet's own copy of the file
  *   <appData>/library/<sha256>/thumb.png      bust thumbnail
  *   <appData>/library/<sha256>/meta.json      ModelInfo (written last: marks the entry complete)
  */
+import { locale, t, type Key } from '../i18n';
+import { pluralKey } from '../i18n/strings/library';
 import type { ModelWarning } from '../scene/modelChecks';
 import type { VrmMeta, VrmSpec } from './vrmMeta';
 
@@ -150,10 +152,14 @@ export interface LibraryQuery {
   sort: LibrarySort;
 }
 
+/** t() for a counted string: picks `<base>_one/_few/_many/_other` for `n` in the UI language. */
+export const tn = (base: string, n: number, vars?: Record<string, string | number>): string =>
+  t(pluralKey(base, n, locale) as Key, { n, ...vars });
+
 const stripExt = (f: string) => f.replace(/\.[^.]+$/, '');
 
 export function displayName(item: Pick<LibraryItem, 'entry' | 'info'>): string {
-  return item.entry.customName || item.info.meta.name || stripExt(item.info.fileName) || 'UNTITLED';
+  return item.entry.customName || item.info.meta.name || stripExt(item.info.fileName) || t('library.untitled');
 }
 
 export function displayAuthor(info: ModelInfo): string {
@@ -169,7 +175,7 @@ export function queryLibrary(items: readonly LibraryItem[], q: LibraryQuery): Li
     if (q.filter === 'favourites' && !it.entry.favourite) return false;
     if (!terms.length) return true;
     const hay = fold(`${displayName(it)} ${it.info.meta.name} ${displayAuthor(it.info)} ${it.info.fileName}`);
-    return terms.every((t) => hay.includes(t));
+    return terms.every((w) => hay.includes(w));
   });
   const byName = (a: LibraryItem, b: LibraryItem) => fold(displayName(a)).localeCompare(fold(displayName(b))) || a.id.localeCompare(b.id);
   const cmp: Record<LibrarySort, (a: LibraryItem, b: LibraryItem) => number> = {
@@ -183,26 +189,28 @@ export function queryLibrary(items: readonly LibraryItem[], q: LibraryQuery): Li
 
 // ---------------------------------------------------------------- formatting
 
-export function formatAgo(t: number | null, now: number): string {
-  if (t === null) return 'NEVER USED';
-  const s = Math.max(0, (now - t) / 1000);
-  if (s < 60) return 'JUST NOW';
+export function formatAgo(at: number | null, now: number): string {
+  if (at === null) return t('library.ago.never');
+  const s = Math.max(0, (now - at) / 1000);
+  if (s < 60) return t('library.ago.justNow');
   const m = s / 60;
-  if (m < 60) return `${Math.floor(m)} MIN AGO`;
+  if (m < 60) return t('library.ago.min', { n: Math.floor(m) });
   const h = m / 60;
-  if (h < 24) return `${Math.floor(h)} H AGO`;
+  if (h < 24) return t('library.ago.hours', { n: Math.floor(h) });
   const d = h / 24;
-  if (d < 2) return 'YESTERDAY';
-  if (d < 30) return `${Math.floor(d)} DAYS AGO`;
+  if (d < 2) return t('library.ago.yesterday');
+  if (d < 30) return tn('library.ago.days', Math.floor(d));
   const mo = d / 30.44;
-  if (mo < 12) return `${Math.floor(mo)} MO AGO`;
-  return `${Math.floor(mo / 12)} Y AGO`;
+  if (mo < 12) return tn('library.ago.months', Math.floor(mo));
+  return tn('library.ago.years', Math.floor(mo / 12));
 }
 
 export function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+  const fmt = (v: number, digits: number) =>
+    v.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
+  if (n < 1024) return t('library.size.b', { n });
+  if (n < 1024 * 1024) return t('library.size.kb', { n: fmt(n / 1024, 0) });
+  return t('library.size.mb', { n: fmt(n / 1024 / 1024, n < 10 * 1024 * 1024 ? 1 : 0) });
 }
 
 export function formatCount(n: number): string {

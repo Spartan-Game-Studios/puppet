@@ -158,10 +158,10 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" = macOS ]; then
-            APP=$(ls -d src-tauri/target/*/release/bundle/macos/Puppet.app)
-            EXT="$APP/Contents/Library/SystemExtensions/com.spartangamestudios.puppet.camera.systemextension"
-            test -x "$EXT/Contents/MacOS/com.spartangamestudios.puppet.camera"
-            lipo -info "$EXT/Contents/MacOS/com.spartangamestudios.puppet.camera"
+            APP=$(ls -d src-tauri/target/*/release/bundle/macos/VPuppet.app)
+            EXT="$APP/Contents/Library/SystemExtensions/com.spartangamestudios.vpuppet.camera.systemextension"
+            test -x "$EXT/Contents/MacOS/com.spartangamestudios.vpuppet.camera"
+            lipo -info "$EXT/Contents/MacOS/com.spartangamestudios.vpuppet.camera"
             plutil -p "$EXT/Contents/Info.plist" | grep -E 'CMIOExtensionMachServiceName|CFBundlePackageType'
             codesign --verify --strict --verbose=1 "$EXT"
           elif [ "$RUNNER_OS" = Windows ]; then
@@ -171,7 +171,7 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: puppet-${{ matrix.name }}
+          name: vpuppet-${{ matrix.name }}
           path: |
             src-tauri/target/*/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/nsis/*.exe

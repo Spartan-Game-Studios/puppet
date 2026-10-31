@@ -1,0 +1,25 @@
+{
+  "title": "Documentación",
+  "pages": [
+    "---Primeros pasos---",
+    "index",
+    "installation",
+    "getting-started",
+    "---Uso de VPuppet---",
+    "tracking",
+    "model-library",
+    "scene",
+    "physics",
+    "motion",
+    "lip-sync",
+    "---Salida---",
+    "virtual-camera",
+    "vmc",
+    "---Guías---",
+    "...guides",
+    "---Referencia---",
+    "shortcuts",
+    "mcp",
+    "faq"
+  ]
+}

@@ -4,6 +4,7 @@
  * harness). Both store the same files per entry (see libraryIndex.ts).
  */
 import { isTauri } from '../app/platform';
+import { t } from '../i18n';
 import { isValidId, type LibraryFile } from './libraryIndex';
 
 export interface StoredEntry {
@@ -159,7 +160,7 @@ class IdbBackend implements LibraryBackend {
   }
 
   async reveal(): Promise<void> {
-    throw new Error('SHOW IN FOLDER NEEDS THE DESKTOP APP');
+    throw new Error(t('library.err.revealDesktop'));
   }
 
   async openLink(_which: string, url: string): Promise<void> {
@@ -174,7 +175,7 @@ export function createBackend(): LibraryBackend {
 /** Native multi-file open dialog (desktop). */
 export async function pickVrmPaths(): Promise<string[]> {
   const { open } = await import('@tauri-apps/plugin-dialog');
-  const r = await open({ multiple: true, directory: false, filters: [{ name: 'VRM avatar', extensions: ['vrm'] }] });
+  const r = await open({ multiple: true, directory: false, filters: [{ name: t('library.dialogFilter'), extensions: ['vrm'] }] });
   return Array.isArray(r) ? r : typeof r === 'string' ? [r] : [];
 }
 

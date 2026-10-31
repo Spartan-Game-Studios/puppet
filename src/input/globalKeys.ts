@@ -4,11 +4,12 @@
  *
  * macOS: registered through Carbon's RegisterEventHotKey, which needs no
  * Accessibility permission; a registered combo is taken from every other app
- * while Puppet runs, so prefer combos with a modifier. A combo another app
+ * while VPuppet runs, so prefer combos with a modifier. A combo another app
  * already owns fails to register and is reported; the in-window key still
  * works.
  */
 import { isTauri } from '../app/platform';
+import { t } from '../i18n';
 
 export interface GlobalResult {
   registered: string[];
@@ -22,7 +23,7 @@ let current: string[] = [];
 export async function setGlobalShortcuts(accelerators: string[], handler: Handler): Promise<GlobalResult> {
   const res: GlobalResult = { registered: [], failed: [] };
   if (!isTauri) {
-    if (accelerators.length) res.failed.push(...accelerators.map((a) => ({ accelerator: a, error: 'desktop app only' })));
+    if (accelerators.length) res.failed.push(...accelerators.map((a) => ({ accelerator: a, error: t('motion.hk.desktopOnly') })));
     return res;
   }
   const gs = await import('@tauri-apps/plugin-global-shortcut');

@@ -1,0 +1,3 @@
+# SteamPipe build logs/cache and staged files
+output/
+staging/

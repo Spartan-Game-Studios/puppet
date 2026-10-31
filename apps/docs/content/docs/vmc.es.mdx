@@ -1,0 +1,37 @@
+---
+title: Salida VMC
+description: Envía tu seguimiento a otro software de VTuber mediante el protocolo VMC.
+---
+
+VPuppet puede enviar los huesos y los blendshapes del avatar mediante el **protocolo VMC** (OSC sobre UDP) a otra app, por ejemplo una que renderice el avatar o una escena 3D. Está desactivado por defecto.
+
+## Configuración
+
+<Steps>
+<Step>
+Abre **VMC** (`N`) en VPuppet. Indica el **HOST** y el **PORT** (puerto) del receptor.
+
+- El valor por defecto, `127.0.0.1:39539`, es el puerto de recepción VMC habitual (el que usan VSeeFace, Warudo, VNyan, VMC4U y otros) en el mismo ordenador.
+- Para un receptor en otro PC, escribe la dirección IP de ese PC en la red local.
+</Step>
+<Step>
+Marca **SEND VMC (OSC/UDP)** (`V`).
+</Step>
+<Step>
+En la app receptora, activa la recepción VMC / OSC en el mismo puerto y carga allí el mismo avatar.
+</Step>
+</Steps>
+
+El indicador **TX** muestra los fotogramas y los bytes enviados. Los errores de "nadie escuchando" se cuentan pero no detienen el envío, así que puedes iniciar el receptor más tarde.
+
+## Qué se envía
+
+- **Huesos:** la raíz y todos los huesos humanoides, en la forma que los receptores esperan de un VRM.
+- **Blendshapes:** con los nombres de expresión propios del modelo. Los modelos con presets usan los nombres de VRM 0.x (`Blink`, `Blink_L`, `A`, `I`, `U`, `E`, `O`, `Joy`, `Angry`, `Sorrow`, `Fun`, `Surprised`...); los modelos perfect sync envían los nombres de ARKit.
+- **ALSO SEND VRM PRESETS** (activado por defecto): los modelos perfect sync envían además los 13 presets de VRM (`Blink`, `Blink_L`, `Blink_R`, `A`, `I`, `U`, `E`, `O`, `Joy`, `Angry`, `Sorrow`, `Fun`, `Surprised`), derivados de los valores de ARKit, para que los receptores que solo leen presets no muestren una cara congelada. Los valores de ARKit se siguen enviando.
+
+<Callout title="VSeeFace y perfect sync">
+Para usar los blendshapes de ARKit en VSeeFace, activa allí perfect sync en el modelo receptor.
+</Callout>
+
+Los paquetes se mantienen lo bastante pequeños como para atravesar una red real, no solo el propio equipo.

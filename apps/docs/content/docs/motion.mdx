@@ -1,0 +1,97 @@
+---
+title: Motion, hotkeys and gamepad
+description: Idle loops, emotes, your own animation clips, and the keyboard, gamepad and gesture bindings that trigger them.
+---
+
+## Clips (MOTION, `A`)
+
+The **MOTION** window holds the idle loop and the emotes. They play on top of live tracking.
+
+### Built-in clips
+
+| Clip | Moves by default |
+|---|---|
+| IDLE: BREATHE / LOOK AROUND / TALKING / ARMS FOLDED | full body (idle) |
+| NOD (YES), SHAKE (NO) | head |
+| CHEER, ANGRY, CRY | body |
+| DANCE, SIT (loop until triggered again) | full body |
+| DRINK | arms |
+| WAVE, CLAP, POINT | arms |
+| SHRUG, THINK | body |
+| BOW | full body |
+
+Most clips come from the [Quaternius Universal Animation Library](https://quaternius.com) (CC0). WAVE, CLAP, POINT, SHRUG, THINK and BOW are simple keyframed poses made for VPuppet, not motion capture.
+
+### How clips mix with tracking
+
+- The **idle** clip plays while body tracking is off (FACE mode) or lost. While your face is tracked, the head stays yours.
+- An **emote** plays over live tracking and takes over only the bones it needs (full body, body without the head, arms, or head), fading in and out. Your face expressions stay tracked during every emote.
+- Clips that move the hips (like SIT) fade more slowly so cloth can follow.
+
+### Your own clips
+
+Click **IMPORT CLIP**, or drop an `.fbx` or `.glb` on the window. (A `.glb` without animations is taken as a 3D scene instead.)
+
+- Mixamo, Quaternius UAL / Unreal-mannequin and VRoid rigs are recognised by their bone names; common Blender and Unity names work too.
+- Clips are retargeted onto any VRM (0.x and 1.0). Travel is removed so the avatar stays in place; bobbing and sitting height are kept.
+- Each animation in the file becomes its own entry. VPuppet keeps a copy, like the model library.
+
+<Callout type="warn" title="Retargeting limits">
+Retargeting copies bone directions, not contacts: on a model with very different proportions, hands meant to touch the face or each other can miss. An imported `.gltf` with separate files isn't supported for clips; use `.glb` or `.fbx`. Mixamo's terms don't allow redistributing their files, so import your own downloads.
+</Callout>
+
+## Hotkeys (HOTKEYS, `K`) [#hotkeys]
+
+Each binding maps a **trigger** to an **action**.
+
+- **Triggers:** a key or key combination, a gamepad button, or a hand gesture.
+- **Actions:** play an emote; set an expression (**TOGGLE**, **ON**, or **HOLD** while pressed; any VRM preset or custom expression on the model, with fades); **RESET**; or open the **PICKER**.
+
+Click a trigger to rebind it. A dot marks a binding that belongs to the current model only (expressions differ between models); a model's own binding overrides a global one on the same trigger. Clashes with another binding or with an app shortcut are outlined.
+
+### Default bindings
+
+| Trigger | Action |
+|---|---|
+| `⌥1` – `⌥5` (Alt+1 – Alt+5) | happy / angry / sad / relaxed / surprised |
+| `⌥6` | reset expressions |
+| `F3` `F4` `F5` `F6` | wave, nod, shake, clap |
+| `F7` `F8` `F9` `F10` | cheer, bow, shrug, think |
+| `G` | picker |
+
+The expression keys use Alt because `1` `2` `3` are the tracking modes.
+
+### Gamepad
+
+Gamepads using the standard mapping are first class:
+
+| Button | Action |
+|---|---|
+| `A` | wave |
+| `B` | nod |
+| `X` | clap |
+| `Y` | cheer |
+| d-pad | happy / surprised / sad / angry |
+| `LB` | shrug |
+| `RB` | picker |
+| `BACK` | reset |
+
+Gamepad buttons work whenever VPuppet is running, even in the background.
+
+**Menu mode:** on the stage, `LT` enters menu mode: the d-pad or stick moves focus, `A` presses, left / right change sliders and drop-downs, `B` backs out. Settings windows and HOME take the pad on their own. Outside those, the pad stays yours for performing.
+
+### Hand gestures
+
+In +HANDS mode the seven tracked gestures (fist, open palm, point, peace, thumbs up, OK, rock) can be used as triggers, per hand.
+
+### Global hotkeys
+
+**GLOBAL** (off by default) registers your keyboard bindings system-wide, so they work while OBS or a game has focus.
+
+- A key registered globally is taken from every other app while VPuppet runs, so prefer combinations.
+- A combination another app already owns fails to register; it's listed and still works inside VPuppet.
+- On macOS no Accessibility permission is needed. On Linux, global keys need an X11 session; they aren't available on pure Wayland. Global keys have been tested on macOS only so far.
+
+### Picker
+
+`G` or pad `RB` opens a grid of emotes and expressions over the stage. Arrows / d-pad / left stick move, `Enter` / `A` fires, `Esc` / `B` closes.

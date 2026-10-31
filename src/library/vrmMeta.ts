@@ -16,6 +16,8 @@
  * licence URL when one is present, and are otherwise unknown (null).
  */
 
+import { t, type Key } from '../i18n';
+
 export type VrmSpec = '0.x' | '1.0';
 export type AvatarPermission = 'onlyAuthor' | 'onlySeparatelyLicensedPerson' | 'everyone';
 export type CommercialUsage = 'personalNonProfit' | 'personalProfit' | 'corporation';
@@ -250,9 +252,22 @@ export const LICENCE_LETTER: Readonly<Record<LicenceBadge, string>> = {
   'NO TERMS': 'N',
 };
 
+const BADGE_KEY: Readonly<Record<LicenceBadge, string>> = {
+  'AUTHOR ONLY': 'authorOnly',
+  'LICENSED ONLY': 'licensedOnly',
+  CC0: 'cc0',
+  'COMMERCIAL OK': 'commercialOk',
+  'SOLO COMMERCIAL': 'soloCommercial',
+  PERSONAL: 'personal',
+  'NO TERMS': 'noTerms',
+};
+
+/** The badge as shown, in the UI language (the LicenceBadge id itself stays English). */
+export const badgeLabel = (badge: LicenceBadge): string => t(`library.badge.${BADGE_KEY[badge]}` as Key);
+
 /** Tooltip for the letter badge: "A · AUTHOR ONLY". */
 export function licenceLetterTitle(badge: LicenceBadge): string {
-  return `${LICENCE_LETTER[badge]} · ${badge}${badge === 'COMMERCIAL OK' ? ' (BUSINESS USE ALLOWED)' : ''}`;
+  return t(badge === 'COMMERCIAL OK' ? 'library.letterTitleBusiness' : 'library.letterTitle', { letter: LICENCE_LETTER[badge], badge: badgeLabel(badge) });
 }
 
 export interface LicenceLine {
@@ -262,6 +277,7 @@ export interface LicenceLine {
   mark: 'yes' | 'no' | '?' | '';
 }
 
+/** `badge` is an id (English, compared in code); `headline` and `lines` are in the UI language. */
 export interface LicenceSummary {
   badge: LicenceBadge;
   tone: LicenceTone;
@@ -276,7 +292,7 @@ const isCc0 = (m: VrmMeta) =>
   m.licenseName === 'CC0' || /creativecommons\.org\/publicdomain\/zero/i.test(`${m.licenseUrl} ${m.otherLicenseUrl}`);
 
 const yn = (v: boolean | null, yes: string, no: string): [string, LicenceLine['mark']] =>
-  v === null ? ['NOT STATED', '?'] : v ? [yes, 'yes'] : [no, 'no'];
+  v === null ? [t('library.val.notStated'), '?'] : v ? [yes, 'yes'] : [no, 'no'];
 
 export function summarizeLicence(m: VrmMeta): LicenceSummary {
   const cc0 = isCc0(m);
@@ -286,87 +302,89 @@ export function summarizeLicence(m: VrmMeta): LicenceSummary {
   if (m.avatarPermission === 'onlyAuthor') {
     badge = 'AUTHOR ONLY';
     tone = 'warn';
-    headline = 'Only the author may use this model as an avatar.';
+    headline = t('library.head.authorOnly');
   } else if (m.avatarPermission === 'onlySeparatelyLicensedPerson') {
     badge = 'LICENSED ONLY';
     tone = 'warn';
-    headline = 'Only people the author has licensed separately may use this model as an avatar.';
+    headline = t('library.head.licensedOnly');
   } else if (cc0) {
     badge = 'CC0';
     tone = 'ok';
-    headline = 'Public domain (CC0): free to use for anything.';
+    headline = t('library.head.cc0');
   } else if (m.commercialUsage === 'corporation') {
     badge = 'COMMERCIAL OK';
     tone = 'ok';
-    headline = 'Commercial use is allowed, including by companies.';
+    headline = t('library.head.commercialOk');
   } else if (m.commercialUsage === 'personalProfit') {
     badge = 'SOLO COMMERCIAL';
     tone = 'ok';
-    headline = 'Individuals may use it to earn money; companies may not.';
+    headline = t('library.head.soloCommercial');
   } else if (m.commercialUsage === 'personalNonProfit') {
     badge = 'PERSONAL';
     tone = 'info';
-    headline = 'Personal, non-profit use only.';
+    headline = t('library.head.personal');
   } else {
     badge = 'NO TERMS';
     tone = 'unknown';
-    headline = 'The model does not state its terms. Ask the author before using it publicly.';
+    headline = t('library.head.noTerms');
   }
 
   const lines: LicenceLine[] = [];
+  const ALLOWED = t('library.val.allowed');
+  const NOT_ALLOWED = t('library.val.notAllowed');
   const who =
     m.avatarPermission === 'onlyAuthor'
-      ? (['THE AUTHOR ONLY', 'no'] as const)
+      ? ([t('library.val.authorOnly'), 'no'] as const)
       : m.avatarPermission === 'onlySeparatelyLicensedPerson'
-        ? (['PEOPLE THE AUTHOR LICENSED', 'no'] as const)
+        ? ([t('library.val.licensedPeople'), 'no'] as const)
         : m.avatarPermission === 'everyone'
-          ? (['EVERYONE', 'yes'] as const)
-          : (['NOT STATED', '?'] as const);
-  lines.push({ label: 'WHO MAY PERFORM AS IT', value: who[0], mark: who[1] });
+          ? ([t('library.val.everyone'), 'yes'] as const)
+          : ([t('library.val.notStated'), '?'] as const);
+  lines.push({ label: t('library.lic.who'), value: who[0], mark: who[1] });
   const com =
     m.commercialUsage === 'corporation'
-      ? (['ALLOWED, INCLUDING COMPANIES', 'yes'] as const)
+      ? ([t('library.val.companies'), 'yes'] as const)
       : m.commercialUsage === 'personalProfit'
-        ? (['INDIVIDUALS ONLY', 'yes'] as const)
+        ? ([t('library.val.individuals'), 'yes'] as const)
         : m.commercialUsage === 'personalNonProfit'
-          ? (['NOT ALLOWED (NON-PROFIT ONLY)', 'no'] as const)
-          : (['NOT STATED', '?'] as const);
-  lines.push({ label: 'COMMERCIAL USE', value: com[0], mark: com[1] });
+          ? ([t('library.val.nonProfit'), 'no'] as const)
+          : ([t('library.val.notStated'), '?'] as const);
+  lines.push({ label: t('library.lic.commercial'), value: com[0], mark: com[1] });
   const push = (label: string, v: boolean | null, yes: string, no: string) => {
     const [value, mark] = yn(v, yes, no);
     lines.push({ label, value, mark });
   };
-  push('VIOLENT CONTENT', m.allowViolent, 'ALLOWED', 'NOT ALLOWED');
-  push('SEXUAL CONTENT', m.allowSexual, 'ALLOWED', 'NOT ALLOWED');
-  if (m.spec === '1.0' || m.allowPolitical !== null) push('POLITICAL / RELIGIOUS', m.allowPolitical, 'ALLOWED', 'NOT ALLOWED');
-  if (m.spec === '1.0' || m.allowAntisocial !== null) push('ANTISOCIAL / HATE', m.allowAntisocial, 'ALLOWED', 'NOT ALLOWED');
+  push(t('library.lic.violent'), m.allowViolent, ALLOWED, NOT_ALLOWED);
+  push(t('library.lic.sexual'), m.allowSexual, ALLOWED, NOT_ALLOWED);
+  if (m.spec === '1.0' || m.allowPolitical !== null) push(t('library.lic.political'), m.allowPolitical, ALLOWED, NOT_ALLOWED);
+  if (m.spec === '1.0' || m.allowAntisocial !== null) push(t('library.lic.antisocial'), m.allowAntisocial, ALLOWED, NOT_ALLOWED);
   lines.push({
-    label: 'CREDIT THE AUTHOR',
-    value: m.creditNotation === 'required' ? 'REQUIRED' : m.creditNotation === 'unnecessary' ? 'NOT NEEDED' : 'NOT STATED',
+    label: t('library.lic.credit'),
+    value: m.creditNotation === 'required' ? t('library.val.required') : m.creditNotation === 'unnecessary' ? t('library.val.notNeeded') : t('library.val.notStated'),
     mark: m.creditNotation === 'required' ? 'no' : m.creditNotation === 'unnecessary' ? 'yes' : '?',
   });
-  push('REDISTRIBUTE THE FILE', m.allowRedistribution, 'ALLOWED', 'NOT ALLOWED');
+  push(t('library.lic.redistribute'), m.allowRedistribution, ALLOWED, NOT_ALLOWED);
   lines.push({
-    label: 'MODIFY IT',
+    label: t('library.lic.modify'),
     value:
       m.modification === 'prohibited'
-        ? 'NOT ALLOWED'
+        ? NOT_ALLOWED
         : m.modification === 'allowModification'
-          ? 'ALLOWED (DO NOT SHARE EDITS)'
+          ? t('library.val.modNoShare')
           : m.modification === 'allowModificationRedistribution'
-            ? 'ALLOWED, EDITS MAY BE SHARED'
-            : 'NOT STATED',
+            ? t('library.val.modShare')
+            : t('library.val.notStated'),
     mark: m.modification === 'prohibited' ? 'no' : m.modification ? 'yes' : '?',
   });
-  if (m.licenseName) lines.push({ label: 'LICENCE', value: m.licenseName.replace(/_/g, ' ').toUpperCase(), mark: '' });
+  if (m.licenseName) lines.push({ label: t('library.lic.licence'), value: m.licenseName.replace(/_/g, ' ').toUpperCase(), mark: '' });
   const url = m.otherLicenseUrl || m.licenseUrl || m.otherPermissionUrl;
-  if (url) lines.push({ label: 'LICENCE URL', value: url, mark: '' });
-  if (m.otherPermissionUrl && m.otherPermissionUrl !== url) lines.push({ label: 'PERMISSIONS URL', value: m.otherPermissionUrl, mark: '' });
-  if (m.authors.length) lines.push({ label: m.authors.length > 1 ? 'AUTHORS' : 'AUTHOR', value: m.authors.join(', '), mark: '' });
-  if (m.copyright) lines.push({ label: 'COPYRIGHT', value: m.copyright, mark: '' });
-  if (m.contact) lines.push({ label: 'CONTACT', value: m.contact, mark: '' });
-  if (m.references.length) lines.push({ label: 'BASED ON', value: m.references.join(', '), mark: '' });
-  if (m.thirdPartyLicenses) lines.push({ label: 'THIRD-PARTY', value: m.thirdPartyLicenses, mark: '' });
+  if (url) lines.push({ label: t('library.lic.url'), value: url, mark: '' });
+  if (m.otherPermissionUrl && m.otherPermissionUrl !== url) lines.push({ label: t('library.lic.permUrl'), value: m.otherPermissionUrl, mark: '' });
+  if (m.authors.length) lines.push({ label: m.authors.length > 1 ? t('library.lic.authors') : t('library.lic.author'), value: m.authors.join(', '), mark: '' });
+  if (m.copyright) lines.push({ label: t('library.lic.copyright'), value: m.copyright, mark: '' });
+  if (m.contact) lines.push({ label: t('library.lic.contact'), value: m.contact, mark: '' });
+  if (m.references.length) lines.push({ label: t('library.lic.basedOn'), value: m.references.join(', '), mark: '' });
+  if (m.thirdPartyLicenses) lines.push({ label: t('library.lic.thirdParty'), value: m.thirdPartyLicenses, mark: '' });
 
   return { badge, tone, headline, lines, restricted: tone === 'warn' };
 }

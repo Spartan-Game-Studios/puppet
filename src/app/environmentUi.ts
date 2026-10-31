@@ -19,6 +19,7 @@ import {
 import { extOf, loadCustomScene, loadCustomSky, SCENE_EXTS, SKY_EXTS } from '../scene/environment/custom';
 import { baseName, isTauri, pickBrowserFile, pickPath, readPath } from './platform';
 import type { Settings } from './settings';
+import { t } from '../i18n';
 
 export interface EnvUiDeps {
   viewer: Viewer;
@@ -125,8 +126,8 @@ export function bindEnvironmentUi(d: EnvUiDeps): EnvUi {
     const block = $('env-block');
     block.classList.toggle('custom', env.id === 'custom');
     block.classList.toggle('off', d.settings.background.kind !== 'environment');
-    $('env-scene-name').textContent = sceneId ? baseName(sceneId).toUpperCase() : 'NONE (DROP A .GLB)';
-    $('env-sky-name').textContent = skyId ? baseName(skyId).toUpperCase() : 'NONE (GRADIENT)';
+    $('env-scene-name').textContent = sceneId ? baseName(sceneId).toUpperCase() : t('stage.envSceneNone');
+    $('env-sky-name').textContent = skyId ? baseName(skyId).toUpperCase() : t('stage.envSkyNone');
   }
 
   function selectEnv(id: EnvId): void {
@@ -135,7 +136,7 @@ export function bindEnvironmentUi(d: EnvUiDeps): EnvUi {
     refresh();
     push();
     if (d.settings.background.kind !== 'environment') d.setBackgroundKind('environment');
-    if (id === 'custom' && !manager.hasCustomScene && !sceneId) d.setStatus('CUSTOM: LOAD OR DROP A .GLB / .GLTF SCENE');
+    if (id === 'custom' && !manager.hasCustomScene && !sceneId) d.setStatus(t('stage.envCustomHint'));
   }
 
   $<HTMLSelectElement>('env-id').addEventListener('change', (e) => {
@@ -175,30 +176,30 @@ export function bindEnvironmentUi(d: EnvUiDeps): EnvUi {
   // ---------------------------------------------------------------- custom files
   /** `select`: switch to CUSTOM (and the 3D background) once loaded; false when restoring at launch. */
   async function loadScene(buf: ArrayBuffer, id: string, resolve?: (uri: string) => Promise<ArrayBuffer>, select = true): Promise<void> {
-    d.setStatus(`LOADING SCENE ${baseName(id)}`);
+    d.setStatus(t('stage.loadingScene', { name: baseName(id) }));
     try {
       const scene = await loadCustomScene(buf, baseName(id), resolve);
       sceneId = id;
       manager.setCustomScene(scene);
       const s = scene.size;
-      d.setStatus(`SCENE OK: ${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} M`);
+      d.setStatus(t('stage.sceneOk', { x: s.x.toFixed(1), y: s.y.toFixed(1), z: s.z.toFixed(1) }));
       if (select) selectEnv('custom');
       else refresh(), push();
     } catch (e) {
-      d.setStatus(`SCENE LOAD FAILED: ${(e as Error).message}`, true);
+      d.setStatus(t('stage.sceneFailed', { error: (e as Error).message }), true);
     }
   }
   async function loadSky(buf: ArrayBuffer, id: string, select = true): Promise<void> {
-    d.setStatus(`LOADING SKY ${baseName(id)}`);
+    d.setStatus(t('stage.loadingSky', { name: baseName(id) }));
     try {
       const sky = await loadCustomSky(buf, baseName(id), d.viewer.renderer);
       skyId = id;
       manager.setCustomSky(sky);
-      d.setStatus('SKY OK');
+      d.setStatus(t('stage.skyOk'));
       if (select) selectEnv('custom');
       else refresh(), push();
     } catch (e) {
-      d.setStatus(`SKY LOAD FAILED: ${(e as Error).message}`, true);
+      d.setStatus(t('stage.skyFailed', { error: (e as Error).message }), true);
     }
   }
   const siblingReader = (path: string) => {
@@ -222,7 +223,7 @@ export function bindEnvironmentUi(d: EnvUiDeps): EnvUi {
 
   $('btn-env-scene').addEventListener('click', async () => {
     if (isTauri) {
-      const p = await pickPath('glTF scene', SCENE_EXTS);
+      const p = await pickPath(t('stage.pickScene'), SCENE_EXTS);
       if (p) await openScenePath(p);
     } else {
       const f = await pickBrowserFile('.glb,.gltf');
@@ -231,7 +232,7 @@ export function bindEnvironmentUi(d: EnvUiDeps): EnvUi {
   });
   $('btn-env-sky').addEventListener('click', async () => {
     if (isTauri) {
-      const p = await pickPath('HDR / EXR sky', SKY_EXTS);
+      const p = await pickPath(t('stage.pickSky'), SKY_EXTS);
       if (p) await openSkyPath(p);
     } else {
       const f = await pickBrowserFile('.hdr,.exr');
@@ -252,7 +253,7 @@ export function bindEnvironmentUi(d: EnvUiDeps): EnvUi {
     Promise.all([
       scenePath ? readPath(scenePath).then((b) => loadScene(b, scenePath, siblingReader(scenePath), false)) : null,
       skyPath ? readPath(skyPath).then((b) => loadSky(b, skyPath, false)) : null,
-    ]).catch(() => d.setStatus('SAVED CUSTOM ENVIRONMENT NOT FOUND', true));
+    ]).catch(() => d.setStatus(t('stage.envMissing'), true));
   }
 
   refresh();

@@ -1,4 +1,4 @@
-// Entry point of the Puppet camera system extension.
+// Entry point of the VPuppet camera system extension.
 import CoreMediaIO
 import Foundation
 

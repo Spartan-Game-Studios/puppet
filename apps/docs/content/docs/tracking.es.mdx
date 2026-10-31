@@ -1,0 +1,72 @@
+---
+title: Seguimiento
+description: Cara y perfect sync, cuerpo, manos y gestos, suavizado y ajuste por blendshape.
+---
+
+VPuppet te sigue con Google MediaPipe, en tu propio ordenador. Elige cuánto de ti sigue en **01 TRACKING**: **FACE** (`1`), **+BODY** (`2`) o **+HANDS** (`3`).
+
+## Cara [#face]
+
+MediaPipe lee en cada fotograma 52 blendshapes de ARKit (parpadeos, cejas, mandíbula, formas de la boca...) y la rotación de la cabeza. Cómo llegan a tu avatar depende del modelo.
+
+### Modelos perfect sync
+
+Un modelo **perfect sync** tiene una expresión por cada nombre de ARKit (`eyeBlinkLeft`, `jawOpen`, `mouthSmileLeft`, etc.), esculpida por quien hizo el modelo. VPuppet controla entonces cada expresión con el valor seguido del mismo nombre, uno a uno, de modo que cada forma de la boca y de las cejas se ve tal como la creó el artista, en lugar de reducirse a cinco vocales y un parpadeo.
+
+- Los nombres coinciden sin tener en cuenta mayúsculas ni signos de puntuación: `eyeBlinkLeft`, `EyeBlinkLeft` y `eye_blink_left` funcionan todos.
+- VPuppet considera que un modelo es perfect sync cuando tiene al menos 40 de los 52 nombres. La barra inferior muestra `PERFECT SYNC n/52`.
+- MediaPipe proporciona todos los nombres de ARKit excepto `tongueOut`, así que una webcam puede controlar un modelo perfect sync sin necesidad de un iPhone.
+
+### Modelos con presets
+
+Los demás modelos muestran `PRESETS n/13`. VPuppet deriva las expresiones estándar de VRM a partir de los blendshapes seguidos:
+
+- `blink`, `blinkLeft`, `blinkRight`;
+- las vocales `aa`, `ih`, `ou`, `ee`, `oh`;
+- las emociones `happy`, `angry`, `sad`, `surprised`, `relaxed`. Tienen una zona muerta para que una cara neutra siga neutra, y puedes desactivarlas con **EMOTIONS (PRESET MODELS)**.
+
+### Cabeza y mirada
+
+La rotación de la cabeza viene directamente de la transformación facial de MediaPipe. La mirada controla el look-at del modelo, tanto si usa huesos de los ojos como expresiones de mirada. **GAZE GAIN** (ganancia de la mirada) ajusta cuánto se mueven los ojos.
+
+## Cuerpo (+BODY)
+
+La columna, el pecho, los hombros y los brazos siguen los puntos de referencia de pose de MediaPipe.
+
+- El codo se dobla como una bisagra real (0–150°, nunca hacia atrás), y las clavículas acompañan los encogimientos de hombros y los brazos levantados.
+- La inclinación y el giro del torso se limitan por separado, para que un movimiento pequeño no sacuda al avatar.
+- Un brazo que sale del encuadre conserva la parte superior del brazo, y un brazo que no se ve vuelve suavemente al reposo en lugar de saltar de golpe.
+- **POSE MODEL** cambia entre LITE (más rápido) y FULL mientras el seguimiento está en marcha.
+
+Las piernas nunca se siguen: se quedan en una postura de reposo o siguen un emote.
+
+## Manos y gestos (+HANDS)
+
+Se controlan todas las articulaciones de los dedos, incluido el giro del pulgar, así que los pellizcos y la oposición del pulgar se aprecian. Las manos se procesan en paralelo con el cuerpo y en cada fotograma se buscan las dos, también en la parte baja del encuadre, delante del cuerpo o cerca de la cara.
+
+En el modo +HANDS, VPuppet reconoce siete gestos por mano: **puño**, **palma abierta**, **señalar**, **paz**, **pulgar arriba**, **OK** y **rock**. Deben mantenerse un instante antes de registrarse, así que no parpadean. Puedes verlos en la superposición de depuración (`D`) y asignarlos a emotes y expresiones en [HOTKEYS](./motion.mdx#hotkeys).
+
+<Callout type="warn" title="Lo que le cuesta al seguimiento de manos">
+Los brazos cruzados y las manos apoyadas en la cara se pierden a menudo, porque el detector de palmas de MediaPipe rara vez las detecta ahí. Las mangas anchas o las capas sobre los hombros pueden ocultar el codo al modelo de pose, que entonces coloca los brazos levantados más bajos de lo que están.
+</Callout>
+
+## Suavizado
+
+Un único control deslizante, **SMOOTHING** (suavizado), fija cuánto se filtra el seguimiento. Más bajo responde mejor y tiembla un poco; más alto es más estable y se retrasa ligeramente más. Los parpadeos y la mandíbula mantienen una respuesta rápida con cualquier ajuste.
+
+## Calibración
+
+**CALIBRATE** (`C`) guarda tu cara neutra, el ángulo de la cabeza y la mirada como punto cero; **CLR** la borra. Consulta [Primeros pasos](./getting-started.mdx#calibrate).
+
+## Ganancia y curva por blendshape (ventana FACE) [#face-window]
+
+Abre **FACE** (`F`) para ver cada blendshape con su valor sin procesar, el valor que se envía al modelo y dos números que puedes editar en directo:
+
+- **GAIN** (ganancia) multiplica el valor. Súbela para una forma de la boca que se note demasiado poco.
+- **CURVE** (curva) es un exponente. Por debajo de 1, los movimientos pequeños se ven antes; por encima de 1, la forma se contiene hasta que el movimiento es mayor.
+
+Las filas que el modelo no tiene aparecen tachadas. La ventana también muestra los valores de la cabeza y la mirada.
+
+## Superposición de depuración
+
+`D` muestra los fps y el tiempo por fotograma del renderizado, los fps del seguimiento de cara y cuerpo, la latencia, el tiempo de inferencia, los gestos, la cabeza y la mirada, y **HANDS L/R**: el estado de búsqueda de cada mano (TRACKED, FOUND, MISS, ...) y con qué frecuencia se encontró durante los últimos 3 segundos.

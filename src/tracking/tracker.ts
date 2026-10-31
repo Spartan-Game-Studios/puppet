@@ -12,6 +12,7 @@
 import type { BodyMode, FromWorker, Pipeline, PoseResult, TrackerResult } from './protocol';
 import { createLandmarkers, detect, setPoseModel, type LandmarkerSet } from './landmarkers';
 import { HandsMerge } from './handsMerge';
+import { t } from '../i18n';
 
 export interface PipelineStats {
   fps: number;
@@ -60,7 +61,8 @@ export class Tracker {
   onResult: (r: TrackerResult) => void = () => {};
   /** Every result of the hand search, once (debug statistics). */
   onHands: (r: TrackerResult) => void = () => {};
-  onStatus: (s: string) => void = () => {};
+  /** Status line text; `err` marks it as an error. */
+  onStatus: (s: string, err?: boolean) => void = () => {};
 
   private lanes: Record<Pipeline, Lane> = {
     face: { pipeline: 'face', worker: null, busy: false, sentAt: 0, sentVideoTime: 0, nextDue: 0, times: [] },
@@ -84,7 +86,7 @@ export class Tracker {
     const wasmBase = `${base}/wasm`;
     const modelBase = `${base}/models`;
     const forceMain = new URLSearchParams(location.search).get('tracker') === 'main';
-    this.onStatus('LOADING MODELS');
+    this.onStatus(t('stage.loadingModels'));
     if (!forceMain) {
       try {
         const delegates = await Promise.all(
@@ -153,7 +155,7 @@ export class Tracker {
       this.onResult(m);
     } else if (m.type === 'error') {
       lane.busy = false;
-      if (m.fatal) this.onStatus(`TRACKER ERROR: ${m.message}`);
+      if (m.fatal) this.onStatus(t('stage.trackerError', { error: m.message }), true);
     }
   }
 
@@ -177,7 +179,7 @@ export class Tracker {
     this.opts.poseModel = poseModel;
     const w = this.lanes.body.worker;
     if (w) w.postMessage({ type: 'setPoseModel', poseModel });
-    else if (this.main) setPoseModel(this.main, poseModel).catch((e) => this.onStatus(`POSE MODEL ERROR: ${e.message}`));
+    else if (this.main) setPoseModel(this.main, poseModel).catch((e) => this.onStatus(t('stage.poseModelError', { error: e.message }), true));
   }
 
   start(video: HTMLVideoElement): void {

@@ -1,0 +1,58 @@
+---
+title: Primeros pasos
+description: Importa un modelo, oriéntate en el escenario, calibra y elige un modo de seguimiento.
+---
+
+## Primer inicio
+
+VPuppet se abre en **HOME** (inicio), la biblioteca de modelos. La primera vez que inicies la cámara, el sistema operativo te pedirá acceso a ella: permítelo. Si rechazaste el aviso, consulta [La cámara no se inicia](./faq.mdx#camera-doesnt-start).
+
+## Importar un modelo
+
+Haz clic en **IMPORT .VRM** (`I`) en HOME, o arrastra uno o varios archivos `.vrm` a la ventana. Cada archivo muestra su progreso; si un archivo no es un VRM, lo indica en su propia tarjeta.
+
+También puedes abrir un modelo desde el escenario con **OPEN** (`O`) o arrastrando un `.vrm` a la ventana. En ambos casos el modelo se añade a la biblioteca, así que luego puedes volver a abrirlo desde HOME. VPuppet guarda su propia copia, de modo que puedes mover o borrar el archivo original sin problema.
+
+Elige un modelo en HOME y pulsa `Enter` (o haz clic en él) para cargarlo en el escenario.
+
+<Callout title="Licencias">
+Cada VRM lleva las condiciones de su autor. VPuppet las muestra como una insignia en la tarjeta y en **MODEL INFO** (`I` en el escenario). Consulta [Biblioteca de modelos](./model-library.mdx#licence-badges).
+</Callout>
+
+## El escenario
+
+La vista principal ocupa casi todo el espacio. A su alrededor:
+
+- **Barra superior:** HOME, OPEN y un botón por cada ventana de ajustes: **SCENE** (`B`), **FACE** (`F`), **PHYSICS** (`P`), **MOTION** (`A`), **HOTKEYS** (`K`), **LIP SYNC** (`S`) y **VMC** (`N`). Cada ventana se acopla a la derecha para que el avatar siga a la vista. Pulsa la misma tecla o `Esc` para cerrarla.
+- **Columna izquierda:** **01 TRACKING** (modo, modelo de pose, suavizado, ganancia de la mirada, emociones, CALIBRATE) y **02 FRAMING** (encuadre: BUST / UPPER / FULL).
+- **Tarjeta de la cámara** (abajo a la izquierda): la vista previa de la cámara con los puntos de referencia superpuestos, la sección **SOURCE** (cámara, resolución, frecuencia de seguimiento, espejo, reinicio) y la sección **VIRTUAL CAM**. `T` la reduce a una tira; el seguimiento sigue funcionando.
+- **Barra inferior:** el nombre del modelo con su insignia de licencia (haz clic en él o pulsa `I` para abrir MODEL INFO), el estado del seguimiento (TRACKING / LOST / FACE ONLY), el emote o la expresión actual, PERFECT SYNC o PRESETS, las salidas activas (VMC, VCAM) y una línea de estado.
+- **Superposición de depuración** (`D`): fotogramas por segundo del renderizado y del seguimiento, latencia, gestos y estado de la búsqueda de manos.
+
+`L` o `Esc` te devuelven a HOME.
+
+## Calibrar [#calibrate]
+
+Siéntate como lo harás normalmente, mira a la pantalla con los ojos abiertos y la boca cerrada, y pulsa **CALIBRATE** (`C`). VPuppet guarda esta cara neutra, el ángulo de la cabeza y la mirada como punto cero. **CLR** borra la calibración.
+
+Hasta que calibres, VPuppet toma automáticamente como neutro el primer segundo estable de una cara con los ojos abiertos y la boca cerrada (esto no se guarda). Aun así, merece la pena calibrar tú mismo, sobre todo si tu cámara está a un lado.
+
+## Modos de seguimiento
+
+| Tecla | Modo | Qué se sigue |
+|---|---|---|
+| `1` | **FACE** | Cara, cabeza y mirada. El cuerpo reproduce la animación de reposo. |
+| `2` | **+BODY** | Añade la columna, el pecho, los hombros y los brazos. |
+| `3` | **+HANDS** | Añade todos los dedos y los gestos de la mano. |
+
+Los modos superiores requieren más procesamiento. Empieza con FACE y sube de modo cuando todo funcione con fluidez. Las piernas nunca se siguen.
+
+## Espejo
+
+`M` pone la cámara en modo espejo, de forma que al levantar la mano derecha el avatar levanta la mano del mismo lado de la pantalla.
+
+## Siguientes pasos
+
+- Ajusta la cara: [Seguimiento](./tracking.mdx).
+- Coloca el avatar en una escena: [Escena y entornos 3D](./scene.mdx).
+- Envíalo a una llamada o a un directo: [Cámara virtual](./virtual-camera.mdx), [Salida VMC](./vmc.mdx).

@@ -1,13 +1,14 @@
 /**
- * Cheap, reliable checks for model-authoring problems Puppet can see but
+ * Cheap, reliable checks for model-authoring problems VPuppet can see but
  * should not silently "fix": a face modelled on the back of the skeleton, a
  * rig that faces away from the camera, a rest pose that is not the T-pose the
- * VRM spec asks for, humanoid bones Puppet needs that are missing.
+ * VRM spec asks for, humanoid bones VPuppet needs that are missing.
  *
  * Pure (plain numbers in, plain data out) so they are unit-tested with
  * synthetic rigs. The three.js side that gathers the numbers is
  * gatherModelFacts() in avatar.ts.
  */
+import { t } from '../i18n';
 
 export type V3 = [number, number, number];
 
@@ -18,7 +19,7 @@ export const PUPPET_REQUIRED_BONES = [
   'rightUpperArm', 'rightLowerArm', 'rightHand',
 ] as const;
 
-/** Bones Puppet uses when present (body follow, shoulders, eyes, fingers). */
+/** Bones VPuppet uses when present (body follow, shoulders, eyes, fingers). */
 export const PUPPET_OPTIONAL_BONES = [
   'chest', 'upperChest', 'neck', 'leftShoulder', 'rightShoulder', 'leftEye', 'rightEye', 'jaw',
   'leftUpperLeg', 'rightUpperLeg',
@@ -118,42 +119,42 @@ export function modelWarnings(f: ModelFacts): ModelWarning[] {
   if (f.facing === -1) {
     out.push({
       code: 'faces-away',
-      text: 'MODEL FACES AWAY FROM THE CAMERA',
-      detail: 'The skeleton faces the wrong way for its VRM version: you will see its back. Re-export it facing forward.',
+      text: t('stage.chkFacesAway'),
+      detail: t('stage.chkFacesAwayDetail'),
     });
   }
   if (f.face && f.facing !== 0 && f.face[1] * f.facing < -0.5) {
     out.push({
       code: 'face-backwards',
-      text: 'FACE POINTS AWAY FROM SKELETON',
-      detail: 'The face is modelled on the back of the head bone: turning your head turns its face the other way. The model needs fixing in its editor.',
+      text: t('stage.chkFaceBackwards'),
+      detail: t('stage.chkFaceBackwardsDetail'),
     });
   }
   if (f.missingRequired.length) {
     out.push({
       code: 'missing-bones',
-      text: `MISSING BONES: ${f.missingRequired.join(', ').toUpperCase()}`,
-      detail: 'Puppet cannot drive these parts of the body.',
+      text: t('stage.chkMissingBones', { bones: f.missingRequired.join(', ').toUpperCase() }),
+      detail: t('stage.chkMissingBonesDetail'),
     });
   }
   if (f.rest && f.rest.pose !== 'T') {
     out.push({
       code: 'rest-not-t',
-      text: `REST POSE IS ${f.rest.pose === 'A' ? 'A-POSE' : 'NOT A T-POSE'} (ARMS ${f.rest.droopDeg}° DOWN)`,
-      detail: 'VRM asks for a T-pose rest. Puppet copes, but clips and other apps may pose the arms oddly.',
+      text: t(f.rest.pose === 'A' ? 'stage.chkRestA' : 'stage.chkRestOther', { deg: f.rest.droopDeg }),
+      detail: t('stage.chkRestDetail'),
     });
   }
   if (f.expressions === 0) {
     out.push({
       code: 'no-expressions',
-      text: 'NO FACE EXPRESSIONS',
-      detail: 'The model defines no expressions, so face tracking can only turn the head.',
+      text: t('stage.chkNoExpr'),
+      detail: t('stage.chkNoExprDetail'),
     });
   } else if (f.boundExpressions === 0) {
     out.push({
       code: 'empty-expressions',
-      text: 'FACE EXPRESSIONS ARE EMPTY',
-      detail: `The model lists ${f.expressions} expressions but none of them moves anything, so face tracking can only turn the head. Bind them to the face's blend shapes in its editor.`,
+      text: t('stage.chkEmptyExpr'),
+      detail: t('stage.chkEmptyExprDetail', { n: f.expressions }),
     });
   }
   return out;

@@ -1,0 +1,60 @@
+---
+title: 安装
+description: 在 Steam 上购买 VPuppet、试用免费版本，或从源代码构建。
+---
+
+获取 VPuppet 有三种方式。它们是同一个应用、功能相同；区别在于更新方式，以及试用版的可用时长。
+
+## Steam（完整版）
+
+完整版在 Steam 上售价 **$19.99**。Steam 版本已签名并会自动更新。
+
+<Steps>
+<Step>
+打开 [VPuppet 商店页面](https://store.steampowered.com/app/<FULL_APP_ID>/) 并购买。
+</Step>
+<Step>
+在 Steam 库中安装并启动。
+</Step>
+<Step>
+操作系统请求摄像头权限时请允许。参见[快速上手](./getting-started.mdx)。
+</Step>
+</Steps>
+
+<Callout title="macOS：虚拟摄像头">
+macOS 原生虚拟摄像头需要已签名的版本，Steam 版本即是。macOS 只会从 **/Applications** 中的应用安装摄像头扩展；参见[虚拟摄像头](./virtual-camera.mdx#setup)。
+</Callout>
+
+## 免费试用版
+
+试用版就是完整应用，全部功能可使用 **100 小时**。
+
+100 小时之后：
+
+- 舞台上的追踪、虚拟摄像头和 VMC 输出将被锁定；
+- **模型库仍可打开**，并保留你导入的所有模型。
+
+之后如果购买完整版，它会沿用同一个模型库：无需重新导入任何模型。
+
+## 从源代码构建
+
+VPuppet 以 MIT 许可开源：[github.com/Spartan-Game-Studios/puppet](https://github.com/Spartan-Game-Studios/puppet)。
+
+你需要 Node.js 22 或更高版本、[pnpm](https://pnpm.io)、Rust（stable）以及适用于你操作系统的 [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)（macOS 上为 Xcode 命令行工具，Windows 上为 WebView2，Linux 上为 `libwebkit2gtk-4.1-dev` 及相关软件包）。
+
+```sh
+git clone https://github.com/Spartan-Game-Studios/puppet.git
+cd puppet
+pnpm install
+pnpm tauri dev      # run the desktop app
+pnpm tauri build    # make an installer for your OS
+```
+
+`pnpm tauri build` 在 macOS 上生成 `.app` 和 `.dmg`，在 Windows 上生成 `.msi` / `.exe`，在 Linux 上生成 `.deb` / `.rpm` / `.AppImage`。首次构建需要联网：它会从 Google 下载 MediaPipe 追踪模型。
+
+<Callout type="warn" title="未签名的版本">
+除非你自行配置签名，否则自己构建的版本都是未签名的。
+
+- 在 macOS 上，首次打开时请右键点击应用并选择**打开**，或运行 `xattr -dr com.apple.quarantine /Applications/VPuppet.app`。
+- 未签名的 macOS 版本无法安装原生虚拟摄像头。请改用 [OBS 方案](./virtual-camera.mdx#obs-route)。
+</Callout>

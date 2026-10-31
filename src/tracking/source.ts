@@ -1,5 +1,6 @@
 /** Video sources: a webcam, or a recorded clip (`?source=file&src=...`) for testing without a camera. */
 import type { Resolution } from '../app/settings';
+import { t } from '../i18n';
 
 export interface CameraInfo {
   id: string;
@@ -11,7 +12,7 @@ export async function listCameras(): Promise<CameraInfo[]> {
   const devs = await navigator.mediaDevices.enumerateDevices();
   return devs
     .filter((d) => d.kind === 'videoinput')
-    .map((d, i) => ({ id: d.deviceId, label: d.label || `Camera ${i + 1}` }));
+    .map((d, i) => ({ id: d.deviceId, label: d.label || t('stage.cameraN', { n: i + 1 }) }));
 }
 
 export class VideoSource {
@@ -36,7 +37,7 @@ export class VideoSource {
 
   async openCamera(deviceId: string | null, res: Resolution, fps: number): Promise<string> {
     this.stop();
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('getUserMedia unavailable in this webview');
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error(t('stage.noGetUserMedia'));
     const [w, h] = res.split('x').map(Number);
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,

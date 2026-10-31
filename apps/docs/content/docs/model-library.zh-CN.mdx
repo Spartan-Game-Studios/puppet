@@ -1,0 +1,85 @@
+---
+title: 模型库
+description: HOME 保存你导入的每个模型，附带缩略图、详细信息和许可徽章。
+---
+
+**HOME** 是启动后的第一个界面。在舞台上按 `L` 或 `Esc` 返回这里。
+
+## 导入
+
+- **IMPORT .VRM**（`I`）可一次导入一个或多个文件，也可以把 `.vrm` 文件拖到 HOME 上。
+- 在舞台上打开模型（`O`，或拖入文件）也会将其导入。
+- 每个文件都会显示进度；出错时会显示各自的错误（例如 "NOT A VRM"）。
+- 同一个文件导入两次只会保留一份。
+
+VPuppet 会保存每个模型的副本，因此移动或删除原文件都没有问题。
+
+## 卡片
+
+每张卡片显示：
+
+- 导入时渲染的半身缩略图、名称和作者；
+- VRM 0.x 或 1.0；
+- `PERFECT SYNC n/52` 或 `PRESETS n/13`（参见[追踪](./tracking.mdx#face)）；
+- 弹簧骨骼链数、三角面数和文件大小；
+- 许可徽章、收藏星标和上次使用时间；
+- 当 VPuppet 发现严重的制作问题时显示 `!` 标记（参见[模型检查](#model-checks)）。
+
+每张卡片还提供 **RENAME**（重命名）、**RE-RENDER THUMBNAIL**（重新渲染缩略图）、**SHOW IN FOLDER**（在文件夹中显示）和 **REMOVE FROM LIBRARY**（从库中移除）。移除前会先确认，并且只删除 VPuppet 的副本，绝不会删除你的原文件。
+
+## 查找模型
+
+- 筛选 **ALL**（全部）或 **FAVOURITES**（收藏）。在 ALL 中，收藏的模型总是排在最前。
+- 按名称或作者搜索（`/`）。
+- 按上次使用、名称或添加日期排序。
+
+## 键盘
+
+| 按键 | 操作 |
+|---|---|
+| `←` `↑` `↓` `→` | 在卡片间移动 |
+| `Enter` | 加载模型 |
+| `S` | 收藏 |
+| `L` | 许可 |
+| `F2` | 重命名 |
+| `Del` | 从库中移除 |
+| `/` | 搜索 |
+| `I` | 导入 |
+| `Esc` | 返回舞台 |
+
+## 许可徽章 [#licence-badges]
+
+每个 VRM 都在元数据中带有作者的使用条款。VPuppet 会读取这些条款（VRM 1.0 和 0.x），并以通俗的语言显示在卡片的 **LICENCE** 抽屉和舞台的 **MODEL INFO** 窗口中（按 `I`，或点击底栏中的模型名称）。徽章是条款的概括：
+
+| 徽章 | 含义 |
+|---|---|
+| **A** AUTHOR ONLY | 只有作者本人可以扮演此模型。 |
+| **L** LICENSED ONLY | 只有作者及其授权的人可以扮演此模型。 |
+| **C** CC0 | 公有领域。 |
+| **B** COMMERCIAL OK | 允许商业用途，包括公司。 |
+| **S** SOLO COMMERCIAL | 个人可以用它盈利。 |
+| **P** PERSONAL | 仅限非营利用途。 |
+| **N** NO TERMS | 文件未声明任何条款。 |
+
+AUTHOR ONLY 和 LICENSED ONLY 以强调色显示，加载此类模型时会显示一次提示。
+
+<Callout title="仅供参考，不是 DRM">
+VPuppet 从不拒绝加载模型。徽章告诉你作者写了什么；是否遵守这些条款由你负责。
+</Callout>
+
+## 模型检查 [#model-checks]
+
+模型加载时，VPuppet 会查找它能可靠检测到的制作问题，并列在 MODEL INFO 的 **MODEL CHECKS** 下。严重的问题也会显示在模型库卡片上：
+
+- FACE POINTS AWAY FROM SKELETON（面部朝向与骨架相反）
+- MODEL FACES AWAY FROM THE CAMERA（模型背对摄像头）
+- MISSING BONES（缺少骨骼）
+- FACE EXPRESSIONS ARE EMPTY（列出了表情但不起作用）
+- NO FACE EXPRESSIONS（没有面部表情）
+- 静止姿势不是 T 姿势（仅在 MODEL INFO 中）
+
+VPuppet 从不修改你的模型来"修复"这些问题；请在制作模型的工具中修复。
+
+## 模型库的存放位置
+
+模型库保存在 VPuppet 的应用数据文件夹中，例如 macOS 上的 `~/Library/Application Support/com.spartangamestudios.vpuppet`。卡片上的 **SHOW IN FOLDER** 会打开它。

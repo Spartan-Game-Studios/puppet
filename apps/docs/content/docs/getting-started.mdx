@@ -1,0 +1,58 @@
+---
+title: Getting started
+description: Import a model, find your way around the stage, calibrate and choose a tracking mode.
+---
+
+## First launch
+
+VPuppet opens on **HOME**, the model library. The first time you start the camera your operating system asks for camera access: allow it. If you dismissed the prompt, see [Camera permission](./faq.mdx#camera-doesnt-start).
+
+## Import a model
+
+Click **IMPORT .VRM** (`I`) on HOME, or drop one or more `.vrm` files on the window. Each file shows its progress; a file that isn't a VRM says so on its own card.
+
+You can also open a model from the stage with **OPEN** (`O`) or by dropping a `.vrm` on the window. Either way the model is added to the library, so you can reopen it from HOME later. VPuppet keeps its own copy, so moving or deleting the original file afterwards is fine.
+
+Choose a model on HOME and press `Enter` (or click it) to load it onto the stage.
+
+<Callout title="Licences">
+Every VRM carries its author's terms. VPuppet shows them as a badge on the card and in **MODEL INFO** (`I` on the stage). See [Model library](./model-library.mdx#licence-badges).
+</Callout>
+
+## The stage
+
+The viewport gets most of the space. Around it:
+
+- **Top bar:** HOME, OPEN, then one button per settings window: **SCENE** (`B`), **FACE** (`F`), **PHYSICS** (`P`), **MOTION** (`A`), **HOTKEYS** (`K`), **LIP SYNC** (`S`) and **VMC** (`N`). Each window docks on the right so the avatar stays in view. Press the same key or `Esc` to close it.
+- **Left column:** **01 TRACKING** (mode, pose model, smoothing, gaze gain, emotions, CALIBRATE) and **02 FRAMING** (BUST / UPPER / FULL).
+- **Camera card** (bottom left): the camera preview with the landmark overlay, the **SOURCE** section (camera, resolution, tracking rate, mirror, restart) and the **VIRTUAL CAM** section. `T` collapses it to a strip; tracking keeps running.
+- **Bottom bar:** the model name with its licence badge (click it or press `I` for MODEL INFO), the tracking state (TRACKING / LOST / FACE ONLY), the current emote or expression, PERFECT SYNC or PRESETS, the active outputs (VMC, VCAM) and a status line.
+- **Debug overlay** (`D`): render and tracking frame rates, latency, gestures and hand-search status.
+
+`L` or `Esc` takes you back to HOME.
+
+## Calibrate [#calibrate]
+
+Sit as you normally will, look at the screen with your eyes open and mouth closed, and press **CALIBRATE** (`C`). VPuppet stores this neutral face, head angle and gaze as zero. **CLR** clears it.
+
+Until you calibrate, VPuppet takes the first steady second of an open-eyed, closed-mouth face as neutral automatically (this isn't saved). Calibrating yourself is still worth it, especially if your camera sits off to one side.
+
+## Tracking modes
+
+| Key | Mode | What is tracked |
+|---|---|---|
+| `1` | **FACE** | Face, head and gaze. The body plays the idle clip. |
+| `2` | **+BODY** | Adds the spine, chest, shoulders and arms. |
+| `3` | **+HANDS** | Adds every finger and hand gestures. |
+
+Higher modes cost more processing. Start with FACE, then step up once everything runs smoothly. Legs are never tracked.
+
+## Mirror
+
+`M` mirrors the camera, so raising your right hand raises the avatar's hand on the same side of the screen.
+
+## Next steps
+
+- Tune the face: [Tracking](./tracking.mdx).
+- Put the avatar in a scene: [Scene and 3D environments](./scene.mdx).
+- Send it to a call or a stream: [Virtual camera](./virtual-camera.mdx), [VMC output](./vmc.mdx).

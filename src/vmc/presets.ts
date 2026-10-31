@@ -2,7 +2,7 @@
  * VRM 0.x preset clips for VMC output, for every model.
  *
  * Receivers that only understand the presets (most VSeeFace-style setups)
- * see a frozen face from a perfect-sync avatar, because Puppet drives its 52
+ * see a frozen face from a perfect-sync avatar, because VPuppet drives its 52
  * ARKit expressions and none of the presets. So alongside the ARKit values
  * the frame also carries the 13 preset clips (Blink, Blink_L, Blink_R, A, I,
  * U, E, O, Joy, Angry, Sorrow, Fun, Surprised):

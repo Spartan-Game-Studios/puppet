@@ -1,0 +1,113 @@
+---
+title: 虚拟摄像头
+description: 在 Zoom、Meet、Discord、FaceTime 和 OBS 中，把模型当作名为 VPuppet Virtual Camera 的摄像头使用。
+---
+
+VPuppet 可以显示为一个名为 **VPuppet Virtual Camera** 的摄像头，让视频通话和直播应用直接使用模型。控件位于舞台左下角摄像头卡片的 **VIRTUAL CAM** 区。`W` 开关输出。
+
+## 摄像头发送的内容
+
+- **捕获视图**：不带任何界面的模型，取景、光照和场景与舞台相同。
+- **1280×720**（默认）或 **1920×1080**，**30 fps**。
+- 摄像头不传输透明度。使用 **CLEAR** 背景时，模型会叠加在所选颜色上发送（默认绿色 `#00ff00`），因此仍可进行色键抠像。3D 环境按渲染结果发送，但景深只在屏幕上显示。
+
+## 一次性设置 [#setup]
+
+面板会告诉你系统还缺什么，并提供相应的按钮。
+
+<Tabs items={['macOS', 'Windows', 'Linux']}>
+<Tab value="macOS">
+
+需要 macOS 12.3 或更高版本，以及已签名的版本（Steam 版本已签名）。
+
+<Steps>
+<Step>
+把 **VPuppet.app** 移到 **/Applications** 并从那里打开。macOS 只会从 /Applications 中的应用安装摄像头扩展。
+</Step>
+<Step>
+在 **VIRTUAL CAM** 中，点击 **EXTENSION** 行上的 **INSTALL**。
+</Step>
+<Step>
+批准安装。点击面板中的 **OPEN SETTINGS** 跳转到相应页面：
+
+- macOS 15 及更高版本：**系统设置 → 通用 → 登录项与扩展 → 摄像头扩展**，然后打开 **VPuppet**。
+- macOS 13–14：**系统设置 → 隐私与安全性**，在关于 VPuppet 系统软件的提示下点击**允许**。
+</Step>
+<Step>
+EXTENSION 行显示 **ACTIVE**。打开 **CAMERA OUTPUT**（摄像头输出，`W`）。
+</Step>
+</Steps>
+
+摄像头只在 VPuppet 发送时存在。关闭输出或退出 VPuppet 后，**VPuppet Virtual Camera** 会从所有应用的摄像头列表中消失，因此不会留下卡住或黑屏的摄像头。如果某个应用显示 **VPUPPET / WAITING FOR FRAMES**，说明摄像头存在，但还没有收到画面。
+
+当应用更新改变了扩展时，EXTENSION 行还会显示 **NEEDS UPDATE**（点击 **UPDATE**），以及 **UNINSTALL**（按两次确认；macOS 可能会要求输入管理员密码）。把 VPuppet.app 从 /Applications 中移除也会移除该扩展。
+
+</Tab>
+<Tab value="Windows">
+
+Windows 10 或 11。
+
+<Steps>
+<Step>
+在 **VIRTUAL CAM** 中点击 **REGISTER CAMERA**（注册摄像头），并接受管理员提示。只需操作一次。
+</Step>
+<Step>
+打开 **CAMERA OUTPUT**（`W`）。
+</Step>
+</Steps>
+
+只有 64 位的摄像头应用可以使用该摄像头。
+
+</Tab>
+<Tab value="Linux">
+
+Linux 使用一个由你创建一次的 v4l2loopback 设备。面板会显示该命令，点击即可复制：
+
+```sh
+sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="VPuppet" exclusive_caps=1
+```
+
+你可能需要先安装发行版的 v4l2loopback 软件包。然后打开 **CAMERA OUTPUT**（`W`）。在 Linux 上，摄像头名为 **VPuppet**。
+
+</Tab>
+</Tabs>
+
+## 在应用中使用
+
+选择 **VPuppet Virtual Camera**（Linux 上为 **VPuppet**）作为摄像头：
+
+- **Zoom：** 设置 → 视频 → 摄像头。
+- **Discord：** 设置 → 语音与视频 → 摄像头。
+- **Google Meet、FaceTime、OBS：** 摄像头 / 视频源选择器。
+
+VPuppet 的窗口被最小化、隐藏或遮挡时，仍会继续追踪、渲染和发送。
+
+## 没有原生摄像头？OBS 方案 [#obs-route]
+
+此方案适用于所有操作系统，无需安装摄像头驱动，例如用于未签名的 macOS 版本。
+
+<Steps>
+<Step>
+在 VPuppet 中选择背景。**COLOUR** 绿色（`#00ff00`）最容易抠像。
+</Step>
+<Step>
+按 `H` 进入捕获视图：只留下模型。
+</Step>
+<Step>
+在 OBS 中添加窗口捕获来源并选择 VPUPPET 窗口：macOS 上为 **macOS Screen Capture**（方式选 *Window Capture*），Windows 上为 **Window Capture**，Linux 上为 **Window Capture (Xcomposite)**。
+</Step>
+<Step>
+如使用绿色背景：右键点击来源 → **Filters** → **+** → **Chroma Key**（键色选绿色）。
+</Step>
+<Step>
+在 OBS 中点击 **Start Virtual Camera**，并在视频应用中选择 **OBS Virtual Camera**。
+</Step>
+</Steps>
+
+<Callout title="透明捕获">
+CLEAR 会让窗口透明，但 OBS 能否保留透明度取决于操作系统和捕获方式（Linux 还需要合成器）。色键抠像才是可靠的方案。
+</Callout>
+
+## 故障排除
+
+参见常见问题中的 [VPuppet Virtual Camera 没有出现在列表中](./faq.mdx#vcam-not-listed)。

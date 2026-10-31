@@ -1,0 +1,504 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/*
+ * VPUPPET — the app's brutalist print look (src/styles.css, src/app/home.css):
+ * ink on paper, one accent, 3px and 1px rules, square corners, no shadows,
+ * JetBrains Mono everywhere. Dark mode is the inverse: paper on ink, same accent.
+ */
+
+@theme {
+  --font-sans: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+  --color-vp-ink: #0a0a0a;
+  --color-vp-paper: #f2f2ee;
+  --color-vp-white: #ffffff;
+  --color-vp-accent: #ff3b00;
+  --color-vp-mute: #7c7c78;
+
+  --color-fd-background: #f2f2ee;
+  --color-fd-foreground: #0a0a0a;
+  --color-fd-muted: #e6e6e0;
+  --color-fd-muted-foreground: #5c5c58;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #0a0a0a;
+  --color-fd-card: #ffffff;
+  --color-fd-card-foreground: #0a0a0a;
+  --color-fd-border: #0a0a0a;
+  --color-fd-primary: #0a0a0a;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #ffffff;
+  --color-fd-secondary-foreground: #0a0a0a;
+  --color-fd-accent: #e6e6e0;
+  --color-fd-accent-foreground: #0a0a0a;
+  --color-fd-ring: #ff3b00;
+}
+
+:root {
+  --vp-ink: #0a0a0a;
+  --vp-paper: #f2f2ee;
+  --vp-white: #ffffff;
+  --vp-accent: #ff3b00;
+  --vp-mute: #7c7c78;
+  /* "fg" / "bg" flip in dark mode; ink and paper never do. */
+  --vp-fg: var(--vp-ink);
+  --vp-bg: var(--vp-paper);
+  --vp-box: var(--vp-white);
+  --vp-grid: rgb(10 10 10 / 0.07);
+  --vp-rule: 3px solid var(--vp-fg);
+  --vp-thin: 1px solid var(--vp-fg);
+}
+
+.dark {
+  --color-fd-background: #0a0a0a;
+  --color-fd-foreground: #f2f2ee;
+  --color-fd-muted: #1a1a19;
+  --color-fd-muted-foreground: #a6a6a1;
+  --color-fd-popover: #141413;
+  --color-fd-popover-foreground: #f2f2ee;
+  --color-fd-card: #141413;
+  --color-fd-card-foreground: #f2f2ee;
+  --color-fd-border: #f2f2ee;
+  --color-fd-primary: #f2f2ee;
+  --color-fd-primary-foreground: #0a0a0a;
+  --color-fd-secondary: #141413;
+  --color-fd-secondary-foreground: #f2f2ee;
+  --color-fd-accent: #222220;
+  --color-fd-accent-foreground: #f2f2ee;
+  --color-fd-ring: #ff3b00;
+
+  --vp-fg: var(--vp-paper);
+  --vp-bg: var(--vp-ink);
+  --vp-box: #141413;
+  --vp-grid: rgb(242 242 238 / 0.06);
+}
+
+/* neutral.css tints the dark sidebar; keep it flat ink. */
+.dark #nd-sidebar {
+  --color-fd-muted: #1a1a19;
+  --color-fd-secondary: #141413;
+  --color-fd-muted-foreground: #a6a6a1;
+}
+
+/* ---- square, flat, everywhere ---- */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html {
+  scrollbar-gutter: stable;
+  font-family: var(--font-sans);
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+body {
+  background: var(--vp-bg);
+  color: var(--vp-fg);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--vp-accent);
+  color: var(--vp-ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--vp-accent) !important;
+  outline-offset: -3px;
+}
+
+kbd {
+  display: inline-block;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.78em;
+  line-height: 1;
+  border: 1px solid var(--vp-ink);
+  padding: 2px 5px;
+  margin: 0 1px;
+  background: var(--vp-white);
+  color: var(--vp-ink);
+  vertical-align: 1px;
+}
+
+/* ---- top bar: an ink bar with a 3px rule, like the app's ---- */
+#nd-nav,
+#nd-subnav {
+  border-bottom: var(--vp-rule) !important;
+}
+#nd-nav {
+  backdrop-filter: none !important;
+  background: var(--color-fd-background) !important;
+}
+
+/* ---- sidebar ---- */
+#nd-sidebar {
+  border-inline-end: var(--vp-rule) !important;
+  background: var(--color-fd-background);
+}
+#nd-sidebar a,
+#nd-sidebar button {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+#nd-sidebar a[data-active='false']:hover,
+#nd-sidebar a:not([data-active]):hover,
+#nd-sidebar button:hover {
+  background: var(--vp-fg) !important;
+  color: var(--vp-bg) !important;
+}
+#nd-sidebar a[data-active='true'] {
+  background: var(--vp-ink) !important;
+  color: var(--vp-white) !important;
+}
+.dark #nd-sidebar a[data-active='true'] {
+  background: var(--vp-paper) !important;
+  color: var(--vp-ink) !important;
+}
+#nd-sidebar a[data-active='true']::before {
+  background: var(--vp-accent) !important;
+  width: 4px !important;
+  inset-block: 0 !important;
+  inset-inline-start: 0 !important;
+}
+/* section separators */
+#nd-sidebar p {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  font-size: 0.7rem;
+}
+
+/* search trigger in the sidebar / nav: a white box with a 3px rule */
+button[data-search-full],
+button[data-search] {
+  border: var(--vp-rule) !important;
+  background: var(--vp-box) !important;
+  color: var(--vp-fg) !important;
+  font-weight: 700;
+}
+button[data-search-full]:hover,
+button[data-search]:hover {
+  background: var(--vp-fg) !important;
+  color: var(--vp-bg) !important;
+}
+
+/* ---- table of contents ---- */
+#nd-toc a[data-active='true'] {
+  color: var(--vp-accent);
+  font-weight: 700;
+}
+#nd-toc-title,
+#nd-toc h3 {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+}
+
+/* ---- page title ---- */
+#nd-page h1 {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+/* ---- prose: headings numbered like the app's panels (01 TRACKING) ---- */
+.prose {
+  --tw-prose-body: var(--vp-fg);
+  --tw-prose-headings: var(--vp-fg);
+  --tw-prose-links: var(--vp-fg);
+  --tw-prose-bold: var(--vp-fg);
+  --tw-prose-counters: var(--vp-accent);
+  --tw-prose-bullets: var(--vp-accent);
+  --tw-prose-quotes: var(--vp-fg);
+  --tw-prose-code: var(--vp-fg);
+  --tw-prose-th-borders: var(--vp-fg);
+  --tw-prose-td-borders: var(--vp-fg);
+  counter-reset: vp-h2;
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+.prose :where(h2, h3, h4) {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+.prose h2 {
+  counter-increment: vp-h2;
+  font-size: 1.05rem;
+  border-top: var(--vp-rule);
+  padding-top: 0.9rem;
+}
+.prose h2::before {
+  content: counter(vp-h2, decimal-leading-zero);
+  color: var(--vp-accent);
+  margin-inline-end: 0.9ch;
+}
+.prose h3 {
+  font-size: 0.9rem;
+}
+.prose a {
+  text-decoration-color: var(--vp-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  font-weight: 700;
+}
+.prose a:hover {
+  background: var(--vp-fg);
+  color: var(--vp-bg);
+  text-decoration: none;
+}
+.prose strong {
+  font-weight: 800;
+}
+.prose :not(pre) > code {
+  border: var(--vp-thin);
+  background: var(--vp-box);
+  padding: 1px 5px;
+  font-weight: 700;
+  font-size: 0.85em;
+}
+.prose :not(pre) > code::before,
+.prose :not(pre) > code::after {
+  content: none;
+}
+.prose table {
+  border: var(--vp-rule);
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.prose thead th {
+  background: var(--vp-ink);
+  color: var(--vp-white);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+.dark .prose thead th {
+  background: var(--vp-paper);
+  color: var(--vp-ink);
+}
+.prose :where(th, td) {
+  border: var(--vp-thin);
+  padding: 0.45rem 0.7rem;
+}
+.prose img {
+  border: var(--vp-rule);
+}
+/* tables are wrapped in a bordered, rounded box by Fumadocs: drop it */
+.prose .relative.overflow-auto:has(> table) {
+  border: 0 !important;
+}
+
+/* code blocks */
+figure.shiki,
+.prose figure {
+  border: var(--vp-rule) !important;
+  background: var(--vp-box) !important;
+}
+
+/* callouts: box with a 3px rule and an accent bar */
+.prose [role='alert'],
+.prose div:has(> .fd-callout-title) {
+  border: var(--vp-rule);
+}
+
+/* cards: thick boxes that invert on hover */
+.prose a[data-card].block {
+  border: var(--vp-rule) !important;
+  background: var(--vp-box) !important;
+  transition: none !important;
+}
+.prose a[data-card].block:hover {
+  background: var(--vp-fg) !important;
+  color: var(--vp-bg) !important;
+}
+.prose a[data-card].block:hover * {
+  color: var(--vp-bg) !important;
+}
+
+.prose a[data-card].block h3 {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+/* heading anchors are links too: keep them plain */
+.prose :is(h1, h2, h3, h4) > a {
+  text-decoration: none;
+  font-weight: inherit;
+}
+.prose :is(h1, h2, h3, h4) > a:hover {
+  background: none;
+  color: var(--vp-accent);
+}
+
+/* footer prev/next and other bordered boxes */
+#nd-page footer a {
+  border: var(--vp-rule) !important;
+  background: var(--vp-box);
+}
+#nd-page footer a:hover {
+  background: var(--vp-fg) !important;
+  color: var(--vp-bg) !important;
+}
+#nd-page footer a:hover * {
+  color: var(--vp-bg) !important;
+}
+
+/* dialogs and popovers: white boxes with a 3px rule */
+[role='dialog'],
+[data-radix-popper-content-wrapper] > div {
+  border: var(--vp-rule) !important;
+}
+
+/* ---------------------------------------------------------------- */
+/* landing page                                                      */
+/* ---------------------------------------------------------------- */
+
+.vp-landing {
+  background-color: var(--vp-bg);
+  background-image:
+    linear-gradient(var(--vp-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--vp-grid) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: -1px -1px;
+}
+.vp-hero {
+  border-bottom: var(--vp-rule);
+  padding: clamp(48px, 10vw, 128px) 16px clamp(40px, 8vw, 96px);
+}
+.vp-hero-inner {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+.vp-hero-logo {
+  margin: 0 0 2rem;
+}
+.vp-pitch {
+  max-width: 46rem;
+  font-size: clamp(1rem, 2.2vw, 1.25rem);
+  line-height: 1.6;
+  font-weight: 700;
+  margin: 0 0 2rem;
+}
+.vp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 1.75rem;
+}
+.vp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 20px;
+  border: var(--vp-rule);
+  background: var(--vp-box);
+  color: var(--vp-fg);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.vp-btn:hover {
+  background: var(--vp-fg);
+  color: var(--vp-bg);
+}
+.vp-btn:active {
+  background: var(--vp-accent);
+  color: var(--vp-ink);
+}
+.vp-btn-ink {
+  background: var(--vp-fg);
+  color: var(--vp-bg);
+}
+.vp-btn-ink:hover {
+  background: var(--vp-box);
+  color: var(--vp-fg);
+}
+.vp-btn-ink kbd {
+  background: var(--vp-accent);
+}
+.vp-btn-accent {
+  background: var(--vp-accent);
+  color: var(--vp-ink);
+  border-color: var(--vp-fg);
+}
+.vp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.vp-meta li {
+  padding: 4px 12px;
+  border: var(--vp-thin);
+  margin: 0 -1px -1px 0;
+  background: var(--vp-box);
+}
+.vp-meta a:hover {
+  color: var(--vp-accent);
+}
+.vp-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  max-width: 1040px;
+  margin: clamp(32px, 6vw, 64px) auto clamp(48px, 8vw, 96px);
+  padding: 0 16px;
+}
+.vp-feature {
+  border: var(--vp-rule);
+  margin: 0 -3px -3px 0;
+  background: var(--vp-box);
+}
+.vp-feature h2 {
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--vp-ink);
+  color: var(--vp-white);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.dark .vp-feature h2 {
+  background: var(--vp-paper);
+  color: var(--vp-ink);
+}
+.vp-idx {
+  color: var(--vp-accent);
+  margin-inline-end: 0.6ch;
+}
+.vp-feature p {
+  margin: 0;
+  padding: 12px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+/* the / redirect page */
+.vp-redirect {
+  display: flex;
+  gap: 16px;
+  padding: 32px 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+}

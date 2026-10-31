@@ -1,0 +1,60 @@
+[img]{STEAM_APP_IMAGE}/extras/vpuppet_banner_face.gif[/img]
+
+VPuppet turns an ordinary webcam into a full VTuber rig. Load your VRM avatar and it follows your face, body, hands and fingers live, with expressions, cloth and hair physics, emotes and a 3D set to stand in. Then send it anywhere: VPuppet shows up as a camera called [b]VPuppet Virtual Camera[/b] in Zoom, Google Meet, Discord and OBS, and streams VMC protocol data to other VTuber apps.
+
+No iPhone, no depth camera, no tracking suit. Everything runs on your own computer; the camera image never leaves it.
+
+[h2]Your face, 1:1[/h2]
+[list]
+[*][b]52 ARKit blendshapes from a webcam.[/b] Google MediaPipe reads the same 52 face shapes iPhone face tracking uses (minus tongue), plus head rotation and gaze.
+[*][b]Perfect sync.[/b] If your model has the ARKit expressions, each one is driven directly, so every brow, cheek and mouth shape moves the way its artist sculpted it. Models without them get blinks, the five vowels and emotions derived for them.
+[*][b]Tune every shape.[/b] Per-blendshape gain and curve, live next to the raw value, so a mouth that barely opens can read clearly on stream.
+[*][b]One-key calibration[/b] captures your neutral face, head angle and gaze.
+[/list]
+
+[img]{STEAM_APP_IMAGE}/extras/vpuppet_hands.gif[/img]
+
+[h2]Body, hands and fingers[/h2]
+[list]
+[*][b]Upper body:[/b] spine, chest, shoulders and arms, with a real elbow hinge and limits so arms never bend backwards.
+[*][b]Hands and every finger,[/b] tracked in parallel with the body. Both hands are searched for every frame, so a hand is found even where the body tracker has lost its wrist.
+[*][b]Gestures:[/b] fist, open palm, point, peace, thumbs up, OK and rock, per hand, which you can bind to emotes.
+[*]Choose FACE, +BODY or +HANDS to match your camera, your machine and your stream.
+[/list]
+
+[h2]Show up anywhere[/h2]
+[list]
+[*][b]Virtual camera:[/b] VPuppet appears as a webcam in Zoom, Meet, Discord, OBS and other apps, at 1280×720 or 1920×1080, 30 fps. On a plain background it sends a chroma-key colour of your choice.
+[*][b]VMC protocol output[/b] to VSeeFace, Warudo, VNyan and other VMC receivers, on this PC or another one on your network.
+[*][b]Capture view[/b] hides every control for a clean window capture in OBS.
+[/list]
+
+[img]{STEAM_APP_IMAGE}/extras/vpuppet_environments.png[/img]
+
+[h2]Make it feel alive[/h2]
+[list]
+[*][b]Cloth and hair physics[/b] built on your model's own spring bones. Neighbouring skirt and cape chains are linked so they move as one panel, and body colliders are fitted to your model so cloth drapes over legs and arms instead of passing through them.
+[*][b]Emotes and expressions on hotkeys:[/b] wave, nod, clap, cheer, bow, shrug and more, plus idle loops, layered over live tracking. Bind them to the keyboard, a gamepad or a hand gesture; keys can work system-wide while OBS or a game has focus.
+[*][b]Bring your own animations:[/b] import FBX or glTF clips (Mixamo, VRoid and common rigs are detected) and they are retargeted onto your avatar.
+[*][b]Mic lip sync[/b] keeps your mouth moving when you look away from the camera, or blends with tracking.
+[*][b]3D environments:[/b] six built-in lit scenes (photo studio, cosy room, moor at dusk, night clearing, neon grid, concrete hall) or your own glTF scene with an HDR sky.
+[/list]
+
+[h2]Your models, organised[/h2]
+[list]
+[*]A [b]model library[/b] home screen with thumbnails, search, favourites and per-model settings.
+[*]Supports [b]VRM 0.x and 1.0[/b], for example models exported from VRoid Studio.
+[*]Every model's licence terms are read from the file and shown in plain language, so you know what each author allows.
+[*][b]Gamepad friendly:[/b] every control in the app is reachable from a controller, and the pad doubles as an emote board while you perform.
+[/list]
+
+[h2]Open source[/h2]
+VPuppet's source code is MIT-licensed and public on GitHub. The Steam version is the signed, ready-to-run build that updates itself through Steam and comes with support. Buying it is also how you fund development.
+
+[h2]Before you buy[/h2]
+[list]
+[*][b]A webcam is required.[/b] Good, even lighting on your face makes the biggest difference to tracking.
+[*][b]VPuppet does not include an avatar.[/b] Bring your own VRM model, or make one for free in VRoid Studio.
+[*]Body tracking covers the upper body and arms. Legs follow idle and emote animations; there is no walking.
+[*]Try it first: the free demo is the full app for 100 hours of use.
+[/list]

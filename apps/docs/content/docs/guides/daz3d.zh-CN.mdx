@@ -1,0 +1,33 @@
+---
+title: 用 Daz 3D 制作模型
+description: 从 Daz Studio 经 Blender 制作出 VPuppet 可加载的 VRM，以及需要事先确认的许可问题。
+---
+
+Daz Studio 的角色可以通过 Blender 转换为 VRM 模型。这是一条进阶路线：骨骼绑定、面部形状和性能都需要花时间处理。
+
+<Callout type="warn" title="先确认许可">
+Daz 的内容受 Daz EULA 约束，该协议限制分发和导出其 3D 资产，某些用途还需要额外许可（Daz 出售用于在交互式软件中使用内容的 Interactive License）。VRM 包含完整的网格和纹理，因此上传或分享它就等于分发这些资产。开始之前，请阅读 [Daz 3D EULA](https://www.daz3d.com/eula) 以及你所用每件商品的条款。本页不构成法律建议。
+</Callout>
+
+## 1. 从 Daz Studio 到 Blender
+
+在 Daz Studio 中搭建并装扮角色，然后导入 Blender。Daz 官方的 **Daz to Blender** 桥接工具是一种方式；从 Daz Studio 导出 FBX 是另一种。两者都有各自的文档，请以当前版本为准。
+
+## 2. 在 Blender 中制作 VRM
+
+安装 [VRM Add-on for Blender](https://vrm-addon-for-blender.info/)。它可以导出 VRM 0.x 和 1.0，并为每一步提供文档。大致流程：
+
+- **人形骨骼。** 把角色的骨骼分配给 VRM 人形骨骼（臀部、脊柱、胸部、颈部、头部、手臂、手、手指、腿、眼睛）。VPuppet 需要这些骨骼来追踪你。
+- **静止姿势。** 对 VRM 而言，T 姿势是最稳妥的静止姿势。静止姿势不是 T 姿势时，VPuppet 的 MODEL INFO 会给出提示。
+- **表情。** 把面部形态键注册为 VRM 表情。如需 **perfect sync**，请通过映射或组合角色的面部变形，为 52 个 ARKit 混合形状（`eyeBlinkLeft`、`jawOpen`、`mouthSmileLeft`……）创建形态键，并分别以 ARKit 名称注册。VPuppet 匹配名称时忽略大小写和标点，因此 `eyeBlinkLeft`、`EyeBlinkLeft` 和 `eye_blink_left` 都可以；模型需要拥有 52 个中的至少 40 个才会被视为 perfect sync。如果没有这些形状，至少要添加 VRM 预设表情（眨眼、`aa` `ih` `ou` `ee` `oh`、情绪）。
+- **弹簧骨骼。** 为头发和宽松的衣物添加弹簧骨骼链，并在头部和身体上添加碰撞体。VPuppet 的[布料解算器](../physics.mdx)就建立在这些骨骼链之上。
+
+## 3. 保持轻量
+
+Daz 角色是为渲染而制作的，往往比实时模型所需的要重得多。对不会近距离看到的网格进行减面，删除被遮挡的几何体（衣服下面的身体），尽量合并材质，并缩小纹理。追踪和渲染共用你的电脑，模型越轻，留给追踪的资源就越多。VPuppet 的模型库卡片会显示三角面数。
+
+## 4. 在 VPuppet 中检查
+
+把 `.vrm` 导入[模型库](../model-library.mdx)，然后打开 **MODEL INFO**（`I`）。其中的 **MODEL CHECKS** 会列出缺少骨骼、面部朝向与骨架相反、表情不起作用等问题。在 Blender 中修复后重新导出。
+
+连接到 VPuppet 的 AI 智能体可以和你一起完成这个循环：检查模型、重新导入每次的新导出，并测试每个 perfect sync 形状。参见[连接 AI 智能体](../mcp.mdx#workflow)。

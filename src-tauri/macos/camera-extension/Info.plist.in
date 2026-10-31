@@ -10,15 +10,15 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleDisplayName</key>
-  <string>Puppet Camera</string>
+  <string>VPuppet Camera</string>
   <key>CFBundleExecutable</key>
-  <string>com.spartangamestudios.puppet.camera</string>
+  <string>com.spartangamestudios.vpuppet.camera</string>
   <key>CFBundleIdentifier</key>
-  <string>com.spartangamestudios.puppet.camera</string>
+  <string>com.spartangamestudios.vpuppet.camera</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Puppet Camera</string>
+  <string>VPuppet Camera</string>
   <key>CFBundlePackageType</key>
   <string>SYSX</string>
   <key>CFBundleShortVersionString</key>
@@ -34,11 +34,11 @@
   <key>NSHumanReadableCopyright</key>
   <string>MIT License. Copyright (c) Spartan Game Studios</string>
   <key>NSSystemExtensionUsageDescription</key>
-  <string>Puppet adds a virtual camera, "Puppet Virtual Camera", that shows your avatar in Zoom, Meet, Discord and other video apps.</string>
+  <string>VPuppet adds a virtual camera, "VPuppet Virtual Camera", that shows your avatar in Zoom, Meet, Discord and other video apps.</string>
   <key>CMIOExtension</key>
   <dict>
     <key>CMIOExtensionMachServiceName</key>
-    <string>@TEAM_ID@.com.spartangamestudios.puppet.camera</string>
+    <string>@TEAM_ID@.com.spartangamestudios.vpuppet.camera</string>
   </dict>
 </dict>
 </plist>

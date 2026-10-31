@@ -1,0 +1,50 @@
+// TEMPLATE: adjust before use. Fill in every <PLACEHOLDER>, check every path
+// against what the build actually produced (the binary name changes with the
+// Puppet -> VPuppet rename), then run with steamcmd (see README.md).
+// Paths are relative to this file (steam/steampipe/); "../../" is the repo root.
+
+// Windows 64-bit depot (full). Steam ships files, not installers: this maps
+// the raw release binary and its side files, not the .msi / NSIS .exe from
+// src-tauri/target/release/bundle/.
+// Check the file list against what an MSI install puts in Program Files.
+"DepotBuild"
+{
+	"DepotID" "<FULL_DEPOT_ID_WIN>"
+	"ContentRoot" "../../"
+
+	// The app. Name follows Cargo's package name; check after the rename.
+	"FileMapping"
+	{
+		"LocalPath" "src-tauri/target/release/vpuppet.exe"
+		"DepotPath" "."
+	}
+	// Windows virtual camera (softcam) and its licence, bundled as resources
+	// by tauri.windows.conf.json.
+	"FileMapping"
+	{
+		"LocalPath" "src-tauri/target/release/softcam.dll"
+		"DepotPath" "."
+	}
+	"FileMapping"
+	{
+		"LocalPath" "src-tauri/target/release/LICENSE-softcam.txt"
+		"DepotPath" "."
+	}
+
+	// Licence files, required with every copy (MIT + third-party notices).
+	"FileMapping"
+	{
+		"LocalPath" "LICENSE"
+		"DepotPath" "."
+	}
+	"FileMapping"
+	{
+		"LocalPath" "THIRD_PARTY_NOTICES.md"
+		"DepotPath" "."
+	}
+
+	// Never ship these.
+	"FileExclusion" "*.pdb"
+	"FileExclusion" "steam_appid.txt"
+	"FileExclusion" ".DS_Store"
+}

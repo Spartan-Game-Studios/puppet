@@ -1,0 +1,113 @@
+---
+title: Virtual camera
+description: Use the avatar as a webcam called VPuppet Virtual Camera in Zoom, Meet, Discord, FaceTime and OBS.
+---
+
+VPuppet can show up as a webcam called **VPuppet Virtual Camera**, so video-call and streaming apps can use the avatar directly. The controls are in the camera card's **VIRTUAL CAM** section, bottom left of the stage. `W` switches the output on and off.
+
+## What the camera sends
+
+- The **capture view**: the avatar without any interface, with the same framing, lights and scene as the stage.
+- **1280×720** (default) or **1920×1080**, at **30 fps**.
+- Cameras carry no transparency. With a **CLEAR** background the avatar is sent over the chosen colour (green `#00ff00` by default), so you can still chroma-key it. A 3D environment is sent as rendered, except depth of field, which is shown on screen only.
+
+## One-time setup [#setup]
+
+The panel tells you what your system still needs and offers the right button.
+
+<Tabs items={['macOS', 'Windows', 'Linux']}>
+<Tab value="macOS">
+
+Needs macOS 12.3 or later and a signed build (the Steam build is signed).
+
+<Steps>
+<Step>
+Move **VPuppet.app** to **/Applications** and open it from there. macOS installs camera extensions only from apps in /Applications.
+</Step>
+<Step>
+In **VIRTUAL CAM**, click **INSTALL** on the **EXTENSION** line.
+</Step>
+<Step>
+Approve it. Click **OPEN SETTINGS** in the panel to jump to the right page:
+
+- macOS 15 and later: **System Settings → General → Login Items & Extensions → Camera Extensions**, and switch **VPuppet** on.
+- macOS 13–14: **System Settings → Privacy & Security**, and click **Allow** under the message about VPuppet's system software.
+</Step>
+<Step>
+The EXTENSION line reads **ACTIVE**. Switch **CAMERA OUTPUT** on (`W`).
+</Step>
+</Steps>
+
+The camera exists only while VPuppet is sending. Turn the output off or quit VPuppet and **VPuppet Virtual Camera** disappears from every app's camera list, so no frozen or black camera is left behind. If an app shows **VPUPPET / WAITING FOR FRAMES**, the camera is there but no frames are arriving yet.
+
+The EXTENSION line also shows **NEEDS UPDATE** (click **UPDATE**) after an app update changes the extension, and **UNINSTALL** (press twice to confirm; macOS may ask for an administrator password). Removing VPuppet.app from /Applications also removes the extension.
+
+</Tab>
+<Tab value="Windows">
+
+Windows 10 or 11.
+
+<Steps>
+<Step>
+In **VIRTUAL CAM**, click **REGISTER CAMERA** and accept the administrator prompt. This is needed once.
+</Step>
+<Step>
+Switch **CAMERA OUTPUT** on (`W`).
+</Step>
+</Steps>
+
+Only 64-bit camera apps can use the camera.
+
+</Tab>
+<Tab value="Linux">
+
+Linux uses a v4l2loopback device that you create once. The panel shows the command; click it to copy:
+
+```sh
+sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="VPuppet" exclusive_caps=1
+```
+
+You may need to install the v4l2loopback package for your distribution first. Then switch **CAMERA OUTPUT** on (`W`). On Linux the camera is called **VPuppet**.
+
+</Tab>
+</Tabs>
+
+## Use it in an app
+
+Choose **VPuppet Virtual Camera** (Linux: **VPuppet**) as the camera:
+
+- **Zoom:** Settings → Video → Camera.
+- **Discord:** Settings → Voice & Video → Camera.
+- **Google Meet, FaceTime, OBS:** the camera / video source picker.
+
+VPuppet keeps tracking, rendering and sending while its window is minimised, hidden or covered.
+
+## No native camera? The OBS route [#obs-route]
+
+This works on every OS without installing a camera driver, for example with an unsigned macOS build.
+
+<Steps>
+<Step>
+In VPuppet, pick a background. **COLOUR** green (`#00ff00`) is the easiest to key.
+</Step>
+<Step>
+Press `H` for capture view: only the avatar remains.
+</Step>
+<Step>
+In OBS, add a window capture source and pick the VPUPPET window: **macOS Screen Capture** (method *Window Capture*) on macOS, **Window Capture** on Windows, **Window Capture (Xcomposite)** on Linux.
+</Step>
+<Step>
+For a green background: right-click the source → **Filters** → **+** → **Chroma Key** (key colour green).
+</Step>
+<Step>
+Click **Start Virtual Camera** in OBS and choose **OBS Virtual Camera** in your video app.
+</Step>
+</Steps>
+
+<Callout title="Transparent capture">
+CLEAR makes the window transparent, but whether OBS keeps that transparency depends on your OS and capture method (Linux also needs a compositor). A chroma key is the dependable route.
+</Callout>
+
+## Troubleshooting
+
+See [VPuppet Virtual Camera isn't listed](./faq.mdx#vcam-not-listed) in the FAQ.

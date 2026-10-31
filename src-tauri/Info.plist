@@ -3,8 +3,8 @@
 <plist version="1.0">
 <dict>
   <key>NSCameraUsageDescription</key>
-  <string>Puppet uses your camera to track your face, body and hands and drive your avatar. Video never leaves this computer.</string>
+  <string>VPuppet uses your camera to track your face, body and hands and drive your avatar. Video never leaves this computer.</string>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Puppet can use your microphone to move your avatar's mouth when your face isn't tracked (lip sync, off by default). Audio never leaves this computer.</string>
+  <string>VPuppet can use your microphone to move your avatar's mouth when your face isn't tracked (lip sync, off by default). Audio never leaves this computer.</string>
 </dict>
 </plist>

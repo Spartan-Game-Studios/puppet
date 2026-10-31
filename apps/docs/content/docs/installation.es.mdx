@@ -1,0 +1,60 @@
+---
+title: Instalación
+description: Compra VPuppet en Steam, prueba la demo gratuita o compílalo desde el código fuente.
+---
+
+Hay tres formas de conseguir VPuppet. Es la misma app con las mismas funciones; solo cambia cómo recibes las actualizaciones y, en el caso de la demo, cuánto tiempo puedes usarla.
+
+## Steam (app completa)
+
+La app completa se vende en Steam por **19,99 $**. Las versiones de Steam están firmadas y se actualizan automáticamente.
+
+<Steps>
+<Step>
+Abre la [página de VPuppet en la tienda](https://store.steampowered.com/app/<FULL_APP_ID>/) y compra la app.
+</Step>
+<Step>
+Instálala desde tu biblioteca de Steam y ábrela.
+</Step>
+<Step>
+Permite el acceso a la cámara cuando el sistema operativo lo pida. Consulta [Primeros pasos](./getting-started.mdx).
+</Step>
+</Steps>
+
+<Callout title="macOS: cámara virtual">
+La cámara virtual nativa de macOS requiere una versión firmada, y la de Steam lo está. macOS solo instala extensiones de cámara de apps que estén en **/Applications** (Aplicaciones); consulta [Cámara virtual](./virtual-camera.mdx#setup).
+</Callout>
+
+## Demo gratuita
+
+La demo es la app completa, con todas las funciones, durante **100 horas de uso**.
+
+Pasadas las 100 horas:
+
+- el seguimiento en el escenario, la cámara virtual y la salida VMC se bloquean;
+- la **biblioteca de modelos sigue abriéndose** y conserva todos los modelos que importaste.
+
+Si después compras la app completa, esta usa la misma biblioteca: no hace falta volver a importar nada.
+
+## Compilar desde el código fuente
+
+VPuppet es de código abierto con licencia MIT: [github.com/Spartan-Game-Studios/puppet](https://github.com/Spartan-Game-Studios/puppet).
+
+Necesitas Node.js 22 o posterior, [pnpm](https://pnpm.io), Rust (estable) y los [requisitos previos de Tauri 2](https://v2.tauri.app/start/prerequisites/) para tu sistema (las herramientas de línea de comandos de Xcode en macOS, WebView2 en Windows, `libwebkit2gtk-4.1-dev` y paquetes relacionados en Linux).
+
+```sh
+git clone https://github.com/Spartan-Game-Studios/puppet.git
+cd puppet
+pnpm install
+pnpm tauri dev      # run the desktop app
+pnpm tauri build    # make an installer for your OS
+```
+
+`pnpm tauri build` genera un `.app` y un `.dmg` en macOS, `.msi` / `.exe` en Windows y `.deb` / `.rpm` / `.AppImage` en Linux. La primera compilación necesita conexión a internet: descarga de Google los modelos de seguimiento de MediaPipe.
+
+<Callout type="warn" title="Versiones sin firmar">
+Las versiones que compilas tú no están firmadas, salvo que configures tu propia firma.
+
+- En macOS, haz clic derecho en la app y elige **Abrir** la primera vez, o ejecuta `xattr -dr com.apple.quarantine /Applications/VPuppet.app`.
+- Una versión de macOS sin firmar no puede instalar la cámara virtual nativa. Usa en su lugar la [ruta con OBS](./virtual-camera.mdx#obs-route).
+</Callout>

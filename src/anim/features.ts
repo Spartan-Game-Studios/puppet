@@ -20,6 +20,7 @@ import { trackerGestureSource, type GestureSource, type TrackerGestures } from '
 import { LipSync } from '../audio/lipsync';
 import { mountLipSyncPanel } from '../audio/panel';
 import { toggleVcamOutput } from '../app/vcamControls';
+import { t } from '../i18n';
 
 export interface MotionContext {
   settings: Settings;
@@ -34,7 +35,7 @@ export interface MotionContext {
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-const MASK_LABEL: Record<BoneMask, string> = { full: 'FULL', body: 'BODY', arms: 'ARMS', head: 'HEAD' };
+const MASK_LABEL: Record<BoneMask, string> = { full: t('motion.mask.full'), body: t('motion.mask.body'), arms: t('motion.mask.arms'), head: t('motion.mask.head') };
 
 /** A .glb with animations is a clip; one without is a scene (3D environment). */
 export function glbHasAnimations(buf: ArrayBuffer): boolean {
@@ -96,7 +97,7 @@ export async function mountMotion(ctx: MotionContext) {
       items.push({ label: d.label, group: 'EMOTE', run: () => layer && void layer.play(d.id), active: () => !!layer?.playing.includes(d.id) });
     for (const n of expressionNames().filter((n) => !['blink', 'blinkLeft', 'blinkRight', 'aa', 'ih', 'ou', 'ee', 'oh'].includes(n)))
       items.push({ label: n.toUpperCase(), group: 'EXPRESSION', run: () => layer?.overlay.press(n, 'toggle'), active: () => !!layer?.overlay.active.includes(n) });
-    items.push({ label: 'RESET', group: '', run: () => layer?.reset() });
+    items.push({ label: t('motion.act.reset'), group: '', run: () => layer?.reset() });
     return items;
   });
   hotkeys.picker = picker;
@@ -104,16 +105,16 @@ export async function mountMotion(ctx: MotionContext) {
   // ---------------------------------------------------------------- 07 MOTION
   const motionHost = document.getElementById('motion-block')!;
   motionHost.innerHTML = `
-    <h2><span class="idx">07</span>MOTION</h2>
-    <label class="row"><span class="lbl">IDLE</span><select id="mo-idle"></select></label>
-    <label class="check"><input type="checkbox" id="mo-idle-face" /><span>IDLE IN FACE MODE (ELSE ONLY WHEN TRACKING IS LOST)</span></label>
-    <div class="clip-head"><span>EMOTE (CLICK TO PLAY)</span><span>OWNS</span><span title="Loop until triggered again">LP</span></div>
+    <h2><span class="idx">07</span>${t('motion.mo.title')}</h2>
+    <label class="row"><span class="lbl">${t('motion.mo.idle')}</span><select id="mo-idle"></select></label>
+    <label class="check"><input type="checkbox" id="mo-idle-face" /><span>${t('motion.mo.idleFace')}</span></label>
+    <div class="clip-head"><span>${t('motion.mo.headEmote')}</span><span>${t('motion.mo.headOwns')}</span><span title="${esc(t('motion.mo.loopTitle'))}">${t('motion.mo.headLoop')}</span></div>
     <div class="clip-list" id="mo-list"></div>
     <div class="row btns">
-      <button class="btn" id="mo-import">IMPORT CLIP</button>
-      <button class="btn ghost" id="mo-stop" title="Stop emotes and clear hotkey expressions">STOP</button>
+      <button class="btn" id="mo-import">${t('motion.mo.import')}</button>
+      <button class="btn ghost" id="mo-stop" title="${esc(t('motion.mo.stopTitle'))}">${t('motion.mo.stop')}</button>
     </div>
-    <p class="drop-note">OR DROP .FBX / .GLB (MIXAMO, QUATERNIUS UAL, VROID RIGS). BUILT-INS: QUATERNIUS UNIVERSAL ANIMATION LIBRARY (CC0) + PUPPET.</p>`;
+    <p class="drop-note">${t('motion.mo.dropNote')}</p>`;
   const idleSel = motionHost.querySelector<HTMLSelectElement>('#mo-idle')!;
   const idleFace = motionHost.querySelector<HTMLInputElement>('#mo-idle-face')!;
   const listEl = motionHost.querySelector<HTMLElement>('#mo-list')!;
@@ -133,7 +134,7 @@ export async function mountMotion(ctx: MotionContext) {
 
   function renderMotion(): void {
     const all = library.all();
-    idleSel.innerHTML = '<option value="">NONE (STATIC POSE)</option>';
+    idleSel.innerHTML = `<option value="">${esc(t('motion.mo.idleNone'))}</option>`;
     for (const d of all.filter((c) => c.kind === 'idle')) idleSel.append(new Option(d.label, d.id));
     idleSel.value = settings.anim.idle ?? '';
     listEl.innerHTML = '';
@@ -143,11 +144,11 @@ export async function mountMotion(ctx: MotionContext) {
       const user = d.id.startsWith('user:');
       const row = document.createElement('div');
       row.className = `clip-row${user ? ' user' : ''}`;
-      row.innerHTML = `<button class="play${playing.has(d.id) ? ' on' : ''}" title="${esc(d.label)}${user ? ' (imported)' : ''}">${d.kind === 'idle' ? '◌ ' : '▶ '}${esc(d.label)}</button>
-        <select title="Bones this clip owns while it plays">${BONE_MASKS.map((m) => `<option value="${m}"${m === d.mask ? ' selected' : ''}>${MASK_LABEL[m]}</option>`).join('')}</select>
-        <input type="checkbox" title="Loop until triggered again"${d.loop ? ' checked' : ''} />${user ? '<button class="x" title="Remove the imported clip">×</button>' : ''}`;
+      row.innerHTML = `<button class="play${playing.has(d.id) ? ' on' : ''}" title="${esc(user ? t('motion.mo.importedTitle', { label: d.label }) : d.label)}">${d.kind === 'idle' ? '◌ ' : '▶ '}${esc(d.label)}</button>
+        <select title="${esc(t('motion.mo.maskTitle'))}">${BONE_MASKS.map((m) => `<option value="${m}"${m === d.mask ? ' selected' : ''}>${MASK_LABEL[m]}</option>`).join('')}</select>
+        <input type="checkbox" title="${esc(t('motion.mo.loopTitle'))}"${d.loop ? ' checked' : ''} />${user ? `<button class="x" title="${esc(t('motion.mo.removeTitle'))}">×</button>` : ''}`;
       row.querySelector('.play')!.addEventListener('click', () => {
-        if (!layer) return setStatus('LOAD A MODEL FIRST', true);
+        if (!layer) return setStatus(t('motion.st.loadModel'), true);
         void layer.play(d.id);
       });
       row.querySelector('select')!.addEventListener('change', (e) => {
@@ -168,18 +169,19 @@ export async function mountMotion(ctx: MotionContext) {
   };
 
   async function importOne(name: string, bytes: ArrayBuffer, path: string | null): Promise<void> {
-    setStatus(`IMPORTING ${name}`);
+    setStatus(t('motion.st.importing', { name }));
     try {
       const added = await library.importFile(name, bytes, path);
-      setStatus(added.length ? `IMPORTED ${added.length} CLIP${added.length > 1 ? 'S' : ''}: ${added.map((a) => a.label).join(', ')}` : `${name}: ALREADY IMPORTED`);
+      const labels = added.map((a) => a.label).join(', ');
+      setStatus(added.length ? t(added.length > 1 ? 'motion.st.importedMany' : 'motion.st.importedOne', { n: added.length, labels }) : t('motion.st.already', { name }));
     } catch (e) {
-      setStatus(`CLIP IMPORT FAILED: ${(e as Error).message}`, true);
+      setStatus(t('motion.st.importFailed', { error: (e as Error).message }), true);
     }
   }
 
   async function importDialog(): Promise<void> {
     if (isTauri) {
-      const p = await pickPath('Animation clip', ['fbx', 'glb']);
+      const p = await pickPath(t('motion.mo.pickFilter'), ['fbx', 'glb']);
       if (p) await importOne(baseName(p), await readPath(p), p);
     } else {
       const f = await pickBrowserFile('.fbx,.glb');
@@ -235,7 +237,7 @@ export async function mountMotion(ctx: MotionContext) {
       persist();
       void hotkeys.setGlobal(on).then((r) => {
         hkPanel.status();
-        if (on && r.failed.length) setStatus(`GLOBAL HOTKEYS: ${r.failed.length} NOT REGISTERED (${r.failed[0].error})`, true);
+        if (on && r.failed.length) setStatus(t('motion.st.globalFailed', { n: r.failed.length, error: r.failed[0].error }), true);
       });
     },
     emotes: () => library.all().filter((c) => c.kind === 'emote').map((c) => [c.id, c.label] as [string, string]),

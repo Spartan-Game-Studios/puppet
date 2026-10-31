@@ -1,4 +1,4 @@
-//! Imported animation clips: Puppet's own copies of the user's FBX / GLB files.
+//! Imported animation clips: VPuppet's own copies of the user's FBX / GLB files.
 //!
 //! ```text
 //! <appData>/clips/clips.json          index (names, kinds, animation per entry), written atomically
@@ -58,7 +58,7 @@ pub fn import_copy(root: &Path, src: &Path, id: &str, ext: &str) -> Result<bool,
     Ok(true)
 }
 
-/// Delete one entry's directory (Puppet's copy only; never follows a symlink out).
+/// Delete one entry's directory (VPuppet's copy only; never follows a symlink out).
 pub fn remove(root: &Path, id: &str) -> Result<(), String> {
     if !valid_id(id) {
         return Err(format!("not a clip id: {id:?}"));

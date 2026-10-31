@@ -27,6 +27,7 @@ import { probeRig, type RigProbe } from '../core/rigProbe';
 import { StableSprings, springNamesFromGltf, type PhysicsSettings } from '../physics/stableSprings';
 import { gatherModelFacts, type GatheredFacts } from './modelFacts';
 import { applyLookAtFallback } from './lookAtFallback';
+import { t } from '../i18n';
 import type { FaceState } from '../tracking/faceProcessor';
 import type { BodyMode } from '../tracking/protocol';
 
@@ -122,7 +123,7 @@ export async function loadAvatar(
   loader.register((parser) => new VRMLoaderPlugin(parser));
   const [gltf, hash] = await Promise.all([loader.parseAsync(buf, ''), sha256Hex(buf)]);
   const vrm = gltf.userData.vrm as VRM | undefined;
-  if (!vrm) throw new Error('Not a VRM file (no VRM extension found).');
+  if (!vrm) throw new Error(t('stage.notVrm'));
   VRMUtils.removeUnnecessaryVertices(gltf.scene);
   if (opts.widenSkin !== false) widenSkinIndices(gltf.scene);
   VRMUtils.combineSkeletons(gltf.scene);

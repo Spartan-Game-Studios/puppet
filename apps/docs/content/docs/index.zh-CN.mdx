@@ -1,0 +1,42 @@
+---
+title: 简介
+description: VPuppet 是什么、能做什么，以及运行它需要什么。
+---
+
+VPuppet 是一款网络摄像头 VTuber 应用。它加载 VRM 模型，并用普通网络摄像头实时驱动它：你的面部（52 个 ARKit 混合形状、头部姿态和视线）、上半身和双手。模型可以作为虚拟摄像头直接进入 Zoom、Meet、Discord、FaceTime 或 OBS，也可以通过 VMC 协议发送给其他 VTuber 软件。
+
+VPuppet 是一款桌面应用，支持 macOS、Windows 和 Linux。追踪由 Google MediaPipe 在你自己的电脑上运行，不会向任何服务器发送数据。源代码开源（MIT）。
+
+## 功能
+
+- **面部与 perfect sync。** 从网络摄像头获取 52 个 ARKit 混合形状和头部变换。带有 ARKit 命名表情的模型（"perfect sync" 模型）按一对一驱动；其他模型则从同一数据推导出标准 VRM 表情（眨眼、元音 `aa` `ih` `ou` `ee` `oh` 以及情绪）。
+- **上半身与双手。** 脊柱、胸部、肩膀、手臂以及每一根手指骨骼。可识别七种手势（握拳、张开手掌、指向、剪刀手、竖大拇指、OK、摇滚手势）。
+- **虚拟摄像头。** VPuppet 会显示为名为 **VPuppet Virtual Camera** 的摄像头。
+- **VMC 输出。** 通过 OSC/UDP 将骨骼和混合形状发送到 VSeeFace、Warudo 或 VNyan 等接收端。
+- **布料与头发物理**，基于模型自带的弹簧骨骼。
+- **动作与快捷键。** 待机循环、表情动作以及你自己的 FBX / glTF 片段，可由键盘、手柄或手势触发。
+- **麦克风口型同步**，可作为后备、与追踪混合，或作为唯一的嘴部来源。
+- **3D 环境。** 六个内置的带光照场景，或你自己的 `.glb` / `.gltf` 加 HDR 天空。
+- **模型库**，带缩略图和通俗易懂的许可徽章。
+
+## 系统要求
+
+| | |
+|---|---|
+| **操作系统** | macOS、Windows 10/11 或 Linux。原生虚拟摄像头需要 macOS 12.3 或更高版本。 |
+| **网络摄像头** | 操作系统能识别的任意摄像头。追踪最高 30 fps。 |
+| **模型** | 一个 `.vrm` 文件（VRM 0.x 或 1.0）。VPuppet 不附带模型：请使用你自己的模型，例如从 [VRoid Studio](https://vroid.com/en/studio) 导出的模型，或任何许可允许你使用的模型。 |
+| **可选** | 麦克风（口型同步）、手柄（快捷键和菜单导航）、OBS 或视频通话应用（虚拟摄像头）、VMC 接收端。 |
+
+<Callout title="不追踪腿部">
+VPuppet 追踪面部、上半身和双手。腿部保持待机站姿或跟随表情动作片段；不支持行走。
+</Callout>
+
+## 下一步
+
+<Cards>
+  <Card title="安装" href="./installation.mdx" description="Steam、免费试用版，或从源代码构建。" />
+  <Card title="快速上手" href="./getting-started.mdx" description="导入模型、校准并选择追踪模式。" />
+  <Card title="虚拟摄像头" href="./virtual-camera.mdx" description="在 Zoom、Meet、Discord 和 OBS 中把模型当作摄像头使用。" />
+  <Card title="键盘快捷键" href="./shortcuts.mdx" description="所有按键汇总在一页。" />
+</Cards>

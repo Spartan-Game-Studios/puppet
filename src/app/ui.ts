@@ -7,6 +7,7 @@
  *
  * The modal (#tpl-modal) is in modal.ts.
  */
+import { t } from '../i18n';
 
 export function cloneTpl<T extends Element = HTMLElement>(id: string): T {
   const tpl = document.getElementById(id) as HTMLTemplateElement | null;
@@ -48,7 +49,7 @@ export function mountCardSection(mount: HTMLElement, open: boolean, onToggle: (o
   el.dataset.csec = mount.dataset.csec ?? '';
   el.querySelector('.idx')!.textContent = mount.dataset.idx ?? '';
   el.querySelector('.csec-title')!.textContent = mount.dataset.title ?? '';
-  head.title = `${open ? 'Collapse' : 'Expand'} ${mount.dataset.title ?? ''}`.trim();
+  head.title = t(open ? 'stage.collapse' : 'stage.expand', { title: mount.dataset.title ?? '' }).trim();
   body.id = `csec-${el.dataset.csec}`;
   head.setAttribute('aria-controls', body.id);
   body.append(...mount.childNodes);
@@ -62,7 +63,7 @@ export function mountCardSection(mount: HTMLElement, open: boolean, onToggle: (o
     setOpen(on) {
       el.classList.toggle('closed', !on);
       head.setAttribute('aria-expanded', String(on));
-      head.title = `${on ? 'Collapse' : 'Expand'} ${mount.dataset.title ?? ''}`.trim();
+      head.title = t(on ? 'stage.collapse' : 'stage.expand', { title: mount.dataset.title ?? '' }).trim();
     },
     setState(text, hot = false) {
       state.textContent = text;

@@ -1,10 +1,10 @@
 //! Linux sink: v4l2loopback.
 //!
-//! The user creates a loopback device once (Puppet never loads kernel
+//! The user creates a loopback device once (VPuppet never loads kernel
 //! modules):
 //!
 //! ```sh
-//! sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="Puppet" exclusive_caps=1
+//! sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="VPuppet" exclusive_caps=1
 //! ```
 //!
 //! We find `/dev/video*` nodes whose driver is "v4l2 loopback", set the output
@@ -18,7 +18,7 @@ use std::io::Write;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::OpenOptionsExt;
 
-pub const MODPROBE: &str = "sudo modprobe v4l2loopback devices=1 video_nr=10 card_label=\"Puppet\" exclusive_caps=1";
+pub const MODPROBE: &str = "sudo modprobe v4l2loopback devices=1 video_nr=10 card_label=\"VPuppet\" exclusive_caps=1";
 
 // ---- minimal V4L2 ABI (linux/videodev2.h) ----
 
@@ -144,7 +144,7 @@ impl VirtualCamSink for V4l2Sink {
         let devs = loopback_devices();
         let mut st = if devs.is_empty() {
             SinkStatus::new("v4l2loopback", SinkState::NeedsSetup, "NO V4L2LOOPBACK DEVICE FOUND")
-                .hint("Install v4l2loopback (e.g. the v4l2loopback-dkms package), then create a device with this command and press REFRESH. Puppet does not load kernel modules itself.")
+                .hint("Install v4l2loopback (e.g. the v4l2loopback-dkms package), then create a device with this command and press REFRESH. VPuppet does not load kernel modules itself.")
                 .command(MODPROBE)
         } else {
             let state = if self.file.is_some() { SinkState::Running } else { SinkState::Ready };

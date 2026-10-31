@@ -1,0 +1,25 @@
+{
+  "model": "gpt-image-2.5-sunburst",
+  "size": "1536x2304",
+  "quality": "high",
+  "n": "2",
+  "output_format": "png",
+  "ref": "clean",
+  "prompt": "Redraw this character as a tall portrait-format poster illustration. Show her full upper body from the top of her head down to her waist, facing the viewer, with BOTH hands fully inside the frame: her arms raised and held up by the puppet strings at the wrist cuffs like a marionette, hands relaxed and dangling gracefully at about shoulder height on either side of her head, all ten fingers clearly visible and correctly drawn. She leans slightly forward out of the front of the black CRT television, which frames her from behind at chest height and below. The top third of the image above her head is calm, empty light grid paper with only the thin orange strings running up through it (a logo will be placed there later). The background is plain light off-white grid paper: a faint, even, square grid of thin light-grey lines, like engineering paper, flat and uncluttered. Keep the exact same art style as the reference: polished anime illustration, soft cel shading, a restrained brutalist palette of off-white paper (#f2f2ee), near-black ink (#0a0a0a) and a single accent of vivid red-orange (#ff3b00). Same character design as the reference: a young anime woman with shoulder-length messy silver-white hair, a red-orange X-shaped hair clip on her left side and small black hair ties, warm orange eyes, a gentle open-mouthed smile, a black choker with a metal O-ring, a black strap harness over a loose off-white blouse with puffed sleeves, black cuffs on her wrists and upper arms, black nail polish. Thin bright red-orange puppet strings run straight up from her wrist cuffs and shoulders out of the top of the frame. Hands must be anatomically correct: exactly five fingers on each hand, natural joints. ABSOLUTELY NO text, letters, numbers, words, logos, labels, captions, watermarks or signatures anywhere in the image.",
+  "usage": {
+    "input_tokens": 3832,
+    "input_tokens_details": {
+      "image_tokens": 3016,
+      "text_tokens": 816
+    },
+    "output_tokens": 4254,
+    "output_tokens_details": {
+      "image_tokens": 4254,
+      "text_tokens": 0
+    },
+    "total_tokens": 8086
+  },
+  "est_cost_usd_for_request": 0.156,
+  "revised_prompt": null,
+  "seconds": 39.1
+}

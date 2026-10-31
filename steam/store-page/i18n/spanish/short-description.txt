@@ -1,0 +1,1 @@
+Controla tu avatar VRM en tiempo real con una webcam normal: rostro con perfect sync de 52 blendshapes, torso, manos y dedos. VPuppet aparece como cámara en Zoom, Meet, Discord y OBS, envía VMC a otras apps y suma física de ropa y cabello, emotes con atajos de teclado y escenas 3D.

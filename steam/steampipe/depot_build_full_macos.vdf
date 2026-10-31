@@ -1,0 +1,43 @@
+// TEMPLATE: adjust before use. Fill in every <PLACEHOLDER>, check every path
+// against what the build actually produced (the binary name changes with the
+// Puppet -> VPuppet rename), then run with steamcmd (see README.md).
+// Paths are relative to this file (steam/steampipe/); "../../" is the repo root.
+
+// macOS depot (full). The .app must already be Developer ID-signed,
+// notarized and stapled (see steam/README.md, section 9). Upload the .app,
+// not the .dmg.
+// Universal build (Apple silicon + Intel): build with
+//   pnpm tauri build --target universal-apple-darwin
+// and change the path to src-tauri/target/universal-apple-darwin/release/bundle/macos/.
+"DepotBuild"
+{
+	"DepotID" "<FULL_DEPOT_ID_MAC>"
+	"ContentRoot" "../../"
+
+	// The whole bundle, recursively (includes the camera extension under
+	// Contents/Library/SystemExtensions/). The full build has no Steamworks
+	// library.
+	"FileMapping"
+	{
+		"LocalPath" "src-tauri/target/release/bundle/macos/VPuppet.app/*"
+		"DepotPath" "VPuppet.app"
+		"Recursive" "1"
+	}
+
+	// Licence files, required with every copy (MIT + third-party notices).
+	"FileMapping"
+	{
+		"LocalPath" "LICENSE"
+		"DepotPath" "."
+	}
+	"FileMapping"
+	{
+		"LocalPath" "THIRD_PARTY_NOTICES.md"
+		"DepotPath" "."
+	}
+
+	// Never ship these.
+	"FileExclusion" "*.pdb"
+	"FileExclusion" "steam_appid.txt"
+	"FileExclusion" ".DS_Store"
+}

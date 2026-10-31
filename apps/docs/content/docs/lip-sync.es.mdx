@@ -1,0 +1,27 @@
+---
+title: Lip sync
+description: Mueve la boca con tu micrófono cuando la cámara no la ve, o junto con el seguimiento.
+---
+
+Abre **LIP SYNC** (`S`). El lip sync está desactivado por defecto; VPuppet solo pide acceso al micrófono cuando eliges un modo.
+
+## Modos
+
+| Modo | Qué mueve la boca |
+|---|---|
+| **OFF** | Solo el seguimiento facial. |
+| **FALLBACK** | Tu voz, solo mientras no se sigue tu cara (con transiciones suaves). |
+| **BLEND** | El mayor de los dos valores, seguimiento o voz, forma por forma. |
+| **AUDIO** | Solo tu voz. |
+
+## Ajustes
+
+- Elige el **micrófono**.
+- **GATE DB** fija el nivel por debajo del cual se ignora el sonido. Súbelo si el ruido de fondo mueve la boca.
+- El medidor muestra el nivel de entrada, el umbral y cada forma de la boca a medida que se detecta.
+
+VPuppet compara tu voz con cinco vocales. Los modelos con presets reciben `aa` `ih` `ou` `ee` `oh`; los modelos perfect sync reciben `jawOpen`, `mouthFunnel`, `mouthPucker` y `mouthStretch`. La boca se abre rápido (30 ms) y se cierra algo más despacio (90 ms).
+
+<Callout title="FALLBACK y un seguimiento débil">
+FALLBACK solo cambia a la voz cuando se pierde la cara. No puede saber cuándo el seguimiento de la boca simplemente es débil; para eso usa BLEND.
+</Callout>

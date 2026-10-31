@@ -9,7 +9,7 @@
   <true/>
   <key>com.apple.security.application-groups</key>
   <array>
-    <string>@TEAM_ID@.com.spartangamestudios.puppet.camera</string>
+    <string>@TEAM_ID@.com.spartangamestudios.vpuppet.camera</string>
   </array>
 @PROFILE_ENTITLEMENTS@</dict>
 </plist>

@@ -1,0 +1,175 @@
+[
+  {
+    "name": "app_status",
+    "description": "Snapshot of the running VPuppet app: version, demo state, the model on the stage (name, library id, VRM version, perfect-sync coverage), whether the HOME library screen is showing, tracking mode and state, outputs (VMC, virtual camera) and frame rates. Call this first.",
+    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+    "annotations": { "readOnlyHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "library_list",
+    "description": "List the VRM models in VPuppet's library (most recently used first): id (SHA-256 of the file), display name, author, file name, VRM version, measured stats (perfect-sync count, presets, expressions, spring chains, polygons), import-time model-check warnings, licence badge, and which one is on the stage.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "search": { "type": "string", "description": "Only models whose name, author or file name contains this text." },
+        "favourites": { "type": "boolean", "description": "Only favourites." }
+      },
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "library_load",
+    "description": "Load a library model onto the stage (closes the HOME screen). `id` is the library id from library_list; a unique prefix of 8+ characters is enough. Refused when the Steam demo has ended.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "id": { "type": "string", "description": "Library id (or a unique prefix of at least 8 hex characters)." } },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "library_import",
+    "description": "Copy a .vrm file into VPuppet's library (measures it, renders a thumbnail, runs the model checks) and optionally load it onto the stage. The library is content-addressed: a re-exported file is a new entry with a new id; importing identical bytes again returns status 'duplicate' with the existing id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Absolute path to a .vrm file on this computer." },
+        "load": { "type": "boolean", "description": "Also load it onto the stage (default true).", "default": true }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "model_inspect",
+    "description": "Everything VPuppet knows about the model on the stage, for building or debugging an avatar: VRM version and meta, humanoid bones mapped/missing (VRM-required and the ones VPuppet needs), every expression with its bind counts, ARKit perfect-sync coverage (which of the 52 names match using VPuppet's case/punctuation-insensitive matching, which are missing, and missing ones that exist under another naming such as eyeBlink_L), VRM presets present/missing, look-at type, spring bone chains and colliders, mesh/material/texture/polygon stats, licence metadata, and VPuppet's model-check warnings (face backwards, faces away, rest pose, empty expressions).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sections": {
+          "type": "array",
+          "description": "Limit the output to these sections (default: all).",
+          "items": { "type": "string", "enum": ["file", "meta", "licence", "humanoid", "expressions", "perfect_sync", "presets", "look_at", "springs", "mesh", "checks"] }
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "stage_screenshot",
+    "description": "PNG of the stage. `framing` 'current' is exactly what the user sees (their camera, 3D environment included); 'face', 'bust', 'upper' and 'full' frame the avatar from the front with a fixed camera (environment post-processing skipped), without moving the user's camera.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "framing": { "type": "string", "enum": ["current", "face", "bust", "upper", "full"], "default": "current" },
+        "size": { "type": "integer", "minimum": 128, "maximum": 1536, "default": 768, "description": "Longest side in pixels." }
+      },
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "expression_set",
+    "description": "Hold an expression on the avatar at a weight (over tracking) until reset, or reset all held expressions. Names are the model's expression names; ARKit names (eyeBlinkLeft) and VRM presets (happy, aa, blink) also resolve through VPuppet's matching. `exclusive` zeroes every other expression while held, so tracking does not mix in.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Expression to hold." },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+        "exclusive": { "type": "boolean", "default": false },
+        "reset": { "type": "boolean", "description": "Release all held expressions (other fields ignored)." }
+      },
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "expression_sweep",
+    "description": "Drive each expression to 1 in turn (everything else 0, pose frozen) and measure it against a neutral render of the same frame: per expression the bind count, how much of the face changed, which side of the avatar moved (catches swapped Left/Right shapes) and a flag for expressions that bind something but change nothing. Returns those notes plus a labelled contact-sheet PNG (neutral first). Use set='arkit' to verify perfect sync. Pages with offset/limit.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "set": { "type": "string", "enum": ["arkit", "presets", "custom", "all"], "default": "arkit", "description": "arkit: the model's matches for the 52 ARKit names. presets: VRM presets. custom: everything else. all: every expression." },
+        "names": { "type": "array", "items": { "type": "string" }, "description": "Sweep exactly these instead of a set." },
+        "framing": { "type": "string", "enum": ["face", "bust"], "default": "face" },
+        "tile": { "type": "integer", "minimum": 96, "maximum": 256, "default": 160, "description": "Contact-sheet tile size in pixels." },
+        "offset": { "type": "integer", "minimum": 0, "default": 0 },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 60, "default": 30 },
+        "image": { "type": "boolean", "default": true, "description": "Include the contact sheet (false: notes only)." }
+      },
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "clip_list",
+    "description": "List the animation clips (built-in Quaternius UAL / VPuppet clips and the user's imported .fbx/.glb clips): id, label, kind (idle or emote), bone mask, loop, imported, and which are playing.",
+    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+    "annotations": { "readOnlyHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "clip_play",
+    "description": "Play a clip on the avatar over tracking, by id or label (case-insensitive). Playing a looping clip that is already playing stops it. `stop: true` stops all emotes and held hotkey expressions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "clip": { "type": "string", "description": "Clip id or label from clip_list." },
+        "stop": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": false, "destructiveHint": false, "openWorldHint": false }
+  },
+  {
+    "name": "tracking_stats",
+    "description": "Webcam tracking health: mode (face/upper/hands), state (TRACKING, LOST, NO HANDS...), per-pipeline fps, latency and inference ms for face/body/hands, where MediaPipe runs (worker/main, GPU/CPU), hand search status per side with found % over the last 3 s, and the current hand gestures.",
+    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+    "annotations": { "readOnlyHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "logs_recent",
+    "description": "Recent status-bar lines, warnings and errors from the app (newest last), with timestamps.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 },
+        "errors_only": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "settings_get",
+    "description": "Read the settings this server may change: tracking mode, smoothing, stage framing, background and physics mode, with their allowed values.",
+    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false },
+    "annotations": { "readOnlyHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "settings_set",
+    "description": "Change any of: tracking mode, smoothing, stage framing, background (solid colour, transparent or the 3D environment) and physics mode. Applied live and saved like a change in the UI. Returns the new values.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["face", "upper", "hands"], "description": "face: head and expressions only; upper: plus torso and arms; hands: plus fingers." },
+        "smoothing": { "type": "number", "minimum": 0, "maximum": 1, "description": "Higher is steadier with more lag (default 0.5)." },
+        "framing": { "type": "string", "enum": ["bust", "upper", "full"] },
+        "background": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "enum": ["color", "transparent", "environment"] },
+            "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+          },
+          "additionalProperties": false
+        },
+        "physics_mode": { "type": "string", "enum": ["off", "stiff", "normal"] }
+      },
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false }
+  }
+]

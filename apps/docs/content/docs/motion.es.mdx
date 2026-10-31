@@ -1,0 +1,97 @@
+---
+title: Movimiento, atajos y mando
+description: Animaciones de reposo, emotes, tus propios clips de animación y las asignaciones de teclado, mando y gestos que los activan.
+---
+
+## Clips (MOTION, `A`)
+
+La ventana **MOTION** contiene la animación de reposo y los emotes. Se reproducen encima del seguimiento en directo.
+
+### Clips integrados
+
+| Clip | Qué mueve por defecto |
+|---|---|
+| IDLE: BREATHE / LOOK AROUND / TALKING / ARMS FOLDED | cuerpo entero (reposo) |
+| NOD (YES), SHAKE (NO) | cabeza |
+| CHEER, ANGRY, CRY | cuerpo |
+| DANCE, SIT (en bucle hasta volver a activarlo) | cuerpo entero |
+| DRINK | brazos |
+| WAVE, CLAP, POINT | brazos |
+| SHRUG, THINK | cuerpo |
+| BOW | cuerpo entero |
+
+La mayoría de los clips proceden de la [Quaternius Universal Animation Library](https://quaternius.com) (CC0). WAVE, CLAP, POINT, SHRUG, THINK y BOW son poses sencillas con fotogramas clave hechas para VPuppet, no captura de movimiento.
+
+### Cómo se combinan los clips con el seguimiento
+
+- La animación de **reposo** se reproduce mientras el seguimiento del cuerpo está desactivado (modo FACE) o perdido. Mientras se sigue tu cara, la cabeza sigue siendo tuya.
+- Un **emote** se reproduce sobre el seguimiento en directo y solo toma los huesos que necesita (cuerpo entero, cuerpo sin la cabeza, brazos o cabeza), con fundido de entrada y de salida. Tus expresiones faciales se siguen durante todos los emotes.
+- Los clips que mueven la cadera (como SIT) hacen el fundido más despacio para que la tela pueda acompañar.
+
+### Tus propios clips
+
+Haz clic en **IMPORT CLIP** o arrastra un `.fbx` o un `.glb` a la ventana. (Un `.glb` sin animaciones se toma como escena 3D.)
+
+- Los rigs de Mixamo, Quaternius UAL / maniquí de Unreal y VRoid se reconocen por los nombres de sus huesos; los nombres habituales de Blender y Unity también funcionan.
+- Los clips se adaptan (retargeting) a cualquier VRM (0.x y 1.0). Se elimina el desplazamiento para que el avatar se quede en su sitio; se conservan el balanceo y la altura al sentarse.
+- Cada animación del archivo se convierte en una entrada propia. VPuppet guarda una copia, igual que en la biblioteca de modelos.
+
+<Callout type="warn" title="Límites del retargeting">
+El retargeting copia las direcciones de los huesos, no los contactos: en un modelo con proporciones muy distintas, las manos que deberían tocar la cara o la otra mano pueden no llegar. Para los clips no se admite un `.gltf` importado con archivos separados; usa `.glb` o `.fbx`. Las condiciones de Mixamo no permiten redistribuir sus archivos, así que importa tus propias descargas.
+</Callout>
+
+## Atajos (HOTKEYS, `K`) [#hotkeys]
+
+Cada asignación vincula un **disparador** con una **acción**.
+
+- **Disparadores:** una tecla o combinación de teclas, un botón del mando o un gesto de la mano.
+- **Acciones:** reproducir un emote; activar una expresión (**TOGGLE**, **ON** o **HOLD** mientras se mantiene pulsado; cualquier preset de VRM o expresión personalizada del modelo, con fundidos); **RESET**; o abrir el **PICKER** (selector).
+
+Haz clic en un disparador para reasignarlo. Un punto marca una asignación que pertenece solo al modelo actual (las expresiones cambian de un modelo a otro); la asignación propia de un modelo tiene prioridad sobre una global en el mismo disparador. Los conflictos con otra asignación o con un atajo de la app aparecen recuadrados.
+
+### Asignaciones por defecto
+
+| Disparador | Acción |
+|---|---|
+| `⌥1` – `⌥5` (Alt+1 – Alt+5) | happy / angry / sad / relaxed / surprised |
+| `⌥6` | restablecer expresiones |
+| `F3` `F4` `F5` `F6` | wave, nod, shake, clap |
+| `F7` `F8` `F9` `F10` | cheer, bow, shrug, think |
+| `G` | selector |
+
+Las teclas de expresión usan Alt porque `1` `2` `3` son los modos de seguimiento.
+
+### Mando
+
+Los mandos con la asignación estándar son ciudadanos de primera:
+
+| Botón | Acción |
+|---|---|
+| `A` | wave |
+| `B` | nod |
+| `X` | clap |
+| `Y` | cheer |
+| cruceta | happy / surprised / sad / angry |
+| `LB` | shrug |
+| `RB` | selector |
+| `BACK` | restablecer |
+
+Los botones del mando funcionan siempre que VPuppet esté abierto, incluso en segundo plano.
+
+**Modo menú:** en el escenario, `LT` activa el modo menú: la cruceta o el stick mueven el foco, `A` pulsa, izquierda / derecha cambian los deslizadores y los desplegables, `B` vuelve atrás. Las ventanas de ajustes y HOME toman el mando por su cuenta. Fuera de ellas, el mando queda para tu actuación.
+
+### Gestos de la mano
+
+En el modo +HANDS, los siete gestos seguidos (puño, palma abierta, señalar, paz, pulgar arriba, OK, rock) se pueden usar como disparadores, por cada mano.
+
+### Atajos globales
+
+**GLOBAL** (desactivado por defecto) registra tus asignaciones de teclado en todo el sistema, para que funcionen mientras OBS o un juego tienen el foco.
+
+- Una tecla registrada globalmente se le quita a todas las demás apps mientras VPuppet está abierto, así que es mejor usar combinaciones.
+- Una combinación que ya usa otra app no se puede registrar; aparece en la lista y sigue funcionando dentro de VPuppet.
+- En macOS no hace falta el permiso de Accesibilidad. En Linux, los atajos globales necesitan una sesión X11; no están disponibles en Wayland puro. Por ahora, los atajos globales solo se han probado en macOS.
+
+### Selector
+
+`G` o `RB` en el mando abren una cuadrícula de emotes y expresiones sobre el escenario. Las flechas / la cruceta / el stick izquierdo mueven, `Enter` / `A` activan, `Esc` / `B` cierran.

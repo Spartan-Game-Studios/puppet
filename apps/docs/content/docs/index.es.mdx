@@ -1,0 +1,42 @@
+---
+title: Introducción
+description: Qué es VPuppet, qué hace y qué necesitas para usarlo.
+---
+
+VPuppet es una app de VTuber con webcam. Carga un avatar VRM y lo mueve en directo con una webcam normal: tu cara (52 blendshapes de ARKit, la orientación de la cabeza y la mirada), la parte superior de tu cuerpo y tus manos. El avatar puede ir directamente a Zoom, Meet, Discord, FaceTime u OBS como cámara virtual, o a otro software de VTuber mediante el protocolo VMC.
+
+VPuppet es una app de escritorio para macOS, Windows y Linux. El seguimiento se ejecuta en tu propio ordenador con Google MediaPipe; no se envía nada a ningún servidor. El código fuente es abierto (MIT).
+
+## Qué hace
+
+- **Cara y perfect sync.** 52 blendshapes de ARKit y la transformación de la cabeza desde tu webcam. Los modelos con expresiones con nombres de ARKit (modelos "perfect sync") se controlan uno a uno; los demás modelos reciben las expresiones estándar de VRM (parpadeo, las vocales `aa` `ih` `ou` `ee` `oh` y emociones) derivadas de los mismos datos.
+- **Torso y manos.** Columna, pecho, hombros, brazos y cada hueso de los dedos. Se reconocen siete gestos de la mano (puño, palma abierta, señalar, paz, pulgar arriba, OK y rock).
+- **Cámara virtual.** VPuppet aparece como una webcam llamada **VPuppet Virtual Camera**.
+- **Salida VMC.** Huesos y blendshapes por OSC/UDP hacia receptores como VSeeFace, Warudo o VNyan.
+- **Física de ropa y pelo** basada en los spring bones del propio modelo.
+- **Movimiento y atajos.** Animaciones de reposo, emotes y tus propios clips FBX / glTF, activados con el teclado, un mando o gestos de la mano.
+- **Lip sync con micrófono** como respaldo, como mezcla o como única fuente para la boca.
+- **Entornos 3D.** Seis escenas iluminadas integradas, o tu propio `.glb` / `.gltf` con un cielo HDR.
+- **Biblioteca de modelos** con miniaturas e insignias de licencia en lenguaje claro.
+
+## Requisitos
+
+| | |
+|---|---|
+| **Sistema operativo** | macOS, Windows 10/11 o Linux. La cámara virtual nativa requiere macOS 12.3 o posterior. |
+| **Webcam** | Cualquier webcam que el sistema operativo reconozca. El seguimiento funciona a hasta 30 fps. |
+| **Avatar** | Un archivo `.vrm` (VRM 0.x o 1.0). VPuppet no incluye ningún avatar: usa el tuyo, por ejemplo uno exportado desde [VRoid Studio](https://vroid.com/en/studio), o cualquier modelo cuya licencia permita tu uso. |
+| **Opcional** | Un micrófono (lip sync), un mando (atajos y navegación por menús), OBS o una app de videollamadas (cámara virtual), un receptor VMC. |
+
+<Callout title="Las piernas no se siguen">
+VPuppet sigue la cara, el torso y las manos. Las piernas se quedan en una postura de reposo o siguen un clip de emote; no se puede caminar.
+</Callout>
+
+## Siguientes pasos
+
+<Cards>
+  <Card title="Instalación" href="./installation.mdx" description="Steam, la demo gratuita o compilar desde el código fuente." />
+  <Card title="Primeros pasos" href="./getting-started.mdx" description="Importa un modelo, calibra y elige un modo de seguimiento." />
+  <Card title="Cámara virtual" href="./virtual-camera.mdx" description="Usa el avatar como webcam en Zoom, Meet, Discord y OBS." />
+  <Card title="Atajos de teclado" href="./shortcuts.mdx" description="Todas las teclas en una sola página." />
+</Cards>

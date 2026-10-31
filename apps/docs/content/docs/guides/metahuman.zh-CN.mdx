@@ -1,0 +1,42 @@
+---
+title: 用 MetaHuman 制作模型
+description: 从 MetaHuman 经 Unreal Engine 和 Blender 到 VRM 的大致流程，以及需要事先解决的许可问题。
+---
+
+<Callout type="warn" title="先确认许可">
+MetaHuman 受 Epic Games 的 MetaHuman 和 Unreal Engine 许可条款约束，最初仅许可在 Unreal Engine 中使用。在 Unreal Engine 之外使用 MetaHuman（作为另一个应用中的 VRM），在适用于你的条款下**可能不被允许**。Epic 曾多次修订这些条款，因此在进行以下任何操作之前，请阅读当前的 MetaHuman 和 Unreal Engine EULA。本页不构成法律建议。
+</Callout>
+
+这是本指南中最复杂的一条路线。以下步骤只是概要；各个工具会随版本变化，具体细节请以各工具当前的文档为准。
+
+## 1. 从 MetaHuman 到 FBX
+
+用 MetaHuman Creator 创建角色，并将其导入 Unreal Engine 项目。从 Unreal 中导出身体和面部的骨骼网格（FBX）及其纹理。
+
+## 2. 从 FBX 到 Blender
+
+将 FBX 文件导入 Blender，并把身体和面部合并到同一副骨架上。
+
+## 3. 面部
+
+MetaHuman 的面部由基于关节的绑定加修正形状驱动，而不是一组简单的命名混合形状。Unreal 的 Live Link Face 工作流程会把 52 个 ARKit 混合形状名称映射到 MetaHuman 的面部姿势上，这说明两者存在对应关系，但 VRM 需要把这些姿势做成**形态键**。
+
+要在 VPuppet 中使用 **perfect sync**，必须把每个 ARKit 姿势烘焙成以其名称命名的形态键（`eyeBlinkLeft`、`jawOpen`、`mouthSmileLeft`……）。VPuppet 匹配名称时忽略大小写和标点，并且需要 52 个中的至少 40 个。如果工作量太大，至少烘焙出 VRM 预设表情（眨眼、`aa` `ih` `ou` `ee` `oh`、情绪）；对于任何模型，VPuppet 都会从追踪数据推导出这些表情。
+
+## 4. 制作 VRM
+
+使用 [VRM Add-on for Blender](https://vrm-addon-for-blender.info/)：
+
+- 分配人形骨骼并检查静止姿势（T 姿势最稳妥）；
+- 把面部形态键注册为表情；
+- 为头发和宽松衣物添加弹簧骨骼链和碰撞体。
+
+## 5. 减轻模型
+
+MetaHuman 的网格和纹理是为高端实时渲染打造的，对于要和追踪共用电脑的模型来说太重了。如有可能，使用较低的细节层级（LOD），进行减面，删除被遮挡的几何体，并缩小纹理（MetaHuman 的纹理通常为 4K 或更大）。
+
+## 6. 在 VPuppet 中检查
+
+导入 `.vrm`，打开 **MODEL INFO**（`I`）并查看 **MODEL CHECKS**。底栏会显示 `PERFECT SYNC n/52` 或 `PRESETS n/13`，FACE 窗口（`F`）会为模型缺少的 ARKit 行显示删除线。
+
+连接到 VPuppet 的 AI 智能体可以和你一起完成这项检查：检查模型、重新导入每次的新导出，并测试每个 perfect sync 形状。参见[连接 AI 智能体](../mcp.mdx#workflow)。

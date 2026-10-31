@@ -1,0 +1,39 @@
+---
+title: Physics (cloth and hair)
+description: How VPuppet moves skirts, capes and hair, and the settings in the PHYSICS window.
+---
+
+VPuppet simulates the spring bones your VRM already has (hair, skirts, capes, ribbons, ears...). Nothing has to be set up in the model beyond what a normal VRM export includes.
+
+## What the cloth solver does
+
+- **Panels move together.** Neighbouring chains are found automatically (a skirt ring around the hips, a cape, a hair fringe) and linked into a lattice, so panels swing as one piece instead of splaying into separate strands.
+- **The body collides.** Capsule colliders are generated from the skeleton and fitted to the mesh (hips, legs, torso, arms, shoulders, neck, head), alongside the model's own colliders. Whole segments collide, so a fast arm or leg doesn't pass through cloth between frames.
+- **Authored settings keep their meaning.** Stiffness, drag and gravity from the model work as the modeller set them. Stiffness fades toward the hem of skirts and capes so they drape.
+- **It stays calm.** The simulation runs at a fixed rate with clamped speeds and smoothed body input, so hair and cloth don't thrash when tracking jitters.
+
+## Quick switch
+
+| Key | Setting |
+|---|---|
+| `8` | **OFF**: no physics |
+| `9` | **STIFF**: little movement |
+| `0` | **NORMAL** |
+| `R` | Settle: reset the physics to rest |
+
+## The PHYSICS window (`P`)
+
+- **Cloth groups:** links on or off, stiffness, and per-chain grouping overrides.
+- **Chains:** each chain on or off, with stiffness, drag and gravity multipliers.
+- **Colliders:** each collider on or off, including the generated **BODY** colliders.
+- **SETTLE** resets the simulation; **RESET OVERRIDES** clears your changes for this model.
+- **SOLVER → LEGACY** switches to the previous solver (three-vrm's spring bones with stabilisers). It also handles the plane and "inside" colliders of the VRM extended-collider spec, which the cloth solver ignores.
+
+Overrides are saved per model, so the same file always comes back with your settings.
+
+## Limits
+
+- This is bone cloth: the mesh between two linked chains still bends by skinning, so a coarse rig (few chains, long segments) can't fold finely.
+- Very loose clothing skinned to the body rather than to spring bones makes the generated colliders fatter than the body underneath.
+- Anything that overlaps the body in the model's rest pose is left overlapping.
+- Hair or cloth swept over a raised arm can stay caught on it until the arm moves again, as real hair would.

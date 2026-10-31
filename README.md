@@ -1,8 +1,14 @@
-# PUPPET
+# VPUPPET
 
-Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and drives it live from an ordinary webcam with Google MediaPipe: face (52 ARKit blendshapes, head pose, gaze), upper body and hands. It sends everything over the VMC protocol, and its spring-bone physics doesn't thrash. It is a desktop app for macOS, Windows and Linux, built with Tauri 2.
+VPuppet is an open-source (MIT) webcam VTuber app. It loads a VRM avatar and drives it live from an ordinary webcam with Google MediaPipe: face (52 ARKit blendshapes, head pose, gaze), upper body and hands. It sends everything over the VMC protocol, and its spring-bone physics doesn't thrash. It is a desktop app for macOS, Windows and Linux, built with Tauri 2.
 
-![Puppet UI](docs/ui.png)
+![VPuppet UI](docs/ui.png)
+
+## Steam
+
+The signed, auto-updating builds are sold on Steam ($19.99). There is a free demo: fully featured for 100 hours of use, after which tracking on the stage, the virtual camera and VMC lock; the model library still opens and keeps everything imported, and the full app picks up the same library. The demo is the cargo feature `demo` (`src-tauri/src/demo.rs`, `src/app/demo.ts`), built with `pnpm tauri:demo`; the source stays MIT. Store page copy, assets checklist and SteamPipe scripts are in [steam/](steam/README.md).
+
+Renamed from Puppet: the first launch moves the old `com.spartangamestudios.puppet` config and data folders to the new identifier (`src-tauri/src/migrate.rs`). Environment variables keep their `PUPPET_` names and the test hooks stay on `window.__puppet`.
 
 ## Features
 
@@ -14,7 +20,7 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
   - **Calibrate** (`C`) captures your neutral face, head angle and gaze as zero. Until you do, the first steady second of an open-eyed, closed-mouth face is taken as neutral automatically (not saved), so an uncalibrated start doesn't carry MediaPipe's resting offsets (a few degrees of head pitch, a dark-lipped "pucker") onto the avatar.
   - Per-blendshape **gain** and **curve** (exponent) so mouths read strongly. You can edit them live next to the raw and output bars.
 - **Upper body and hands.** PoseLandmarker world landmarks drive the spine, chest, shoulders and arms. HandLandmarker drives all finger bones. Choose FACE (`1`), +BODY (`2`) or +HANDS (`3`). Legs stay in an idle stance.
-  - The solver is Puppet's own: direction vectors against the model's measured rest directions.
+  - The solver is VPuppet's own: direction vectors against the model's measured rest directions.
     - **Arms:** the elbow is a true hinge (0–150°, never backwards); the plane it bends in sets the upper arm's twist, which is limited and held while the arm is too straight to show it. Part of the wrist twist moves into the forearm. The clavicles follow arm raises and shrugs.
     - **Depth:** MediaPipe's z is its noisiest axis, so forearm and shoulder-line depth is rebuilt from the 2D image and each bone's tracked length; z only decides the sign. The upper arm keeps MediaPipe's depth: it mostly hangs near the image plane, where any length error would tilt it forward.
     - **Torso:** lean and twist are solved and limited separately; the twist sits mostly in the upper chest.
@@ -24,8 +30,8 @@ Puppet is a free, open-source (MIT) webcam VTuber app. It loads a VRM avatar and
   - **Gestures** (HANDS mode): fist, open palm, point, peace, thumbs up, OK and rock, per hand, shown in the debug overlay. They come from the hand landmarks (finger curls, thumb position) through hysteresis, so they don't flicker. Code can subscribe; see [Gesture events](#gesture-events).
   - Pose LITE/FULL switches live.
 - **VMC protocol output** over OSC/UDP from the Rust side (`rosc`). Perfect-sync models also send the 13 VRM 0.x presets derived from the ARKit values, so preset-only receivers don't see a frozen face (see [VMC setup](#vmc-setup)). Messages: `/VMC/Ext/OK`, `/VMC/Ext/T`, `/VMC/Ext/Root/Pos`, `/VMC/Ext/Bone/Pos` (all humanoid bones, Unity coordinates), `/VMC/Ext/Blend/Val` and `/VMC/Ext/Blend/Apply`. Host and port are configurable (default `127.0.0.1:39539`). Bundles are split under 1200 bytes so they also cross a real network.
-- **Virtual camera output.** Puppet shows up as a webcam, **Puppet Virtual Camera**, in Zoom, Meet, Discord, FaceTime and OBS (the camera card's **VIRTUAL CAM** section, `W`). It sends the capture view at 1280×720 or 1920×1080, 30 fps. Cameras have no alpha, so the CLEAR background is sent as the chosen colour (green by default); a 3D environment is sent as rendered, except depth of field, which is display-only. See [Virtual camera](#virtual-camera).
-  - macOS 12.3+: a CoreMediaIO Camera Extension inside Puppet.app (needs a Developer ID–signed build; see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)).
+- **Virtual camera output.** VPuppet shows up as a webcam, **VPuppet Virtual Camera**, in Zoom, Meet, Discord, FaceTime and OBS (the camera card's **VIRTUAL CAM** section, `W`). It sends the capture view at 1280×720 or 1920×1080, 30 fps. Cameras have no alpha, so the CLEAR background is sent as the chosen colour (green by default); a 3D environment is sent as rendered, except depth of field, which is display-only. See [Virtual camera](#virtual-camera).
+  - macOS 12.3+: a CoreMediaIO Camera Extension inside VPuppet.app (needs a Developer ID–signed build; see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)).
   - Windows 10/11: a DirectShow camera built from [softcam](https://github.com/tshino/softcam) (MIT); one admin prompt to register it.
   - Linux: a v4l2loopback device you create with `modprobe`.
 - **Cloth and hair physics.** A bone-cloth solver over the VRM's own spring bones (`src/physics/cloth/`):
@@ -72,21 +78,21 @@ Home: `←` `↑` `↓` `→` move · `Enter` load · `S` favourite · `L` licen
 | CHEER, ANGRY, CRY | UAL `Celebration`, `Counter_Angry`, `Crying` | body |
 | DANCE, SIT (loop until triggered again) | UAL `Dance_Loop`, `Sitting_Idle_Loop` | full |
 | DRINK | UAL `Drink` | arms |
-| WAVE, CLAP, POINT | Puppet (keyframed, `src/anim/authored.ts`) | arms |
-| SHRUG, THINK | Puppet | body |
-| BOW | Puppet | full |
+| WAVE, CLAP, POINT | VPuppet (keyframed, `src/anim/authored.ts`) | arms |
+| SHRUG, THINK | VPuppet | body |
+| BOW | VPuppet | full |
 
-UAL = the [Quaternius Universal Animation Library](https://quaternius.com) 1 and 2 (CC0 1.0). The library has no wave, clap, bow, point, shrug or thinking pose, so those six are Puppet's own keyframes, authored against each avatar's measured rest directions. `scripts/build-builtin-clips.mjs` strips the UAL clips to bone tracks (no mesh, no skin, no scale tracks, rotations as normalized shorts, constant tracks as one key) into `public/clips/ual.glb`: 12 clips, 433 KiB.
+UAL = the [Quaternius Universal Animation Library](https://quaternius.com) 1 and 2 (CC0 1.0). The library has no wave, clap, bow, point, shrug or thinking pose, so those six are VPuppet's own keyframes, authored against each avatar's measured rest directions. `scripts/build-builtin-clips.mjs` strips the UAL clips to bone tracks (no mesh, no skin, no scale tracks, rotations as normalized shorts, constant tracks as one key) into `public/clips/ual.glb`: 12 clips, 433 KiB.
 
-- **Your clips.** IMPORT CLIP, or drop an `.fbx` / `.glb` on the window (a `.glb` without animations is still taken as a 3D environment). Mixamo (`mixamorig:` names), UAL / Unreal-mannequin and VRoid rigs are detected by bone names; common Blender/Unity names work as a fallback. Puppet keeps a copy in `<appData>/clips/<sha256>/clip.fbx|glb` with a `clips.json` index (same rules as the model library). One entry per animation in the file; empty bind-pose takes are skipped. Mixamo's terms don't allow redistributing their files: import your own, never commit them.
-- **Retargeting** (`src/anim/retarget.ts`): the clip is sampled at 30 fps and stored per bone as its world rotation change from the source's rest pose, in a frame detected from the rest pose (up = hips → head, left = right arm → left arm), so Y-up, Z-up and either facing all work. On binding to a model, each bone gets a fix rotation from the model's rest direction to the source's (an A-pose source keeps its A-pose arms on a T-pose VRM), and local rotations follow from the bones the model has (a missing upperChest folds into the chest). VRM 0.x models are handled by the same 180° turn Puppet uses for tracking. Hips translation is scaled by hip height; travel is removed (in place), bob and sit height are kept.
+- **Your clips.** IMPORT CLIP, or drop an `.fbx` / `.glb` on the window (a `.glb` without animations is still taken as a 3D environment). Mixamo (`mixamorig:` names), UAL / Unreal-mannequin and VRoid rigs are detected by bone names; common Blender/Unity names work as a fallback. VPuppet keeps a copy in `<appData>/clips/<sha256>/clip.fbx|glb` with a `clips.json` index (same rules as the model library). One entry per animation in the file; empty bind-pose takes are skipped. Mixamo's terms don't allow redistributing their files: import your own, never commit them.
+- **Retargeting** (`src/anim/retarget.ts`): the clip is sampled at 30 fps and stored per bone as its world rotation change from the source's rest pose, in a frame detected from the rest pose (up = hips → head, left = right arm → left arm), so Y-up, Z-up and either facing all work. On binding to a model, each bone gets a fix rotation from the model's rest direction to the source's (an A-pose source keeps its A-pose arms on a T-pose VRM), and local rotations follow from the bones the model has (a missing upperChest folds into the chest). VRM 0.x models are handled by the same 180° turn VPuppet uses for tracking. Hips translation is scaled by hip height; travel is removed (in place), bob and sit height are kept.
 - **Layering** (`src/anim/player.ts`): the IDLE clip plays while body tracking is off (FACE mode, unless switched off) or lost; with the face tracked the head stays the face's, with the face lost too the idle owns it. An emote plays over live tracking and owns the bones of its mask (FULL, BODY = all but neck and head, ARMS, HEAD), fading in over 0.3 s and out over 0.45 s; clips that move the hips (sit) fade over 0.8 s, because a fast drop pushes the legs through skirts faster than cloth collision follows. Face expressions stay tracked during every emote. Clips are applied as a slerp from the tracked pose, so a clip start is a continuous motion for the cloth solver.
 
 ### Hotkeys (HOTKEYS)
 
 Each binding maps a trigger (key or combo, gamepad button, hand gesture) to an action: play an emote, set an expression (TOGGLE, ON, or HOLD while pressed; any VRM preset or custom expression on the model, with fades), RESET, or the PICKER. Click a trigger to rebind it. The dot marks a binding that belongs to the current model only (expressions differ per model); a model's own binding overrides a global one on the same trigger. Clashes with another binding or with an app shortcut are outlined.
 
-- **GLOBAL** (off by default): the keyboard bindings are registered system-wide with `tauri-plugin-global-shortcut`, so they work while OBS or a game has focus. On macOS this uses Carbon hot keys (no Accessibility permission needed); verified with the desktop build running in the background (a synthesised `⌃⌥⇧F19` fired an emote). A registered key is taken from every other app while Puppet runs, so prefer combos for global use; a combo another app owns fails to register, is listed, and still works in-window.
+- **GLOBAL** (off by default): the keyboard bindings are registered system-wide with `tauri-plugin-global-shortcut`, so they work while OBS or a game has focus. On macOS this uses Carbon hot keys (no Accessibility permission needed); verified with the desktop build running in the background (a synthesised `⌃⌥⇧F19` fired an emote). A registered key is taken from every other app while VPuppet runs, so prefer combos for global use; a combo another app owns fails to register, is listed, and still works in-window.
 - **Gamepad** buttons work whenever the window can poll the Gamepad API (the app keeps rendering in the background).
 - **Hand gestures** plug in through `GestureSource` (`src/input/gestures.ts`); the tracker's gesture events are the TODO adapter there.
 - **Picker:** `G` or pad `RB` opens a grid of emotes and expressions over the stage. Arrows / d-pad / left stick move, `Enter` / `A` fires, `Esc` / `B` closes.
@@ -99,7 +105,7 @@ The desktop app asks for the microphone only when you pick a mode: `NSMicrophone
 
 ## Model library
 
-HOME shows every imported model as a card: a bust thumbnail rendered at import, the name and author, VRM 0.x / 1.0, `PERFECT SYNC n/52` or `PRESETS n/13`, spring-bone chains, triangles, file size, a licence badge, a favourite star and when it was last used. Filter ALL / FAVOURITES (favourites always sort first in ALL), search by name or author, sort by last used, name or date added. Each card also has RENAME, RE-RENDER THUMBNAIL, SHOW IN FOLDER and REMOVE FROM LIBRARY (asks first, and deletes only Puppet's copy).
+HOME shows every imported model as a card: a bust thumbnail rendered at import, the name and author, VRM 0.x / 1.0, `PERFECT SYNC n/52` or `PRESETS n/13`, spring-bone chains, triangles, file size, a licence badge, a favourite star and when it was last used. Filter ALL / FAVOURITES (favourites always sort first in ALL), search by name or author, sort by last used, name or date added. Each card also has RENAME, RE-RENDER THUMBNAIL, SHOW IN FOLDER and REMOVE FROM LIBRARY (asks first, and deletes only VPuppet's copy).
 
 Import with **IMPORT .VRM** (`I`, several files at once) or by dropping `.vrm` files on HOME; each file shows its progress and its own error ("NOT A VRM ..."). Opening a model from the stage (`O`, drop) imports it as well. Models are deduplicated by SHA-256.
 
@@ -107,16 +113,16 @@ Storage (desktop):
 
 ```
 <app data>/library/library.json          favourites, custom names, added / last-used times (atomic write)
-<app data>/library/<sha256>/model.vrm    Puppet's own copy, so moving the original is fine
+<app data>/library/<sha256>/model.vrm    VPuppet's own copy, so moving the original is fine
 <app data>/library/<sha256>/thumb.png    512×512 bust thumbnail
 <app data>/library/<sha256>/meta.json    measured info and the parsed VRM meta (written last)
 ```
 
-`<app data>` is e.g. `~/Library/Application Support/com.spartangamestudios.puppet` on macOS. `PUPPET_LIBRARY_DIR` (or `PUPPET_SETTINGS_DIR`, as `<dir>/library`) moves it for tests. The Rust commands (`src-tauri/src/library.rs`) only accept 64-hex-character ids and the three file names above, so nothing outside the library can be read, written or deleted through them. In a plain browser (`pnpm dev`) the library lives in IndexedDB instead. The pre-library "last model" setting is offered for import once.
+`<app data>` is e.g. `~/Library/Application Support/com.spartangamestudios.vpuppet` on macOS. `PUPPET_LIBRARY_DIR` (or `PUPPET_SETTINGS_DIR`, as `<dir>/library`) moves it for tests. The Rust commands (`src-tauri/src/library.rs`) only accept 64-hex-character ids and the three file names above, so nothing outside the library can be read, written or deleted through them. In a plain browser (`pnpm dev`) the library lives in IndexedDB instead. The pre-library "last model" setting is offered for import once.
 
 ### Licences
 
-Every VRM carries its author's terms in its metadata. Puppet reads them (VRM 1.0 and 0.x, `src/library/vrmMeta.ts`) and shows them in plain language in the card's LICENCE drawer and in the stage's MODEL INFO window (`I`, or click the model name in the bottom bar). The card badge summarises them: **AUTHOR ONLY** / **LICENSED ONLY** (only the author, or people they licensed, may perform as the model), **CC0**, **COMMERCIAL OK** (companies too), **SOLO COMMERCIAL** (individuals may earn money), **PERSONAL** (non-profit only) or **NO TERMS**. Loading an AUTHOR ONLY or LICENSED ONLY model shows a one-time notice. Puppet never refuses to load a model: this is information, not DRM.
+Every VRM carries its author's terms in its metadata. VPuppet reads them (VRM 1.0 and 0.x, `src/library/vrmMeta.ts`) and shows them in plain language in the card's LICENCE drawer and in the stage's MODEL INFO window (`I`, or click the model name in the bottom bar). The card badge summarises them: **AUTHOR ONLY** / **LICENSED ONLY** (only the author, or people they licensed, may perform as the model), **CC0**, **COMMERCIAL OK** (companies too), **SOLO COMMERCIAL** (individuals may earn money), **PERSONAL** (non-profit only) or **NO TERMS**. Loading an AUTHOR ONLY or LICENSED ONLY model shows a one-time notice. VPuppet never refuses to load a model: this is information, not DRM.
 
 VRM 0.x fields map to 1.0 as the VRM consortium's migration does (`allowedUserName` → `avatarPermission`, `commercialUssageName` Allow → `personalProfit`); 0.x credit / redistribution / modification terms come from the licence name (CC0, CC_BY, ...) or a VRoid Hub licence URL. Literal `"undefined"` strings, which one exporter writes, count as empty.
 
@@ -163,25 +169,25 @@ cargo test --manifest-path src-tauri/Cargo.toml   # VMC OSC encoding, UDP loopba
 
 **MediaPipe models are downloaded at build time, not vendored.** `scripts/fetch-models.mjs` runs before every `dev`/`build`. It downloads the four `.task` files (Apache-2.0, published by Google) from Google's official storage (`storage.googleapis.com/mediapipe-models/...`, versioned URLs) into `public/mediapipe/models/`, checks each one against a pinned SHA-256, and copies the tasks-vision WASM runtime out of `node_modules`. The release bundle contains them. The first build needs internet access.
 
-Builds are unsigned unless the Apple signing secrets are configured (see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)). On macOS, right-click the app and choose **Open** the first time, or run `xattr -dr com.apple.quarantine /Applications/Puppet.app`.
+Builds are unsigned unless the Apple signing secrets are configured (see [docs/virtual-camera.md](docs/virtual-camera.md#macos-signing)). On macOS, right-click the app and choose **Open** the first time, or run `xattr -dr com.apple.quarantine /Applications/VPuppet.app`.
 
 Platform extras for the virtual camera: on macOS, `pnpm tauri build` also builds the Swift camera extension (`src-tauri/macos/build-camera-extension.sh`, needs Xcode); on Windows, `pnpm tauri dev` / `build` first build `softcam.dll` (`scripts/build-softcam.ps1`, needs git and Visual Studio 2022+ with C++, which Tauri needs anyway).
 
 ### Avatars
 
-Puppet ships no avatar. Use your own `.vrm` (VRM 0.x or 1.0), for example one exported from [VRoid Studio](https://vroid.com/en/studio), or any model whose licence allows your use. Check the model's own VRM licence metadata. `*.vrm` is git-ignored throughout this repo; please don't commit models.
+VPuppet ships no avatar. Use your own `.vrm` (VRM 0.x or 1.0), for example one exported from [VRoid Studio](https://vroid.com/en/studio), or any model whose licence allows your use. Check the model's own VRM licence metadata. `*.vrm` is git-ignored throughout this repo; please don't commit models.
 
 ## Virtual camera
 
 1. Pick a background in **03 BACKGROUND** (CLEAR is sent as the chosen colour).
 2. In the camera card's **VIRTUAL CAM** section, do the one-time setup the panel asks for:
-   - **macOS:** Puppet must be in /Applications. Click **INSTALL** on the EXTENSION line, then **OPEN SETTINGS** and approve it in System Settings → General → Login Items & Extensions → Camera Extensions (macOS 13–14: Privacy & Security → Allow). This needs a signed build; unsigned builds say so and point to the OBS route.
+   - **macOS:** VPuppet must be in /Applications. Click **INSTALL** on the EXTENSION line, then **OPEN SETTINGS** and approve it in System Settings → General → Login Items & Extensions → Camera Extensions (macOS 13–14: Privacy & Security → Allow). This needs a signed build; unsigned builds say so and point to the OBS route.
    - **Windows:** click **REGISTER CAMERA** and accept the admin prompt.
    - **Linux:** create a loopback device once (the panel shows this command, click to copy):
      ```sh
-     sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="Puppet" exclusive_caps=1
+     sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="VPuppet" exclusive_caps=1
      ```
-3. Tick **SEND TO VIRTUAL CAMERA** (`W`) and pick **Puppet Virtual Camera** (Linux: **Puppet**) as the camera in Zoom, Meet, Discord or OBS.
+3. Tick **SEND TO VIRTUAL CAMERA** (`W`) and pick **VPuppet Virtual Camera** (Linux: **VPuppet**) as the camera in Zoom, Meet, Discord or OBS.
 
 Details, the Apple Developer portal setup for signed builds, and how it works: [docs/virtual-camera.md](docs/virtual-camera.md).
 
@@ -189,18 +195,18 @@ Details, the Apple Developer portal setup for signed builds, and how it works: [
 
 This works on every OS without installing a camera driver. Use it when the native virtual camera isn't available (for example an unsigned macOS build).
 
-1. In Puppet, pick a background:
+1. In VPuppet, pick a background:
    - **COLOUR** green (`#00ff00`) is the most reliable;
    - **CLEAR** is transparent, but whether OBS keeps the alpha depends on the OS and capture method (see Known limitations).
 2. Press `H` for **capture view**: only the avatar remains.
-3. In OBS, add a **macOS Screen Capture** (method *Window Capture*) / **Window Capture** (Windows) / **Window Capture (Xcomposite)** (Linux) source and pick the PUPPET window.
+3. In OBS, add a **macOS Screen Capture** (method *Window Capture*) / **Window Capture** (Windows) / **Window Capture (Xcomposite)** (Linux) source and pick the VPUPPET window.
 4. For a green background, right-click the source → **Filters** → **+ Chroma Key** (key colour Green).
 5. Compose your scene, then click **Start Virtual Camera** in OBS.
 6. In Discord (Settings → Voice & Video → Camera) or Zoom (Settings → Video → Camera), choose **OBS Virtual Camera**.
 
 ## VMC setup
 
-1. In Puppet's **VMC** window (`N`), set the receiver's host and port and tick **SEND VMC** (`V`).
+1. In VPuppet's **VMC** window (`N`), set the receiver's host and port and tick **SEND VMC** (`V`).
    - The default `127.0.0.1:39539` is the usual VMC receive port (VSeeFace, Warudo, VNyan, VMC4U, and others).
    - For a receiver on another PC, use its LAN IP.
 2. In the receiver, enable VMC/OSC receiving on that port.
@@ -210,11 +216,40 @@ This works on every OS without installing a camera driver. Use it when the nativ
 
 The TX readout shows frames and bytes sent. "Nothing listening" errors are counted, not fatal.
 
+## AI agents (MCP server)
+
+VPuppet can host a local [MCP](https://modelcontextprotocol.io) server so AI agents on your computer (Claude Code, Claude Desktop, Cursor and other MCP clients) can look at and drive the running app: inspect a model while you build it in Blender, check its perfect-sync shapes, take screenshots, try expressions and clips, and read tracking stats and errors.
+
+1. In the **VMC** window (`N`), tick **ALLOW AI AGENTS (LOCAL MCP SERVER)**. It is off by default.
+2. Register VPuppet with your clients (run it again after **NEW TOKEN** or a port change):
+   ```sh
+   # macOS / Linux
+   curl -fsSL https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.sh | sh
+   # Windows (PowerShell)
+   irm https://raw.githubusercontent.com/Spartan-Game-Studios/puppet/main/apps/docs/public/mcp/install.ps1 | iex
+   ```
+   The script reads the token from VPuppet's config folder and adds a `vpuppet` server to Claude Code (`claude mcp add --transport http --scope user`), Cursor (`~/.cursor/mcp.json`) and Claude Desktop (`claude_desktop_config.json`, through the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge, which needs Node.js). It merges JSON configs, backs them up first, never prints the token, and is safe to re-run. `| sh -s -- --uninstall` (or `$env:VPUPPET_MCP_UNINSTALL=1` on Windows) removes the entries. Other clients: an HTTP (Streamable HTTP) MCP server at `http://127.0.0.1:39540/mcp` with the header `Authorization: Bearer <contents of mcp-token>`; **COPY CLAUDE CODE COMMAND** in the app copies a ready `claude mcp add` line.
+
+Security: the server listens on `127.0.0.1` only, every request needs the bearer token (random, created on first enable, kept as `mcp-token` next to `settings.json`, owner-only on macOS/Linux), and requests with a browser `Origin` header or a non-loopback `Host` are refused, so web pages cannot reach it. It reads only files you or the agent name (`library_import`). The port (default 39540) is set next to the toggle; `mcp.json` beside the token records it for the installer.
+
+| Tool | What it does |
+| --- | --- |
+| `app_status` | Version, demo state, model on the stage, screen, tracking mode/state, outputs, fps |
+| `library_list` / `library_load` / `library_import` | List the library; load by id (refused once the Steam demo has ended); import an absolute `.vrm` path (and load it) |
+| `model_inspect` | VRM version and meta, humanoid bones mapped/missing, every expression and its binds, ARKit perfect-sync coverage (missing names, and ones present under another naming such as `eyeBlink_L`), presets, look-at, spring chains/colliders, mesh/material/texture stats, licence, model-check warnings |
+| `stage_screenshot` | PNG of the stage as you see it, or framed face / bust / upper / full |
+| `expression_set` / `expression_sweep` | Hold an expression over tracking; drive each expression in turn with the pose frozen and report dead shapes and swapped Left/Right, with a contact sheet |
+| `clip_list` / `clip_play` | Built-in and imported animation clips |
+| `tracking_stats` / `logs_recent` | Per-pipeline fps/latency, hand search per side; recent status lines and errors |
+| `settings_get` / `settings_set` | Tracking mode, smoothing, framing, background, physics mode (nothing else) |
+
+A typical loop: `model_inspect` → fix the model in Blender → export → `library_import` the new file → `expression_sweep set=arkit` to verify perfect sync. Code: `src-tauri/src/mcp/` (server on the official Rust SDK [`rmcp`](https://crates.io/crates/rmcp), auth, tool list in `tools.json`) and `src/app/mcpBridge.ts` (the tools, run in the webview).
+
 ## Perfect sync, explained
 
 ARKit (iPhone face tracking) defines 52 named blendshapes such as `eyeBlinkLeft`, `jawOpen` and `mouthSmileLeft`. A **perfect-sync** model ships one expression per ARKit name, sculpted by the modeller. The tracker's 52 numbers then drive the face directly, and every mouth and brow shape reads as the artist intended instead of being squeezed into five vowels and a blink. MediaPipe's FaceLandmarker outputs the same 52 names (minus `tongueOut`), so a webcam can drive a perfect-sync model without an iPhone.
 
-Puppet detects perfect sync when the model has at least 40 of the 52 names. The bottom bar shows `PERFECT SYNC n/52` or `PRESETS n/13`. Rows the model lacks are struck through in the FACE window (`F`).
+VPuppet detects perfect sync when the model has at least 40 of the 52 names. The bottom bar shows `PERFECT SYNC n/52` or `PRESETS n/13`. Rows the model lacks are struck through in the FACE window (`F`).
 
 ## Testing without a camera
 
@@ -322,7 +357,7 @@ The hitch settle time is set by the shoulder ribbons, not the skirt. Most of the
 
 On the same avatar the stability test above gives, for the cloth solver: 1.44 m/s max tail speed (p99 1.36, skirt median 0.53) and 0.29 s settle time.
 
-**Skin-index overflow.** `VRMUtils.combineSkeletons` (three-vrm 3.5.5) remaps each mesh's joint indices into one combined skeleton but keeps the attribute's array type. With 8-bit `JOINTS_0` and more than 256 bones in total, indices wrap around: on the avatar above a third of the gown's vertex weights pointed at hair spring bones, so the skirt tore apart whenever the hair moved, whatever the physics. Puppet now widens skin indices to 16 bits before combining (`widenSkinIndices` in `src/scene/avatar.ts`).
+**Skin-index overflow.** `VRMUtils.combineSkeletons` (three-vrm 3.5.5) remaps each mesh's joint indices into one combined skeleton but keeps the attribute's array type. With 8-bit `JOINTS_0` and more than 256 bones in total, indices wrap around: on the avatar above a third of the gown's vertex weights pointed at hair spring bones, so the skirt tore apart whenever the hair moved, whatever the physics. VPuppet now widens skin indices to 16 bits before combining (`widenSkinIndices` in `src/scene/avatar.ts`).
 
 ## Gesture events
 
@@ -399,7 +434,7 @@ The captures span a loaded and a quiet machine; on the three quiet ones (hands a
 
 ### Compatibility sweep
 
-`scripts/compat-sweep.mjs` (`harness/compat.ts`) loads each VRM with the app's own loader in headless Chrome on its own Vite server (port 5233) and checks what tends to break from model to model: load errors and warnings, VRM version and licence, humanoid bones Puppet needs, rest pose (T / A) and facing, bounds and the BUST / UPPER / FULL framing (camera outside the mesh, avatar in view), whether expressions and gaze visibly change the picture, spring chains and cloth groups under a shake (max speed, settle time, NaN), skinned bone count (over 256 takes the 16-bit skin-index path), materials (MToon, transparency, outlines, black or pink or missing textures), render fps at 1280×720, the IDLE / WAVE / CHEER clips (frame-to-frame limb jumps), and the library's import analysis and thumbnail. With `PUPPET_CLIP_DIR` set to a rendered test clip (`scripts/render-clip.mjs`) it also plays the clip through the real app per model, screenshots rest / head turn / arms up and checks the arms go up and the head turns the mirrored way, opens MODEL INFO and the library card. It writes `report.html` (one row per model, PASS / WARN / FAIL per check, thumbnails and screenshots) and `report.json`.
+`scripts/compat-sweep.mjs` (`harness/compat.ts`) loads each VRM with the app's own loader in headless Chrome on its own Vite server (port 5233) and checks what tends to break from model to model: load errors and warnings, VRM version and licence, humanoid bones VPuppet needs, rest pose (T / A) and facing, bounds and the BUST / UPPER / FULL framing (camera outside the mesh, avatar in view), whether expressions and gaze visibly change the picture, spring chains and cloth groups under a shake (max speed, settle time, NaN), skinned bone count (over 256 takes the 16-bit skin-index path), materials (MToon, transparency, outlines, black or pink or missing textures), render fps at 1280×720, the IDLE / WAVE / CHEER clips (frame-to-frame limb jumps), and the library's import analysis and thumbnail. With `PUPPET_CLIP_DIR` set to a rendered test clip (`scripts/render-clip.mjs`) it also plays the clip through the real app per model, screenshots rest / head turn / arms up and checks the arms go up and the head turns the mirrored way, opens MODEL INFO and the library card. It writes `report.html` (one row per model, PASS / WARN / FAIL per check, thumbnails and screenshots) and `report.json`.
 
 ```sh
 node scripts/fetch-test-avatars.mjs             # the CC0 test avatars (pinned URLs + SHA-256) into test-assets/cc0/
@@ -409,7 +444,7 @@ PUPPET_CLIP_DIR=clip/ node scripts/compat-sweep.mjs out/ a.vrm b.vrm   # your ow
 
 CI runs it on the two committed fixtures (`test-assets/cc0/devil.vrm`, `the-worm.vrm`; CC0, see `LICENSES.md` there) with software GL and fails on any FAIL. Reports made from your own models show those models: keep them out of the repo.
 
-**Model checks.** On load Puppet looks for authoring problems it can detect cheaply and reliably (`src/scene/modelChecks.ts`) and lists them under MODEL CHECKS in MODEL INFO; the serious ones also go on the library card: FACE POINTS AWAY FROM SKELETON (the face mesh is on the back of the head bone), MODEL FACES AWAY FROM THE CAMERA, MISSING BONES, FACE EXPRESSIONS ARE EMPTY (expressions listed but bound to nothing), NO FACE EXPRESSIONS, and (MODEL INFO only) a rest pose that is not a T-pose. Puppet never edits the model to "fix" these.
+**Model checks.** On load VPuppet looks for authoring problems it can detect cheaply and reliably (`src/scene/modelChecks.ts`) and lists them under MODEL CHECKS in MODEL INFO; the serious ones also go on the library card: FACE POINTS AWAY FROM SKELETON (the face mesh is on the back of the head bone), MODEL FACES AWAY FROM THE CAMERA, MISSING BONES, FACE EXPRESSIONS ARE EMPTY (expressions listed but bound to nothing), NO FACE EXPRESSIONS, and (MODEL INFO only) a rest pose that is not a T-pose. VPuppet never edits the model to "fix" these.
 
 Two behaviours came out of the sweep. Framing scales with the avatar: anything 1.3–2.1 m tall is framed as before, a 30 cm mascot or a 4 m giant proportionally, and a head much bigger than a person's (an all-head mascot, a 2 m ball) is kept partly in view instead of filling the frame. And a VRM 0.x model that declares bone look-at but has no eye bones, while its LookUp / Down / Left / Right expressions are bound (a common exporter default), has its eyes driven through those expressions.
 
@@ -440,7 +475,7 @@ Two behaviours came out of the sweep. Framing scales with the avatar: anything 1
 - **Virtual camera.**
   - macOS needs a Developer ID–signed build with the system-extension entitlement; unsigned builds (including CI artifacts) can't install the camera. The extension, its activation and the CMIO sink path have been built and checked as far as an unsigned build allows (activation stops at "missing entitlement"); the signed install and a real Zoom/Meet session are untested.
   - Windows (softcam) and Linux (v4l2loopback) build and pass unit tests in CI but have not been run on real machines.
-  - The camera gets a new frame only when Puppet renders one, so its rate is capped by the app's render rate. Puppet keeps rendering while its window is hidden or covered (`backgroundThrottling` is off), but a heavily loaded machine lowers both.
+  - The camera gets a new frame only when VPuppet renders one, so its rate is capped by the app's render rate. VPuppet keeps rendering while its window is hidden or covered (`backgroundThrottling` is off), but a heavily loaded machine lowers both.
   - 30 fps only. Windows: 64-bit camera apps only (no 32-bit DLL).
 - **Physics.**
   - The **inertia** stabiliser assumes no VRM spring `center`; the cloth solver simulates every chain in world space.
@@ -452,8 +487,8 @@ Two behaviours came out of the sweep. Framing scales with the avatar: anything 1
 
 ## Licences and credits
 
-Puppet is MIT licensed (see `LICENSE`). Third-party components and their licences are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+VPuppet is MIT licensed (see `LICENSE`). Third-party components and their licences are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Built on [three.js](https://threejs.org) (MIT), [@pixiv/three-vrm](https://github.com/pixiv/three-vrm) (MIT), [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe) (Apache-2.0, models Apache-2.0), [Tauri](https://tauri.app) (MIT/Apache-2.0), [rosc](https://github.com/klingtnet/rosc) (MIT/Apache-2.0), [softcam](https://github.com/tshino/softcam) (MIT, Windows virtual camera) and [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (OFL-1.1). The one-euro filter follows Casiez, Roussel and Vogel (CHI 2012).
 
-Puppet's code is written from these libraries and their documentation. It contains no code from other VTuber applications.
+VPuppet's code is written from these libraries and their documentation. It contains no code from other VTuber applications.

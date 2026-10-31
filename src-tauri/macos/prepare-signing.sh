@@ -8,7 +8,7 @@
 # Inputs (env):
 #   APPLE_TEAM_ID            10-character team ID
 #   PUPPET_APP_PROFILE       path to the app's .provisionprofile
-#                            (App ID com.spartangamestudios.puppet, with the
+#                            (App ID com.spartangamestudios.vpuppet, with the
 #                            System Extension capability)
 # The extension's own signing happens in build-camera-extension.sh
 # (APPLE_SIGNING_IDENTITY, PUPPET_CAMEXT_PROFILE). See docs/virtual-camera.md.
@@ -32,7 +32,7 @@ cat > "$OUT/Entitlements.app.plist" <<PLIST
   <key>com.apple.developer.system-extension.install</key>
   <true/>
   <key>com.apple.application-identifier</key>
-  <string>$APPLE_TEAM_ID.com.spartangamestudios.puppet</string>
+  <string>$APPLE_TEAM_ID.com.spartangamestudios.vpuppet</string>
   <key>com.apple.developer.team-identifier</key>
   <string>$APPLE_TEAM_ID</string>
 </dict>
@@ -48,7 +48,7 @@ cat > "$OUT/tauri.signed.conf.json" <<JSON
       "entitlements": "macos/build/Entitlements.app.plist",
       "files": {
         "embedded.provisionprofile": "macos/build/embedded.provisionprofile",
-        "Library/SystemExtensions/com.spartangamestudios.puppet.camera.systemextension": "macos/build/com.spartangamestudios.puppet.camera.systemextension"
+        "Library/SystemExtensions/com.spartangamestudios.vpuppet.camera.systemextension": "macos/build/com.spartangamestudios.vpuppet.camera.systemextension"
       }
     }
   }

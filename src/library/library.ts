@@ -1,8 +1,9 @@
 /**
- * The model library: imported VRMs copied into Puppet's own storage, with
+ * The model library: imported VRMs copied into VPuppet's own storage, with
  * thumbnails, measured info and the user's favourites / names / times.
  */
 import { readPath } from '../app/platform';
+import { t, type Key } from '../i18n';
 import { analyzeVrm } from './analyze';
 import { createBackend, type LibraryBackend } from './backend';
 import {
@@ -43,6 +44,18 @@ async function sha256Hex(buf: ArrayBuffer): Promise<string> {
 }
 
 const enc = new TextEncoder();
+
+/** Import errors thrown in English (tests and scripts match "NOT A VRM"), shown in the UI language. */
+const ERROR_TEXT: Readonly<Record<string, Key>> = {
+  'NOT A VRM (NEEDS A .VRM FILE)': 'library.err.needsVrm',
+  'NOT A VRM (FILE TOO SMALL)': 'library.err.tooSmall',
+  'NOT A VRM (NOT A GLB FILE)': 'library.err.notGlb',
+  'NOT A VRM (BAD GLB JSON CHUNK)': 'library.err.badChunk',
+  'NOT A VRM (UNREADABLE GLB JSON)': 'library.err.unreadableJson',
+  'NOT A VRM (BAD GLB JSON)': 'library.err.badJson',
+  'NOT A VRM (NO VRM EXTENSION)': 'library.err.noExt',
+  'NOTHING TO READ': 'library.err.nothing',
+};
 
 export class Library {
   readonly cards = new Map<string, Card>();
@@ -151,7 +164,8 @@ export class Library {
       return { status: 'added', id };
     } catch (e) {
       const msg = (e as Error).message || String(e);
-      return { status: 'error', error: /NOT A VRM/.test(msg) ? msg : `FAILED: ${msg}` };
+      const known = ERROR_TEXT[msg];
+      return { status: 'error', error: known ? t(known) : /NOT A VRM/.test(msg) ? msg : t('library.err.failed', { msg }) };
     }
   }
 
@@ -160,7 +174,7 @@ export class Library {
     if (!c) return;
     const bytes = await this.backend.read(id, 'model.vrm');
     const { thumb } = await analyzeVrm(bytes);
-    if (!thumb) throw new Error('THUMBNAIL RENDER FAILED');
+    if (!thumb) throw new Error(t('library.err.thumbFailed'));
     await this.backend.write(id, 'thumb.png', thumb);
     c.info = { ...c.info, thumbAt: Date.now() };
     await this.backend.write(id, 'meta.json', enc.encode(JSON.stringify(c.info, null, 1)));

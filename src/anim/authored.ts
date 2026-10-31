@@ -1,5 +1,5 @@
 /**
- * Puppet's own keyframed emotes (wave, clap, bow, point, shrug, think): the
+ * VPuppet's own keyframed emotes (wave, clap, bow, point, shrug, think): the
  * gestures the bundled CC0 library doesn't have. Authored in solver space
  * (+Y up, the avatar faces +Z, its left hand is +X) against the avatar's
  * measured rest directions, so they fit any VRM.
