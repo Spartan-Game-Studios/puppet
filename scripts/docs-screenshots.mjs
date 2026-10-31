@@ -1,6 +1,8 @@
 // Screenshots of the real app UI for the docs site, in every UI language.
 //   node scripts/docs-screenshots.mjs [--only name,name] [--langs en,ru]
 // Writes apps/docs/public/screenshots/<lang>/<name>.webp (needs `cwebp`).
+// For the Steam store page (1920x1080 PNGs, English):
+//   node scripts/docs-screenshots.mjs --langs en --size 1920x1080 --out steam/screenshots
 //
 // Runs the app's frontend in headless Chrome (nothing opens on screen) on a
 // private Vite server, with the fake camera and only the CC0 test avatars in
@@ -16,7 +18,14 @@ import { launch } from './lib/browser.mjs';
 import { startVite } from './lib/vite.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const OUT = join(ROOT, 'apps/docs/public/screenshots');
+const one = (name) => {
+  const i = process.argv.indexOf(name);
+  return i > 0 ? process.argv[i + 1] : null;
+};
+// --out writes plain PNGs (no per-language folder when only one language is asked for).
+const OUT = one('--out') ? join(ROOT, one('--out')) : join(ROOT, 'apps/docs/public/screenshots');
+const PNG = !!one('--out');
+const [VW, VH] = (one('--size') ?? '1440x900').split('x').map(Number);
 const arg = (name) => {
   const i = process.argv.indexOf(name);
   return i > 0 ? process.argv[i + 1].split(',') : null;
@@ -56,10 +65,10 @@ let made = 0;
 
 try {
   for (const lang of LANGS) {
-    const dir = join(OUT, lang);
+    const dir = PNG && LANGS.length === 1 ? OUT : join(OUT, lang);
     mkdirSync(dir, { recursive: true });
     // A fresh context per language: its own (empty) model library.
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+    const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, deviceScaleFactor: 1 });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.log(`[${lang}] pageerror`, e.message));
     await page.route('**/__local/worm-arkit.vrm', (r) => r.fulfill({ body: wormArkit, contentType: 'application/octet-stream' }));
@@ -71,11 +80,11 @@ try {
       if (ONLY && !ONLY.includes(name)) return;
       await prep?.();
       await page.waitForTimeout(700);
-      const png = join(tmp, `${lang}-${name}.png`);
+      const png = PNG ? join(dir, `${name}.png`) : join(tmp, `${lang}-${name}.png`);
       await page.screenshot({ path: png, clip: clip ? await clip() : undefined });
-      execFileSync('cwebp', ['-quiet', '-q', '85', png, '-o', join(dir, `${name}.webp`)]);
+      if (!PNG) execFileSync('cwebp', ['-quiet', '-q', '85', png, '-o', join(dir, `${name}.webp`)]);
       made++;
-      console.log(`${lang}/${name}.webp`);
+      console.log(PNG ? png : `${lang}/${name}.webp`);
     };
     const key = async (k) => {
       await page.keyboard.press(k);
@@ -140,7 +149,7 @@ try {
       () => key('n'),
       async () => {
         const top = await page.evaluate(() => document.getElementById('mcp-controls')?.closest('section')?.getBoundingClientRect().top ?? 900);
-        return { x: 0, y: 0, width: 1440, height: Math.max(300, Math.min(900, Math.floor(top))) };
+        return { x: 0, y: 0, width: VW, height: Math.max(300, Math.min(VH, Math.floor(top))) };
       },
     );
     await closeModal();
