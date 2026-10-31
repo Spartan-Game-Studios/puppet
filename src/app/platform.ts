@@ -113,15 +113,24 @@ export interface DemoStatus {
   used_s: number;
   limit_s: number;
   locked: boolean;
+  /** Hours used up; when not `locked` yet, the app locks at its next start. */
+  expired: boolean;
   steam: boolean;
 }
 
-/** In the browser `?demo=on|low|locked` fakes a demo build (layout tests). */
+/** In the browser `?demo=on|low|expired|locked` fakes a demo build (layout tests). */
 function fakeDemo(): DemoStatus {
   const m = new URLSearchParams(location.search).get('demo');
   const limit = 100 * 3600;
-  const used = m === 'locked' ? limit : m === 'low' ? limit - 4 * 3600 : 0;
-  return { demo: m === 'on' || m === 'low' || m === 'locked', used_s: used, limit_s: limit, locked: m === 'locked', steam: false };
+  const used = m === 'locked' || m === 'expired' ? limit : m === 'low' ? limit - 4 * 3600 : 0;
+  return {
+    demo: ['on', 'low', 'expired', 'locked'].includes(m ?? ''),
+    used_s: used,
+    limit_s: limit,
+    locked: m === 'locked',
+    expired: used >= limit,
+    steam: false,
+  };
 }
 
 export async function demoStatus(): Promise<DemoStatus> {

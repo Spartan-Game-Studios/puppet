@@ -81,14 +81,18 @@ export async function mountDemo(deps: DemoDeps): Promise<Demo> {
   let locked = false;
   function render(s: DemoStatus): void {
     st = s;
-    (cell.querySelector('.val') as HTMLElement).textContent = s.locked ? t('demo.ended') : fmtLeft(s);
-    cell.classList.toggle('hot', s.locked || hoursLeft(s) <= WARN_H);
-    const warn = s.locked || hoursLeft(s) <= WARN_H;
+    // Used up mid-session (expired, not locked): this session keeps going; the next start locks.
+    const lastSession = s.expired && !s.locked;
+    (cell.querySelector('.val') as HTMLElement).textContent = s.locked ? t('demo.ended') : lastSession ? t('demo.lastSession') : fmtLeft(s);
+    cell.classList.toggle('hot', s.expired || hoursLeft(s) <= WARN_H);
+    const warn = s.expired || hoursLeft(s) <= WARN_H;
     banner.classList.toggle('hidden', !warn);
-    banner.classList.toggle('ended', s.locked);
+    banner.classList.toggle('ended', s.expired);
     (banner.querySelector('.demo-msg') as HTMLElement).textContent = s.locked
       ? t('demo.bannerEnded')
-      : t('demo.bannerLeft', { left: fmtLeft(s) });
+      : lastSession
+        ? t('demo.bannerExpired')
+        : t('demo.bannerLeft', { left: fmtLeft(s) });
     lock.classList.toggle('hidden', !s.locked);
     if (s.locked && !locked) {
       locked = true;

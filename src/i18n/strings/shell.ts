@@ -289,6 +289,8 @@ export const en = {
   'demo.bannerLeft': 'DEMO: {left} OF 100 FREE HOURS.',
   'demo.statusEnded': 'DEMO ENDED',
   'demo.statusRefused': 'DEMO ENDED: BUY VPUPPET TO LOAD MODELS ON THE STAGE',
+  'demo.lastSession': 'LAST SESSION',
+  'demo.bannerExpired': 'YOU HAVE USED THE 100 FREE HOURS. THIS SESSION KEEPS RUNNING; TRACKING AND OUTPUTS LOCK THE NEXT TIME VPUPPET STARTS.',
 } as const;
 
 export const ru: Tr<typeof en> = {
@@ -559,6 +561,8 @@ export const ru: Tr<typeof en> = {
   'demo.bannerLeft': 'ДЕМО: {left} ИЗ 100 БЕСПЛАТНЫХ ЧАСОВ.',
   'demo.statusEnded': 'ДЕМО ЗАКОНЧЕНО',
   'demo.statusRefused': 'ДЕМО ЗАКОНЧЕНО: КУПИТЕ VPUPPET, ЧТОБЫ ЗАГРУЖАТЬ МОДЕЛИ НА СЦЕНУ',
+  'demo.lastSession': 'ПОСЛЕДНИЙ СЕАНС',
+  'demo.bannerExpired': 'ВЫ ИСПОЛЬЗОВАЛИ 100 БЕСПЛАТНЫХ ЧАСОВ. ЭТОТ СЕАНС ПРОДОЛЖАЕТСЯ; ТРЕКИНГ И ВЫВОД ЗАБЛОКИРУЮТСЯ ПРИ СЛЕДУЮЩЕМ ЗАПУСКЕ VPUPPET.',
 };
 
 export const zhCN: Tr<typeof en> = {
@@ -827,6 +831,8 @@ export const zhCN: Tr<typeof en> = {
   'demo.bannerLeft': '试用：100 小时免费时长中{left}。',
   'demo.statusEnded': '试用已结束',
   'demo.statusRefused': '试用已结束：购买 VPUPPET 后才能将模型加载到舞台',
+  'demo.lastSession': '最后一次',
+  'demo.bannerExpired': '你已用完 100 小时免费时长。本次会话会继续运行；下次启动 VPUPPET 时，追踪和输出将被锁定。',
 };
 
 export const es: Tr<typeof en> = {
@@ -1097,4 +1103,6 @@ export const es: Tr<typeof en> = {
   'demo.bannerLeft': 'DEMO: {left} DE 100 HORAS GRATIS.',
   'demo.statusEnded': 'DEMO TERMINADA',
   'demo.statusRefused': 'DEMO TERMINADA: COMPRA VPUPPET PARA CARGAR MODELOS EN EL ESCENARIO',
+  'demo.lastSession': 'ÚLTIMA SESIÓN',
+  'demo.bannerExpired': 'HAS USADO LAS 100 HORAS GRATIS. ESTA SESIÓN SIGUE FUNCIONANDO; EL SEGUIMIENTO Y LAS SALIDAS SE BLOQUEAN LA PRÓXIMA VEZ QUE INICIES VPUPPET.',
 };
