@@ -1,11 +1,11 @@
-"""Build every Steam capsule size from the AI art plates and the original logo.
+"""Build every Steam capsule size from the AI art plates and the VPuppet logo.
 
     python3 steam/capsules/make_capsules.py [--sheet]
 
 Inputs:
-  - source/base.webp (1672x941), the original key art. Only its logo is used:
-    re-rendered from thresholded masks so it stays crisp at any size (flat ink
-    and orange, transparent background). The image model never draws the logo.
+  - source/fonts/Jersey10-Regular.ttf (SIL OFL 1.1, licence beside it): the
+    logo is set in it, "V" on an orange block then "PUPPET", flat ink and
+    orange on a transparent background. The image model never draws the logo.
   - source/ai/*.png, text-free plates made by gen.py from that key art:
       landscape_right      2560x1440  CRT + avatar in the right 58%, calm paper left
       wide_hero            3840x1280  ultra-wide, avatar right, calm paper left/centre
@@ -24,11 +24,10 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from scipy import ndimage
 
 HERE = Path(__file__).resolve().parent
-SRC = HERE / "source" / "base.webp"
 AI = HERE / "source" / "ai"
 
 
@@ -41,69 +40,60 @@ OUT = HERE / "out"
 INK = (10, 10, 10)        # #0a0a0a
 ORANGE = (255, 59, 0)     # #ff3b00
 
-# Logo geometry in base.webp.
-LOGO_BOX = (52, 60, 790, 236)   # logo incl. tagline, in source px
-TAGLINE_Y = 200                 # source y where the tagline starts
-V_BOX = (56, 64, 186, 226)      # the orange V block
+FONT = HERE / "source" / "fonts" / "Jersey10-Regular.ttf"
+TAGLINE = "3D AVATAR SOFTWARE"
 
 
 # ---------------------------------------------------------------- logo
 
-def masks(src):
-    """(ink, orange) masks of the logo region, as float arrays 0..1."""
-    a = np.asarray(src.crop(LOGO_BOX)).astype(float)
-    r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    lum = 0.299 * r + 0.587 * g + 0.114 * b
-    orange = (r > 170) & (g < 130) & (b < 100)
-    ink = (lum < 110) & ~orange
-    # Drop the corner bracket decoration right of the tagline.
-    x0, y0 = LOGO_BOX[0], LOGO_BOX[1]
-    ink[TAGLINE_Y - 15 - y0 :, 610 - x0 :] = False
-    return ink.astype(float), orange.astype(float)
+def _text(draw, xy, text, font, fill, spacing=0):
+    """Draw `text` with extra `spacing` px between letters; returns the end x."""
+    x, y = xy
+    for ch in text:
+        draw.text((x, y), ch, font=font, fill=fill)
+        x += draw.textlength(ch, font=font) + spacing
+    return x - spacing
 
 
-def render_logo(src, width, tagline=True):
-    """The logo at `width` px, crisp: masks upscaled smoothly, re-thresholded."""
-    ink, orange = masks(src)
-    if not tagline:
-        cut = TAGLINE_Y - LOGO_BOX[1] - 4
-        ink, orange = ink[:cut], orange[:cut]
-    h0, w0 = ink.shape
-    k = width / w0
-    size = (width, max(1, round(h0 * k)))
+def render_logo(width, tagline=True):
+    """The logo at `width` px: drawn 4x large in Jersey 10, then downscaled."""
+    big = 640                                   # font px at 4x
+    f = ImageFont.truetype(str(FONT), big)
+    probe = ImageDraw.Draw(Image.new("L", (1, 1)))
+    l, t, r, b = probe.textbbox((0, 0), "V", font=f)
+    cap = b - t
+    pad = round(cap * 0.16)                     # orange around the V
+    gap = round(cap * 0.14)                     # block to "PUPPET"
+    track = round(cap * 0.04)                   # letter spacing
+    block_w, block_h = (r - l) + 2 * pad, cap + 2 * pad
+    word_w = probe.textlength("PUPPET", font=f) + track * 5
+    tag_f = ImageFont.truetype(str(FONT), round(big * 0.30))
+    tag_h = round(cap * 0.42) if tagline else 0
+    tag_w = probe.textlength(TAGLINE, font=tag_f) + round(cap * 0.08) * (len(TAGLINE) - 1)
+    W = round(block_w + gap + max(word_w, tag_w if tagline else 0))
+    im = Image.new("RGBA", (W, block_h + tag_h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rectangle((0, 0, block_w - 1, block_h - 1), fill=ORANGE)
+    d.text((pad - l, pad - t), "V", font=f, fill=INK)
+    _text(d, (block_w + gap, pad - t), "PUPPET", f, INK, track)
+    if tagline:
+        tb = probe.textbbox((0, 0), TAGLINE, font=tag_f)
+        _text(d, (block_w + gap, block_h + tag_h * 0.35 - tb[1]), TAGLINE, tag_f, INK, round(cap * 0.08))
+    im = im.crop(im.getbbox())
+    return im.resize((width, max(1, round(im.height * width / im.width))), Image.LANCZOS)
 
-    def up(m):
-        im = Image.fromarray((m * 255).astype(np.uint8)).resize(size, Image.LANCZOS)
-        im = im.filter(ImageFilter.GaussianBlur(max(0.6, k * 0.35)))
-        return np.asarray(im).astype(float) / 255
 
-    mi, mo = up(ink), up(orange)
-    edge = lambda m: np.clip((m - 0.5) * 6 + 0.5, 0, 1)
-    ai, ao = edge(mi), edge(mo)
-    alpha = np.maximum(ao, ai)
-    rgb = (np.array(ORANGE) * (ao * (1 - ai))[..., None] + np.array(INK) * ai[..., None]) / np.maximum(alpha, 1e-6)[..., None]
-    out = np.dstack([rgb, alpha * 255])
-    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
-
-
-def icon(src, size):
+def icon(size):
     """The orange V block alone, square."""
-    a = np.asarray(src.crop(V_BOX)).astype(float)
-    r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    ink = ((0.299 * r + 0.587 * g + 0.114 * b) < 90) & (r < 120)
-    ink[:, :6] = ink[:, -6:] = False
-    ink[:6] = ink[-6:] = False
-    ink = ink.astype(float)
-    ys, xs = np.nonzero(ink > 0.5)
-    ink = ink[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1]
-    h0, w0 = ink.shape
-    k = size * 0.72 / h0
-    vw, vh = round(w0 * k), round(h0 * k)
-    m = Image.fromarray((ink * 255).astype(np.uint8)).resize((vw, vh), Image.LANCZOS)
-    m = Image.fromarray((np.clip((np.asarray(m) / 255 - 0.5) * 6 + 0.5, 0, 1) * 255).astype(np.uint8))
-    canvas = Image.new("RGB", (size, size), ORANGE)
-    canvas.paste(Image.new("RGB", (vw, vh), INK), ((size - vw) // 2, (size - vh) // 2), m)
-    return canvas
+    f = ImageFont.truetype(str(FONT), size * 4)
+    canvas = Image.new("RGB", (size * 4, size * 4), ORANGE)
+    d = ImageDraw.Draw(canvas)
+    l, t, r, b = d.textbbox((0, 0), "V", font=f)
+    k = size * 4 * 0.72 / (b - t)
+    f = ImageFont.truetype(str(FONT), round(size * 4 * k))
+    l, t, r, b = d.textbbox((0, 0), "V", font=f)
+    d.text(((size * 4 - (r - l)) / 2 - l, (size * 4 - (b - t)) / 2 - t), "V", font=f, fill=INK)
+    return canvas.resize((size, size), Image.LANCZOS)
 
 
 # ---------------------------------------------------------------- plates
@@ -185,7 +175,7 @@ def widen(pl, extra, calm_x, below=0):
     return out
 
 
-def landscape(src, pl, W, H, logo_frac, tagline=True, name="", extra=0, cut=0, below=0):
+def landscape(pl, W, H, logo_frac, tagline=True, name="", extra=0, cut=0, below=0):
     """landscape_right, full width (or full height if narrower), logo on the left
     calm paper, vertically centred on the band above the CRT's bottom. `extra`
     widens the paper on the left and `below` under the art (see widen) and `cut` crops that many plate px
@@ -210,13 +200,13 @@ def landscape(src, pl, W, H, logo_frac, tagline=True, name="", extra=0, cut=0, b
     canvas = crop_fit(pl, box, W, H)
     calm_w = (calm_x - box[0]) * s
     margin, gap = round(W * 0.035), round(W * 0.015)   # left edge, gap to the CRT
-    logo = render_logo(src, round(min(calm_w - margin - gap, W * logo_frac)), tagline)
+    logo = render_logo(round(min(calm_w - margin - gap, W * logo_frac)), tagline)
     # Centred on the CRT (plate y 160..1300), or a little low on uncropped plates.
     y = round(((160 + 1300) / 2 - box[1]) * s - logo.height / 2) if below else round(H * 0.44 - logo.height / 2)
     return put_logo(canvas, logo, (margin, y), name)
 
 
-def small(src, pl, W, H):
+def small(pl, W, H):
     """Logo (no tagline) on calm paper at left, the face tight on the right."""
     face = (1450, 400, 1990, 900)                       # in landscape_right
     s = H / (face[3] - face[1])
@@ -225,11 +215,11 @@ def small(src, pl, W, H):
     canvas = Image.new("RGB", (W, H))
     canvas.paste(paper, (0, 0))
     canvas.paste(crop_fit(pl, face, fw, H), (W - fw, 0))
-    logo = render_logo(src, W - fw - 28, tagline=False)
+    logo = render_logo(W - fw - 28, tagline=False)
     return put_logo(canvas, logo, (14, (H - logo.height) // 2), "small_capsule")
 
 
-def portrait(src, pl, W, H, y0, band, logo_frac, name, tagline=True):
+def portrait(pl, W, H, y0, band, logo_frac, name, tagline=True):
     """A portrait plate cropped to W:H from y0 (full width), logo centred in the
     paper band above the head (`band` = plate y of the head top)."""
     PW, PH = pl.size
@@ -237,7 +227,7 @@ def portrait(src, pl, W, H, y0, band, logo_frac, name, tagline=True):
     assert y0 + h <= PH
     s = W / PW
     canvas = crop_fit(pl, (0, y0, PW, y0 + h), W, H)
-    logo = render_logo(src, round(W * logo_frac), tagline)
+    logo = render_logo(round(W * logo_frac), tagline)
     band_h = (band - y0) * s
     assert logo.height < band_h - 30, f"{name}: no room above the head"
     y = round((band_h - logo.height) / 2)
@@ -280,8 +270,6 @@ def contact_sheet(names):
 
 
 def main():
-    src = Image.open(SRC).convert("RGB")
-    assert src.size == (1672, 941), f"logo coordinates are for 1672x941, got {src.size}"
     lr = plate("landscape_right")
     wide = plate("wide_hero")
     por = plate("portrait")
@@ -296,25 +284,25 @@ def main():
 
     # Store and library capsules: Valve allows only the logo as text on these
     # (no tagline), and the header's logo must fill at least a third of it.
-    save("header_capsule", landscape(src, lr, 920, 430, 0.70, tagline=False, name="header_capsule", extra=1500, cut=250, below=320))
-    save("small_capsule", small(src, lr, 462, 174))
-    save("main_capsule", landscape(src, lr, 1232, 706, 0.70, tagline=False, name="main_capsule", extra=825, cut=300, below=320))
-    save("vertical_capsule", portrait(src, por, 748, 896, y0=150, band=600, logo_frac=0.80, name="vertical_capsule", tagline=False))
+    save("header_capsule", landscape(lr, 920, 430, 0.70, tagline=False, name="header_capsule", extra=1500, cut=250, below=320))
+    save("small_capsule", small(lr, 462, 174))
+    save("main_capsule", landscape(lr, 1232, 706, 0.70, tagline=False, name="main_capsule", extra=825, cut=300, below=320))
+    save("vertical_capsule", portrait(por, 748, 896, y0=150, band=600, logo_frac=0.80, name="vertical_capsule", tagline=False))
     save("page_background", page_background(plate("clean_landscape"), 1438, 810))
     # Library
-    save("library_capsule", portrait(src, peace, 600, 900, y0=0, band=740, logo_frac=0.84, name="library_capsule", tagline=False))
-    save("library_header", landscape(src, lr, 920, 430, 0.70, tagline=False, name="library_header", extra=1500, cut=250, below=320))
+    save("library_capsule", portrait(peace, 600, 900, y0=0, band=740, logo_frac=0.84, name="library_capsule", tagline=False))
+    save("library_header", landscape(lr, 920, 430, 0.70, tagline=False, name="library_header", extra=1500, cut=250, below=320))
     # Hero: native crop of the wide plate (3840 wide), no logo (Steam overlays library_logo).
     save("library_hero", wide.crop((0, 20, 3840, 1260)))
-    logo = render_logo(src, 1200, tagline=False)
+    logo = render_logo(1200, tagline=False)
     ll = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
     ll.alpha_composite(logo, ((1280 - logo.width) // 2, (720 - logo.height) // 2))
     save("library_logo", ll)
     # Community / events
-    save("community_icon", icon(src, 184))
-    save("event_cover", landscape(src, lr, 800, 450, 0.40, name="event_cover"))
+    save("community_icon", icon(184))
+    save("event_cover", landscape(lr, 800, 450, 0.40, name="event_cover"))
     eh = crop_fit(wide, (0, 18, 3840, 18 + 3840 * 622 / 1920), 1920, 622)
-    lg = render_logo(src, 820)
+    lg = render_logo(820)
     save("event_header", put_logo(eh, lg, (round(1920 * 0.06), round(622 * 0.46 - lg.height / 2)), "event_header"))
 
     if "--sheet" in sys.argv:

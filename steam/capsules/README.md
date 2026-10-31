@@ -2,7 +2,7 @@
 
 Every Steam image is composed by `make_capsules.py` from two kinds of input:
 
-- **The logo** comes from `source/base.webp` (1672×941), the original key art. It is re-rendered from thresholded masks of that image so it stays sharp at any size, in flat ink `#0a0a0a` and orange `#ff3b00`. The image model never draws the logo or any text.
+- **The logo** is set in [Jersey 10](https://github.com/scfried/soft-type-jersey) (`source/fonts/Jersey10-Regular.ttf`, SIL OFL 1.1, licence beside it): "V" on an orange block, then "PUPPET", in flat ink `#0a0a0a` and orange `#ff3b00`. Store and library capsules show the logo alone; only the event images add the "3D AVATAR SOFTWARE" tagline (Valve allows no other text on capsules). The image model never draws the logo or any text.
 - **The art** is a set of text-free plates in `source/ai/`, made by `gen.py` as edits of the key art so the character and style match.
 
 ```bash
@@ -53,4 +53,4 @@ The plate geometry hard-coded in `make_capsules.py` (where the CRT starts, where
 
 ## Steamworks content survey
 
-Declare AI-generated content. The original key art (`base.webp`) is AI-generated. So are all the plates above, and they are in every capsule except `library_logo` and `community_icon`. Those two are only the logo, which itself comes from the AI key art. The logo is re-rendered procedurally, and no AI-generated text appears in any capsule.
+Declare AI-generated content. The original key art (`base.webp`) is AI-generated. So are all the plates above, and they are in every capsule except `library_logo` and `community_icon`. Those two are only the logo, set in a font. No AI-generated text appears in any capsule.
