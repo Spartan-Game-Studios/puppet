@@ -20,7 +20,9 @@ ink on a dark area (asserts the paper under the logo is light).
 
 --sheet also writes out/_contact_sheet.png (not a Steam asset).
 """
+import io
 import sys
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -315,8 +317,25 @@ def main():
     lg = render_logo(820)
     save("event_header", put_logo(eh, lg, (round(1920 * 0.06), round(622 * 0.46 - lg.height / 2)), "event_header"))
 
+    client_icons()
+
     if "--sheet" in sys.argv:
         contact_sheet(names)
+
+
+def client_icons():
+    """Steamworks > Community > Client Images: the shortcut icon (512 PNG,
+    Steam derives the 184 JPG app icon from it), the macOS ICNS and the Linux
+    icon zip. All the same V block as the community icon."""
+    icon(512).convert("RGB").save(OUT / "shortcut_icon.png", optimize=True)
+    icon(184).convert("RGB").save(OUT / "app_icon.jpg", quality=95)
+    icon(1024).save(OUT / "client_icon.icns")
+    with zipfile.ZipFile(OUT / "linux_icons.zip", "w") as z:
+        for s in (16, 24, 32, 48, 64, 96, 128, 256):
+            buf = io.BytesIO()
+            icon(s).convert("RGB").save(buf, "PNG")
+            z.writestr(f"{s}x{s}.png", buf.getvalue())
+    print("client icons           shortcut_icon.png app_icon.jpg client_icon.icns linux_icons.zip")
 
 
 if __name__ == "__main__":

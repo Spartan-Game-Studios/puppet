@@ -24,6 +24,10 @@ Every capsule is a crop of one plate, and plates are only ever scaled down. The 
 | `library_hero.png` | 3840×1240 | Library: hero (no logo; Steam overlays `library_logo`) | `wide_hero`, native |
 | `library_logo.png` | 1280×720 | Library: logo (transparent) | logo only |
 | `community_icon.png` | 184×184 | Community icon | the V block from the logo |
+| `shortcut_icon.png` | 512×512 | Client Images: Shortcut Icon (Steam derives the App Icon) | the V block |
+| `app_icon.jpg` | 184×184 | Client Images: App Icon, if uploaded separately | the V block |
+| `client_icon.icns` | 1024 | Client Images: Mac Icon | the V block |
+| `linux_icons.zip` | 16–256 | Client Images: Linux Icons | the V block |
 | `event_cover.png` | 800×450 | Events: cover | `landscape_right` |
 | `event_header.png` | 1920×622 | Events: header | `wide_hero` |
 
@@ -53,4 +57,4 @@ The plate geometry hard-coded in `make_capsules.py` (where the CRT starts, where
 
 ## Steamworks content survey
 
-Declare AI-generated content. The original key art (`base.webp`) is AI-generated. So are all the plates above, and they are in every capsule except `library_logo` and `community_icon`. Those two are only the logo, set in a font. No AI-generated text appears in any capsule.
+Declare AI-generated content. The original key art (`base.webp`) is AI-generated. So are all the plates above, and they are in every capsule except `library_logo` and the icons. Those are only the logo, set in a font. No AI-generated text appears in any capsule.
