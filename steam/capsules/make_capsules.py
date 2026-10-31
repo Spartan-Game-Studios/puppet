@@ -198,7 +198,7 @@ def small(src, pl, W, H):
     return put_logo(canvas, logo, (14, (H - logo.height) // 2), "small_capsule")
 
 
-def portrait(src, pl, W, H, y0, band, logo_frac, name):
+def portrait(src, pl, W, H, y0, band, logo_frac, name, tagline=True):
     """A portrait plate cropped to W:H from y0 (full width), logo centred in the
     paper band above the head (`band` = plate y of the head top)."""
     PW, PH = pl.size
@@ -206,7 +206,7 @@ def portrait(src, pl, W, H, y0, band, logo_frac, name):
     assert y0 + h <= PH
     s = W / PW
     canvas = crop_fit(pl, (0, y0, PW, y0 + h), W, H)
-    logo = render_logo(src, round(W * logo_frac))
+    logo = render_logo(src, round(W * logo_frac), tagline)
     band_h = (band - y0) * s
     assert logo.height < band_h - 30, f"{name}: no room above the head"
     y = round((band_h - logo.height) / 2)
@@ -263,18 +263,19 @@ def main():
         names.append(name)
         print(f"{name:<22} {im.width}x{im.height}")
 
-    # Store
-    save("header_capsule", landscape(src, lr, 920, 430, 0.40, name="header_capsule"))
+    # Store and library capsules: Valve allows only the logo as text on these
+    # (no tagline), and the header's logo must fill at least a third of it.
+    save("header_capsule", landscape(src, lr, 920, 430, 0.45, tagline=False, name="header_capsule"))
     save("small_capsule", small(src, lr, 462, 174))
-    save("main_capsule", landscape(src, lr, 1232, 706, 0.40, name="main_capsule"))
-    save("vertical_capsule", portrait(src, por, 748, 896, y0=150, band=600, logo_frac=0.80, name="vertical_capsule"))
+    save("main_capsule", landscape(src, lr, 1232, 706, 0.45, tagline=False, name="main_capsule"))
+    save("vertical_capsule", portrait(src, por, 748, 896, y0=150, band=600, logo_frac=0.80, name="vertical_capsule", tagline=False))
     save("page_background", page_background(plate("clean_landscape"), 1438, 810))
     # Library
-    save("library_capsule", portrait(src, peace, 600, 900, y0=0, band=740, logo_frac=0.84, name="library_capsule"))
-    save("library_header", landscape(src, lr, 920, 430, 0.40, name="library_header"))
+    save("library_capsule", portrait(src, peace, 600, 900, y0=0, band=740, logo_frac=0.84, name="library_capsule", tagline=False))
+    save("library_header", landscape(src, lr, 920, 430, 0.45, tagline=False, name="library_header"))
     # Hero: native crop of the wide plate (3840 wide), no logo (Steam overlays library_logo).
     save("library_hero", wide.crop((0, 20, 3840, 1260)))
-    logo = render_logo(src, 1200, tagline=True)
+    logo = render_logo(src, 1200, tagline=False)
     ll = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
     ll.alpha_composite(logo, ((1280 - logo.width) // 2, (720 - logo.height) // 2))
     save("library_logo", ll)
