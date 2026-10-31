@@ -55,12 +55,22 @@ def _text(draw, xy, text, font, fill, spacing=0):
     return x - spacing
 
 
+def ink_box(text, font):
+    """The bounding box of the pixels `text` actually draws at (0, 0) (PIL's
+    textbbox includes Jersey 10's right side bearing)."""
+    l, t, r, b = ImageDraw.Draw(Image.new("L", (1, 1))).textbbox((0, 0), text, font=font)
+    m = Image.new("L", (r - min(l, 0) + 2, b - min(t, 0) + 2))
+    ImageDraw.Draw(m).text((-min(l, 0), -min(t, 0)), text, font=font, fill=255)
+    x0, y0, x1, y1 = m.getbbox()
+    return x0 + min(l, 0), y0 + min(t, 0), x1 + min(l, 0), y1 + min(t, 0)
+
+
 def render_logo(width, tagline=True):
     """The logo at `width` px: drawn 4x large in Jersey 10, then downscaled."""
     big = 640                                   # font px at 4x
     f = ImageFont.truetype(str(FONT), big)
     probe = ImageDraw.Draw(Image.new("L", (1, 1)))
-    l, t, r, b = probe.textbbox((0, 0), "V", font=f)
+    l, t, r, b = ink_box("V", f)
     cap = b - t
     pad = round(cap * 0.16)                     # orange around the V
     gap = round(cap * 0.14)                     # block to "PUPPET"
@@ -91,7 +101,7 @@ def icon(size):
     l, t, r, b = d.textbbox((0, 0), "V", font=f)
     k = size * 4 * 0.72 / (b - t)
     f = ImageFont.truetype(str(FONT), round(size * 4 * k))
-    l, t, r, b = d.textbbox((0, 0), "V", font=f)
+    l, t, r, b = ink_box("V", f)
     d.text(((size * 4 - (r - l)) / 2 - l, (size * 4 - (b - t)) / 2 - t), "V", font=f, fill=INK)
     return canvas.resize((size, size), Image.LANCZOS)
 
