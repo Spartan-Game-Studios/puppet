@@ -35,3 +35,18 @@ Para usar los blendshapes de ARKit en VSeeFace, activa allí perfect sync en el 
 </Callout>
 
 Los paquetes se mantienen lo bastante pequeños como para atravesar una red real, no solo el propio equipo.
+
+## Recibir VMC (trackers corporales, apps del móvil) [#vmc-in]
+
+VPuppet también puede **recibir** VMC: los trackers corporales o una app del móvil controlan parte del avatar y la cámara web sigue con el resto.
+
+1. En la ventana VMC (`N`), sección **ENTRADA VMC**, marca **RECIBIR VMC**. El puerto predeterminado es 39539. Si la propia salida VMC de VPuppet también envía al puerto 39539 de este equipo, da a una de las dos otro puerto.
+2. Apunta el emisor a este equipo y puerto:
+   - **SlimeVR:** en el servidor de SlimeVR, activa la salida VMC hacia `127.0.0.1` y el mismo puerto.
+   - **mocopi:** envía VMC desde el enlace de PC de mocopi a este equipo.
+   - **Apps de seguimiento facial del iPhone** que envían VMC: marca **PERMITIR OTROS DISPOSITIVOS DE MI RED** y envía a la IP local de este equipo.
+3. En **QUÉ CONTROLA QUÉ**, elige CÁMARA WEB o VMC para CARA, CABEZA, TORSO, BRAZOS, DEDOS y PIERNAS. Por defecto, TORSO y PIERNAS vienen de VMC (trackers corporales) y el resto de la cámara web.
+
+ESTADO muestra RECIBIENDO con la frecuencia y el emisor, y LLEGAN cuántos huesos y blendshapes llegan. Si el emisor se detiene medio segundo, esas partes vuelven a la cámara web o a la pose de reposo. Los huesos VMC tienen prioridad sobre las animaciones de reposo y los gestos. Los blendshapes se emparejan por nombre ARKit, nombre de clip VRM 0.x (A, Joy, Blink_L) o los nombres de expresión del propio modelo.
+
+¿Aún no tienes trackers? `node scripts/vmc-send.mjs sit` (o `walk`, `squat`, `lean`, `face`, `all`) en el repositorio del código envía un movimiento de prueba.

@@ -105,6 +105,34 @@ export async function vmcStats(): Promise<VmcStats | null> {
   return invoke<VmcStats>('vmc_stats');
 }
 
+/** Mirrors `vmc_in::InStatus`. */
+export interface VmcInStatus {
+  enabled: boolean;
+  listening: string | null;
+  error: string | null;
+  packets: number;
+  messages: number;
+  ignored: number;
+  bad: number;
+  sender: string | null;
+  age_ms: number | null;
+  rate: number;
+}
+
+export function vmcInConfigure(enabled: boolean, port: number, lan: boolean): Promise<VmcInStatus | null> {
+  if (!isTauri) return Promise.resolve(null);
+  return invoke<VmcInStatus>('vmc_in_configure', { enabled, port, lan });
+}
+
+export async function vmcInStatus(): Promise<VmcInStatus | null> {
+  return isTauri ? invoke<VmcInStatus>('vmc_in_status') : null;
+}
+
+export function vmcInPoll(since: number): Promise<import('../vmc/vmcInput').VmcInFrame | null> {
+  if (!isTauri) return Promise.resolve(null);
+  return invoke('vmc_in_poll', { since });
+}
+
 // ---------------------------------------------------------------- demo (src-tauri/src/demo.rs)
 
 /** Mirrors `demo::Status`. `demo` is false in the full app. */

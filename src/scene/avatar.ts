@@ -2,6 +2,7 @@
  * Avatar: a loaded VRM plus everything that drives it — expressions (perfect
  * sync or presets), head/gaze, upper body and hands, and stabilised physics.
  */
+import type { ExternalPose } from '../vmc/vmcInput';
 import { Box3, BufferAttribute, Mesh, Object3D, Quaternion, SkinnedMesh, Uint16BufferAttribute, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from '@pixiv/three-vrm';
@@ -187,6 +188,10 @@ export class Avatar {
   drive: DriveOptions = { ...DEFAULT_DRIVE };
   /** Optional layer over tracking (see AvatarLayer). */
   layer: AvatarLayer | null = null;
+  /** VMC input for the regions set to VMC (src/vmc/vmcInput.ts): replaces tracking and clips for those bones. */
+  external: ExternalPose | null = null;
+  /** Per VMC-driven bone: its smoothed rotation, the release weight, and what was last written. */
+  private ext = new Map<string, { q: Quaternion; w: number; last: Quaternion }>();
   /** Rest-pose bounds of the skinned meshes in the avatar's space (for camera framing). */
   readonly bounds = new Box3();
 
@@ -255,6 +260,10 @@ export class Avatar {
       }
     });
     if (this.bounds.isEmpty()) this.bounds.set(new Vector3(-0.3, 0, -0.2), new Vector3(0.3, 1.7, 0.2));
+  }
+
+  hasBone(name: string): boolean {
+    return this.bones.has(name);
   }
 
   get isVrm0(): boolean {
@@ -427,6 +436,9 @@ export class Avatar {
 
     this.layer?.body(this, dt);
 
+    // After the layer: real trackers beat canned clips (idle loops and emotes) on the bones they drive.
+    this.applyExternal(dt, false);
+
     // Head relative to the (now updated) chest.
     // From the hips: tracking leaves them at rest, but an animation clip may bend them.
     const hipsNode = this.bones.get('hips');
@@ -436,7 +448,9 @@ export class Avatar {
     const neck = this.bones.get('neck');
     const head = this.bones.get('head');
     const kh = 1 - Math.exp(-d.followRate * 1.5 * dt);
-    if (neck && head) {
+    if (this.external?.bones.has('head')) {
+      // VMC drives the head (applyExternal, head pass).
+    } else if (neck && head) {
       neck.quaternion.slerp(qpow(headLocal, 0.4), kh);
       head.quaternion.slerp(qpow(headLocal, 0.6), kh);
     } else if (head) {
@@ -444,6 +458,8 @@ export class Avatar {
     }
 
     this.layer?.head(this, dt);
+
+    this.applyExternal(dt, true);
 
     this.applyExpressions(face, dt);
 
@@ -455,6 +471,46 @@ export class Avatar {
     vrm.nodeConstraintManager?.update();
     this.physics.update(dt);
     for (const m of vrm.materials ?? []) (m as { update?: (d: number) => void }).update?.(dt);
+  }
+
+  /**
+   * VMC bones (body pass: everything but the head; head pass: neck, head, jaw).
+   * Written outright from a smoothed copy, so nothing that rewrites the bone
+   * each frame (clips, tracking) drags it part way back. When VMC stops
+   * driving a bone it hands back over RELEASE_S: to whatever else wrote the
+   * bone this frame, or to rest if nothing did.
+   */
+  private applyExternal(dt: number, headPass: boolean): void {
+    const RELEASE_S = 0.3;
+    const isHead = (b: string) => b === 'neck' || b === 'head' || b === 'jaw';
+    const k = 1 - Math.exp(-30 * dt);
+    const ext = this.external?.bones;
+    if (ext) {
+      for (const [b, q] of ext) {
+        if (isHead(b) !== headPass) continue;
+        const node = this.bones.get(b);
+        if (!node) continue;
+        let st = this.ext.get(b);
+        if (!st) this.ext.set(b, (st = { q: node.quaternion.clone(), w: 1, last: new Quaternion() }));
+        st.q.slerp(this.toBone(q), k);
+        st.w = 1;
+        node.quaternion.copy(st.q);
+        st.last.copy(node.quaternion);
+      }
+    }
+    for (const [b, st] of this.ext) {
+      if (isHead(b) !== headPass || ext?.has(b)) continue;
+      const node = this.bones.get(b);
+      if (!node) {
+        this.ext.delete(b);
+        continue;
+      }
+      st.w -= dt / RELEASE_S;
+      const base = node.quaternion.equals(st.last) ? new Quaternion() : node.quaternion.clone();
+      node.quaternion.copy(base.slerp(st.q, Math.max(0, st.w)));
+      st.last.copy(node.quaternion);
+      if (st.w <= 0) this.ext.delete(b);
+    }
   }
 
   private applyExpressions(face: FaceState | null, dt: number): void {
@@ -484,6 +540,7 @@ export class Avatar {
         la.pitch = -face.gaze.pitch * this.drive.gazeGain;
       }
     }
+    if (this.external?.expressions) for (const [n, v] of this.external.expressions) set(n, v);
     this.layer?.expressions(out, this, dt);
     for (const [n, v] of out) {
       em.setValue(n, v);

@@ -9,8 +9,9 @@ import * as mcp from './strings/mcp';
 import * as motion from './strings/motion';
 import * as shell from './strings/shell';
 import * as stage from './strings/stage';
+import * as vmcin from './strings/vmcin';
 
-const areas = [shell, stage, library, motion, mcp, doctor] as const;
+const areas = [shell, stage, library, motion, mcp, doctor, vmcin] as const;
 
 type Merge<A extends readonly { en: object }[]> = A extends readonly [infer H extends { en: object }, ...infer R extends { en: object }[]]
   ? H['en'] & Merge<R>

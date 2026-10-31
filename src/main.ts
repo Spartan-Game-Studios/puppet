@@ -68,6 +68,7 @@ import { createModal, openModal, type Modal } from './app/modal';
 import { mountCardSection } from './app/ui';
 import { PadNav } from './app/padNav';
 import { mcpLog, mountMcpBridge } from './app/mcpBridge';
+import { mountVmcIn } from './app/vmcInUi';
 import { applyDom, locale, t, LOCALE_NAMES, LOCALES, setLocale, type Locale } from './i18n';
 
 // Static markup in the chosen language before anything reads it (modal titles
@@ -571,6 +572,8 @@ async function applyVmc(): Promise<void> {
   } catch (e) {
     setStatus(t('stage.vmcError', { error: String(e) }), true);
   }
+  // The receiver refuses a port VMC OUT loops back into.
+  vmcIn.apply();
 }
 checkBind('vmc-enabled', () => settings.vmc.enabled, (v) => {
   settings.vmc.enabled = v;
@@ -597,6 +600,9 @@ portEl.addEventListener('change', () => {
   persist();
   applyVmc();
 });
+
+// VMC input: body trackers / phone apps per body region (src/app/vmcInUi.ts, src/vmc/vmcInput.ts).
+const vmcIn = mountVmcIn({ settings, persist, avatar: () => avatar, setStatus, mount: document.getElementById('vmcin-controls') });
 
 let vmcBusy = false;
 const t0 = performance.now();
@@ -961,6 +967,7 @@ const demo = await mountDemo({
     demoLocked = true;
     if (vcam.running) vcam.stop().catch(() => {});
     vmcConfigure(false, settings.vmc.host, settings.vmc.port).catch(() => {});
+    vmcIn.stop();
     source.stop();
     setStatus(t('demo.statusEnded'), true);
   },
@@ -1085,6 +1092,7 @@ function tick(now: number): void {
     motion.hotkeys.enabled = !home.visible;
     motion.tick(now);
   }
+  vmcIn.tick();
   avatar?.update(dt);
   viewer.render();
   vcam.tick(now);
@@ -1289,6 +1297,7 @@ Object.assign(window, {
     modals,
     vcam,
     mcp,
+    vmcIn,
     env: envUi,
     frame: (f: Framing) => {
       currentFraming = f;

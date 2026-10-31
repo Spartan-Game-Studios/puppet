@@ -1,4 +1,5 @@
 /** Persisted settings: one JSON document in the app config dir (or localStorage in a browser). */
+import { DEFAULT_SOURCES, type RegionSources } from '../vmc/vmcInput';
 import { defaultGainCurves, type GainCurve } from '../core/blendshapes';
 import { DEFAULT_PHYSICS, type PhysicsOverrides, type PhysicsSettings } from '../physics/stableSprings';
 import { EMPTY_CALIBRATION, type Calibration } from '../tracking/faceProcessor';
@@ -32,6 +33,8 @@ export interface Settings {
   background: { kind: BackgroundKind; color: string; imagePath: string | null };
   /** `presets`: also send the 13 VRM 0.x preset clips derived from ARKit (src/vmc/presets.ts). */
   vmc: { enabled: boolean; host: string; port: number; presets: boolean };
+  /** VMC input (src/vmc/vmcInput.ts): body trackers / iPhone apps, per body region. `lan`: accept other devices. */
+  vmcIn: { enabled: boolean; port: number; lan: boolean; regions: RegionSources };
   /** Virtual camera output (06 VIRTUAL CAM). `device`: Linux /dev/videoN, null = first found. */
   vcam: { enabled: boolean; resolution: VcamResolution; device: string | null };
   physics: PhysicsSettings;
@@ -70,6 +73,7 @@ export function defaultSettings(): Settings {
     calibration: structuredClone(EMPTY_CALIBRATION),
     background: { kind: 'color', color: '#00ff00', imagePath: null },
     vmc: { enabled: false, host: '127.0.0.1', port: 39539, presets: true },
+    vmcIn: { enabled: false, port: 39539, lan: false, regions: { ...DEFAULT_SOURCES } },
     vcam: { enabled: false, resolution: '1280x720', device: null },
     physics: { ...DEFAULT_PHYSICS },
     physicsOverrides: {},

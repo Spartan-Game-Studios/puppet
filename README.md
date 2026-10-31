@@ -218,6 +218,12 @@ This works on every OS without installing a camera driver. Use it when the nativ
 
 The TX readout shows frames and bytes sent. "Nothing listening" errors are counted, not fatal.
 
+## VMC input (body trackers, phone apps)
+
+VPuppet also receives VMC (`src-tauri/src/vmc_in.rs`, `src/vmc/vmcInput.ts`, VMC window → VMC IN): SlimeVR, mocopi, iPhone face apps or any VMC sender drive the body regions you pick (FACE, HEAD, TORSO, ARMS, FINGERS, LEGS; default TORSO + LEGS from VMC, the rest from the webcam). A Rust thread listens on UDP (default 39539, localhost only unless ALLOW OTHER DEVICES is ticked), decodes `/VMC/Ext/Bone/Pos`, `/VMC/Ext/Root/Pos`, `/VMC/Ext/Blend/Val` + `Apply`, and the webview polls the latest pose once per frame. Bone rotations are normalized-rig local rotations (identity at T-pose), the same convention as VPuppet's output; they are written after idle and emote clips, and hand back over 0.3 s when the sender stops for 0.5 s. Blend shapes match by ARKit name, VRM 0.x clip name or the model's own names. Hips position isn't applied yet (rotations only), so a seated pose keeps the hips at standing height.
+
+Test without hardware: `node scripts/vmc-send.mjs <sit|walk|squat|lean|face|all> [port] [seconds]` sends a scripted motion.
+
 ## AI agents (MCP server)
 
 VPuppet can host a local [MCP](https://modelcontextprotocol.io) server so AI agents on your computer (Claude Code, Claude Desktop, Cursor and other MCP clients) can look at and drive the running app: inspect a model while you build it in Blender, check its perfect-sync shapes, take screenshots, try expressions and clips, and read tracking stats and errors.
