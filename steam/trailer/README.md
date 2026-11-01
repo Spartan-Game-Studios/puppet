@@ -20,10 +20,16 @@ Title and end cards bracket the steps. The end card says "Free demo: every featu
 
 ## Music
 
-The music bed is synthesised by `music.py` (numpy and scipy, no samples), so there is nothing to license. It is a soft pad at 72 bpm in D major (Dmaj7, Bm7, Gmaj7, Asus4), with a pluck arpeggio and a faint shaker during the steps, resolving on D under the end card, normalised to -20 LUFS. `steam-trailer.mjs` renders it to the recording's exact length. To rescore existing MP4s without re-recording:
+The current trailers use "Ambience 3" from the *50 Cozy Fantasy RPG Tracks* pack (the loop version). It is a licensed track, so it stays out of the repo; pass it with `--music`. `music.py` loops the track to the recording's length, fades it in and out, and normalises it to -26 LUFS so it stays a quiet bed:
 
 ```bash
-python3 steam/trailer/music.py 61.17 bed.wav
+node scripts/steam-trailer.mjs hero.vrm perf/ --music ".../Loops/mp3/Ambience 3.mp3"
+```
+
+Without `--music`, `music.py` synthesises a bed instead, with numpy and scipy and no samples, so there is nothing to license. It is a soft pad at 72 bpm in D major. To rescore existing MP4s without re-recording:
+
+```bash
+python3 steam/trailer/music.py 61.2 bed.wav [track.mp3]
 ffmpeg -i setup-guide-en.mp4 -i bed.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4
 ```
 

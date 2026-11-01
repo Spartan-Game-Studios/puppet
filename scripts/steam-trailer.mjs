@@ -1,9 +1,10 @@
 // Steam store trailer: a one-minute setup guide recorded from the real app UI
 // in headless Chrome (nothing opens on screen), with captions and title cards
 // drawn into the page so every script renders the same.
-//   node scripts/steam-trailer.mjs <hero.vrm> <performer-clip-dir> [--lang en,ru,zh-CN,es] [--keep]
+//   node scripts/steam-trailer.mjs <hero.vrm> <performer-clip-dir> [--lang en,ru,zh-CN,es] [--music track.mp3] [--keep]
 // Writes steam/trailer/setup-guide-<lang>.mp4 (1920x1080, 60 fps, H.264, AAC),
-// scored with the quiet bed from steam/trailer/music.py.
+// scored with a quiet bed from steam/trailer/music.py: --music's track looped
+// and faded, or a synthesised one.
 //
 // Tracking is real: the performer clip (scripts/render-clip.mjs) is fed in as
 // the webcam (?source=file) and the hero follows it. Render it from a model
@@ -23,12 +24,14 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = join(ROOT, 'steam/trailer');
 const [heroPath, clipDir] = process.argv.slice(2);
 if (!heroPath || !clipDir || clipDir.startsWith('--')) {
-  console.error('usage: node scripts/steam-trailer.mjs <hero.vrm> <performer-clip-dir> [--lang en,ru] [--keep]');
+  console.error('usage: node scripts/steam-trailer.mjs <hero.vrm> <performer-clip-dir> [--lang en,ru] [--music track.mp3] [--keep]');
   process.exit(2);
 }
 const li = process.argv.indexOf('--lang');
 const LANGS = li > 0 ? process.argv[li + 1].split(',') : ['en', 'ru', 'zh-CN', 'es'];
 const KEEP = process.argv.includes('--keep');
+const mi = process.argv.indexOf('--music');
+const MUSIC = mi > 0 ? [process.argv[mi + 1]] : [];
 const FPS = 60;
 
 const files = {
@@ -339,7 +342,7 @@ async function record(lang) {
   writeFileSync(join(tmp, 'list.ffconcat'), lines.join('\n'));
   const out = join(OUT, `setup-guide-${lang}.mp4`);
   const bed = join(tmp, 'bed.wav');
-  execFileSync('python3', [join(OUT, 'music.py'), (stamps.at(-1) - stamps[0] + 1 / FPS).toFixed(3), bed]);
+  execFileSync('python3', [join(OUT, 'music.py'), (stamps.at(-1) - stamps[0] + 1 / FPS).toFixed(3), bed, ...MUSIC]);
   execFileSync('ffmpeg', [
     '-y', '-loglevel', 'error',
     '-f', 'concat', '-safe', '0', '-i', join(tmp, 'list.ffconcat'),

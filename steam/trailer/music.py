@@ -1,13 +1,17 @@
-"""Quiet music bed for the trailer, synthesised from scratch (no samples, so
-nothing to license).
+"""Quiet music bed for the trailer.
 
-    python3 steam/trailer/music.py <seconds> <out.wav>
+    python3 steam/trailer/music.py <seconds> <out.wav> [track]
+
+With a track (any format ffmpeg reads), it is looped to the length, faded in
+and out and normalised to -26 LUFS. Licensed tracks stay outside the repo.
+Without one, a bed is synthesised from scratch (no samples, so nothing to
+license):
 
 72 bpm in D major: Dmaj7 - Bm7 - Gmaj7 - Asus4/A, two bars each, as a soft
 detuned pad over a sine sub, with an eighth-note pluck arpeggio and a faint
 shaker while the steps play. The pluck and shaker wait for the title card
 (about 4 s) and stop before the end card, where the pad resolves on D. The
-result is loudness-normalised by ffmpeg to -20 LUFS so it stays a bed.
+result is loudness-normalised by ffmpeg to -26 LUFS so it stays a bed.
 """
 import subprocess
 import sys
@@ -19,6 +23,16 @@ from scipy.signal import butter, fftconvolve, sosfilt
 
 DUR, OUT = float(sys.argv[1]), sys.argv[2]
 SR = 48000
+LOUDNORM = "loudnorm=I=-26:TP=-3:LRA=11"
+
+if len(sys.argv) > 3:
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-stream_loop", "-1", "-i", sys.argv[3], "-t", f"{DUR:.3f}",
+         "-af", f"afade=in:d=1.5,afade=out:st={DUR - 3:.3f}:d=3,{LOUDNORM}", "-ar", str(SR), "-ac", "2", OUT],
+        check=True,
+    )
+    print(OUT)
+    sys.exit()
 BEAT = 60 / 72
 BAR = 4 * BEAT
 INTRO, OUTRO = 3.8, 4.2   # title and end cards, in seconds
@@ -131,7 +145,7 @@ with tempfile.NamedTemporaryFile(suffix=".wav") as raw:
     wavfile.write(raw.name, SR, (mix * 32767).astype(np.int16))
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-i", raw.name,
-         "-af", "loudnorm=I=-20:TP=-2:LRA=7", "-ar", str(SR), OUT],
+         "-af", LOUDNORM, "-ar", str(SR), OUT],
         check=True,
     )
 print(OUT)
