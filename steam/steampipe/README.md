@@ -39,6 +39,8 @@ PUPPET_CAMEXT_PROFILE=<path>/VPuppet_Camera_Developer_ID.provisionprofile \
 NOTARY_PROFILE=vpuppet bash steam/steampipe/build-macos.sh
 ```
 
+The store's macOS notices come from Steamworks → Application → General → Supported Operating Systems, not from the depot. Keep "64 Bit (Intel) Binaries Included", "Apple Silicon Binaries Included" and "App Bundles Are Notarized" all ticked, then publish. With only Apple Silicon ticked, the store page says the game is "not compatible with macOS systems using Intel processors".
+
 Linux: stage the AppImage under a fixed name (the commands are at the top of `depot_build_*_linux.vdf`).
 
 ## 2. Collect the artefacts on one machine
