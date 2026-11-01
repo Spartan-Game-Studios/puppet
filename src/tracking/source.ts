@@ -39,15 +39,27 @@ export class VideoSource {
     this.stop();
     if (!navigator.mediaDevices?.getUserMedia) throw new Error(t('stage.noGetUserMedia'));
     const [w, h] = res.split('x').map(Number);
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        deviceId: deviceId ? { exact: deviceId } : undefined,
-        width: { ideal: w },
-        height: { ideal: h },
-        frameRate: { ideal: Math.max(30, fps) },
-      },
-    });
+    const open = (id: string | null) =>
+      navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          deviceId: id ? { exact: id } : undefined,
+          width: { ideal: w },
+          height: { ideal: h },
+          frameRate: { ideal: Math.max(30, fps) },
+        },
+      });
+    let stream: MediaStream;
+    try {
+      stream = await open(deviceId);
+    } catch (e) {
+      // WebKit salts device IDs per origin, so an ID saved by another build
+      // (dev server vs. the bundled app) or for an unplugged camera matches
+      // nothing. Fall back to the default camera instead of failing.
+      const name = (e as DOMException).name;
+      if (!deviceId || (name !== 'OverconstrainedError' && name !== 'NotFoundError')) throw e;
+      stream = await open(null);
+    }
     this.stream = stream;
     this.video.srcObject = stream;
     await this.video.play();

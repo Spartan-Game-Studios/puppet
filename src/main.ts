@@ -333,6 +333,8 @@ async function startSource(): Promise<void> {
           ? t('stage.noCameraFound')
           : t('stage.cameraError', { error: err.message });
     setStatus(msg, true);
+    // Still list the cameras, so another one can be picked.
+    if (source.kind !== 'file') await refreshCameras().catch(() => {});
   }
 }
 
