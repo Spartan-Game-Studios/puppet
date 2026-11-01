@@ -29,3 +29,6 @@ test-assets/cc0/*
 
 # Demo build output (steam/steampipe/README.md)
 src-tauri/target-demo/
+
+# Store trailers (scripts/steam-trailer.mjs): large, and rebuilt from a local hero model
+steam/trailer/*.mp4
