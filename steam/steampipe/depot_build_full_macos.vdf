@@ -13,7 +13,7 @@
 	"ContentRoot" "../../"
 
 	// The whole bundle, recursively (includes the camera extension under
-	// Contents/Library/SystemExtensions/). The full build has no Steamworks
+	// Contents/Helpers/VPuppet Camera.app/). The full build has no Steamworks
 	// library.
 	"FileMapping"
 	{

@@ -44,7 +44,7 @@ Rust: copy into a recycled buffer, try_send to the writer thread (1-slot channel
 - `src-tauri/src/vcam/convert.rs`: BGRA → YUYV (BT.601 limited range) and BGR24.
 - `src-tauri/src/vcam/{macos,windows,linux,file_sink}.rs`: the sinks.
 - `src-tauri/macos/bridge/PuppetVCamBridge.m`: app side on macOS (activation + CMIO sink writer).
-- `src-tauri/macos/camera-extension/`: the Swift camera extension; `build-camera-extension.sh` builds it (universal, signed if a signing identity is set) and `tauri.macos.conf.json` embeds it at `Contents/Library/SystemExtensions/`.
+- `src-tauri/macos/camera-extension/`: the Swift camera extension. `src-tauri/macos/camera-helper/`: **VPuppet Camera.app**, the small app that installs it (see [Why a separate VPuppet Camera app](#why-a-separate-vpuppet-camera-app)). `build-camera-extension.sh` builds both (universal, signed if a signing identity is set), the extension inside the helper, and `tauri.macos.conf.json` embeds the helper at `Contents/Helpers/`.
 - `scripts/build-softcam.ps1`: builds `softcam.dll` from a pinned commit with VPuppet's own filter name, CLSID and shared-memory names; runs automatically before `tauri dev` / `tauri build` on Windows.
 
 If all three frame buffers are still in flight when the next frame is due, that frame is skipped (counted as DROP). The camera never lags behind the avatar.
@@ -53,13 +53,26 @@ If all three frame buffers are still in flight when the next frame is due, that 
 
 ### What the user does (signed build)
 
-1. Move **VPuppet.app** to **/Applications** and open it from there. macOS installs system extensions only from apps in /Applications.
-2. In the camera card's **VIRTUAL CAM** section, click **INSTALL** on the **EXTENSION** line.
-3. macOS asks for approval. Click **OPEN SETTINGS** in the panel to jump to the right page (macOS has no in-app approval prompt for system extensions):
+1. In the camera card's **VIRTUAL CAM** section, click **INSTALL** on the **EXTENSION** line. VPuppet copies **VPuppet Camera.app** to /Applications (a standard, non-administrator account gets macOS's administrator prompt) and runs it.
+2. macOS asks for approval. Click **OPEN SETTINGS** in the panel to jump to the right page (macOS has no in-app approval prompt for system extensions):
    - macOS 15 and later: **System Settings → General → Login Items & Extensions → Camera Extensions**, switch **VPuppet** on.
    - macOS 13–14: **System Settings → Privacy & Security**, under "System software from application VPuppet was blocked", click **Allow**.
-4. The EXTENSION line reads **ACTIVE**. Switch **CAMERA OUTPUT** on (`W`, or START on a gamepad).
-5. In Zoom / Meet / Discord / FaceTime pick **VPuppet Virtual Camera**.
+3. The EXTENSION line reads **ACTIVE**. Switch **CAMERA OUTPUT** on (`W`, or START on a gamepad).
+4. In Zoom / Meet / Discord / FaceTime pick **VPuppet Virtual Camera**.
+
+VPuppet itself can live anywhere: Steam installs it under `~/Library/Application Support/Steam/steamapps/common/VPuppet/`.
+
+### Why a separate VPuppet Camera app
+
+macOS activates a system extension only from the app that contains it, and only when that app is in /Applications. Steam installs games in its own library folder, and moving VPuppet out of it breaks Steam's updates and Play button. So the extension ships inside a second, windowless app, **VPuppet Camera.app** (`com.spartangamestudios.vpuppet.camerahost`), embedded at `VPuppet.app/Contents/Helpers/`:
+
+- **INSTALL / UPDATE** (`pvc_activate` in `PuppetVCamBridge.m`): copy the helper to `/Applications/VPuppet Camera.app` when the copy there differs from VPuppet's (helper and extension executables, Info.plists and code signature compared byte for byte), falling back to macOS's administrator prompt when /Applications isn't writable, then run `VPuppet Camera activate`.
+- **UNINSTALL** (`pvc_deactivate`): run `VPuppet Camera deactivate`, then delete the helper from /Applications.
+- **Status** (`pvc_query_properties`, every 4 s at most while the panel is open): run `VPuppet Camera properties`; no helper in /Applications means nothing is installed.
+
+The helper prints one line per event (`approval`, `activated`, `deactivated`, `reboot`, `props …`, `failed <code> <message>`, `timeout`; the protocol is at the top of `camera-helper/main.swift`). Frames and the presence heartbeat don't involve it: VPuppet writes into the extension's CMIO sink stream directly, from wherever it runs.
+
+Steam can't remove the extension when the game is uninstalled. Click **UNINSTALL** first, or drag **VPuppet Camera** from Applications to the Trash afterwards: macOS removes an extension with its app.
 
 ### The camera exists only while VPuppet sends
 
@@ -80,11 +93,11 @@ Darwin notifications are allowed by the camera-extension sandbox (`cmioextension
 | ACTIVE vN | UNINSTALL |
 | NEEDS UPDATE (installed and bundled versions differ) | UPDATE, UNINSTALL |
 | RESTART YOUR MAC TO FINISH / REMOVED AFTER A RESTART | none |
-| FAILED | RETRY (unless it's a signing or location problem) |
+| FAILED | RETRY (unless it's a signing problem) |
 
 **UNINSTALL** asks for a second press (**CONFIRM UNINSTALL?**, 5 s; Escape cancels), turns the output off and submits a deactivation request; macOS may ask for an administrator password. The extension's version is its `CFBundleVersion`, taken from `src-tauri/macos/camera-extension/BUILD`: **bump BUILD whenever the extension changes**, since macOS only replaces an installed extension whose `CFBundleVersion` differs, and the app compares the installed and bundled values to show NEEDS UPDATE. The first release's extension (always-on device, version 0.1.0) shows as NEEDS UPDATE.
 
-Removing VPuppet.app from /Applications also removes its extension.
+Deleting **VPuppet Camera.app** from /Applications also removes the extension; deleting VPuppet.app does not.
 
 ### Minimized, hidden or covered
 
@@ -95,19 +108,20 @@ VPuppet keeps tracking, rendering and sending (virtual camera and VMC) while its
 
 `scripts/background-test.mjs` checks it on a built binary (`hide` = app hidden from start, `offscreen` = window off every screen; `PUPPET_EXTRA_QUERY=bgloop=0` turns the frontend half off).
 
-The panel shows every state in plain words: not in /Applications, waiting for approval, restart needed, not signed (with the OBS route), installed, running.
+The panel shows every state in plain words: could not copy VPuppet Camera to /Applications, waiting for approval, restart needed, not signed (with the OBS route), installed, running.
 
 ### macOS signing
 
-A camera extension installs only when **the app is signed with a Developer ID certificate and carries the `com.apple.developer.system-extension.install` entitlement from a provisioning profile**. These can only be created by the team's Account Holder in the Apple Developer portal. Unsigned (CI) builds still contain the extension, ad-hoc signed; activation then fails at once with *missing entitlement com.apple.developer.system-extension.install (OSSystemExtensionErrorDomain 2)*, and the panel points to the OBS route.
+A camera extension installs only when **the app containing it is signed with a Developer ID certificate and carries the `com.apple.developer.system-extension.install` entitlement from a provisioning profile**. Here that app is VPuppet Camera.app; VPuppet.app itself no longer needs the entitlement. Profiles can only be created by the team's Account Holder in the Apple Developer portal. Unsigned (CI) builds still contain the helper and extension, ad-hoc signed; activation then fails at once with *missing entitlement com.apple.developer.system-extension.install (OSSystemExtensionErrorDomain 2)*, and the panel points to the OBS route.
 
 #### One-time setup in the Apple Developer portal (developer.apple.com/account)
 
 1. **Certificate.** Certificates → **+** → **Developer ID Application** (G2 Sub-CA). Create it from a CSR made in Keychain Access, download it, double-click to add it to your login keychain, then export it with its private key as a `.p12` with a password.
-2. **App ID for the app.** Identifiers → **+** → App IDs → App → Bundle ID (Explicit) `com.spartangamestudios.vpuppet`. Under Capabilities, enable **System Extension**.
+2. **App IDs for the app and the camera installer.** Identifiers → **+** → App IDs → App → Bundle ID (Explicit) `com.spartangamestudios.vpuppet` (no capability needed now that the helper installs the extension), then again for `com.spartangamestudios.vpuppet.camerahost` with **System Extension** enabled under Capabilities.
 3. **App ID for the extension.** Identifiers → **+** → App IDs → App → Bundle ID (Explicit) `com.spartangamestudios.vpuppet.camera`. No capability is needed: its app group, `<TEAMID>.com.spartangamestudios.vpuppet.camera`, is a macOS team-prefixed group, which needs no registration.
 4. **Profile for the app.** Profiles → **+** → Distribution → **Developer ID** → App ID `com.spartangamestudios.vpuppet` → the Developer ID certificate from step 1 → name it `VPuppet Developer ID` → download `VPuppet_Developer_ID.provisionprofile`.
-5. **Profile for the extension** (recommended; it is what Xcode would create). Same as step 4 with App ID `com.spartangamestudios.vpuppet.camera`, named `VPuppet Camera Developer ID`.
+5. **Profile for the camera installer.** Same as step 4 with App ID `com.spartangamestudios.vpuppet.camerahost`, named `VPuppet Camera Host Developer ID` → `VPuppet_Camera_Host_Developer_ID.provisionprofile`.
+   **Profile for the extension** (recommended; it is what Xcode would create): App ID `com.spartangamestudios.vpuppet.camera`, named `VPuppet Camera Developer ID`.
 6. **Notarization credentials.** Either an app-specific password for your Apple ID (appleid.apple.com → Sign-In and Security → App-Specific Passwords), or an App Store Connect API key (Users and Access → Integrations → Keys).
 7. Note your **Team ID** (Membership details, 10 characters).
 
@@ -120,6 +134,7 @@ A camera extension installs only when **the app is signed with a Developer ID ce
 | `APPLE_SIGNING_IDENTITY` | `Developer ID Application: <Name> (<TEAMID>)` (from `security find-identity -v -p codesigning`) |
 | `APPLE_TEAM_ID` | the Team ID |
 | `PUPPET_APP_PROFILE` | `base64 -i VPuppet_Developer_ID.provisionprofile` |
+| `PUPPET_CAMHOST_PROFILE` | `base64 -i VPuppet_Camera_Host_Developer_ID.provisionprofile` (the camera installer) |
 | `PUPPET_CAMEXT_PROFILE` | `base64 -i VPuppet_Camera_Developer_ID.provisionprofile` (optional) |
 | `APPLE_ID`, `APPLE_PASSWORD` | Apple ID and app-specific password, for notarization |
 
@@ -131,12 +146,13 @@ With `APPLE_CERTIFICATE` and `PUPPET_APP_PROFILE` set, the macOS jobs import the
 export APPLE_SIGNING_IDENTITY="Developer ID Application: <Name> (<TEAMID>)"
 export APPLE_TEAM_ID=<TEAMID>
 export PUPPET_CAMEXT_PROFILE=~/Downloads/VPuppet_Camera_Developer_ID.provisionprofile
+export PUPPET_CAMHOST_PROFILE=~/Downloads/VPuppet_Camera_Host_Developer_ID.provisionprofile
 PUPPET_APP_PROFILE=~/Downloads/VPuppet_Developer_ID.provisionprofile bash src-tauri/macos/prepare-signing.sh
 APPLE_ID=<you@example.com> APPLE_PASSWORD=<app-specific password> \
   pnpm tauri build --config src-tauri/macos/build/tauri.signed.conf.json
 ```
 
-Then copy `src-tauri/target/release/bundle/macos/VPuppet.app` to /Applications and follow [What the user does](#what-the-user-does-signed-build). Check the result with `codesign -d --entitlements - /Applications/VPuppet.app` (it must list `com.apple.developer.system-extension.install`) and `systemextensionsctl list` after approval. You do not need `systemextensionsctl developer on` or any SIP change for a Developer ID–signed, notarized build.
+Then open `src-tauri/target/release/bundle/macos/VPuppet.app` from anywhere and follow [What the user does](#what-the-user-does-signed-build). Check the result with `codesign -d --entitlements - "VPuppet.app/Contents/Helpers/VPuppet Camera.app"` (it must list `com.apple.developer.system-extension.install`) and `systemextensionsctl list` after approval. For the Steam build use `steam/steampipe/build-macos.sh` (universal, notarized, stapled). You do not need `systemextensionsctl developer on` or any SIP change for a Developer ID–signed, notarized build.
 
 ## Windows
 

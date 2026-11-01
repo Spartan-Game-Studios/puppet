@@ -2,16 +2,17 @@
 # Prepare a SIGNED macOS build that can install the camera extension.
 # Writes, under src-tauri/macos/build/:
 #   embedded.provisionprofile   the app's Developer ID provisioning profile
-#   Entitlements.app.plist      app entitlements incl. system-extension.install
+#   Entitlements.app.plist      app entitlements (camera, microphone)
 #   tauri.signed.conf.json      config overlay: pass it to `tauri build --config`
 #
 # Inputs (env):
 #   APPLE_TEAM_ID            10-character team ID
 #   PUPPET_APP_PROFILE       path to the app's .provisionprofile
-#                            (App ID com.spartangamestudios.vpuppet, with the
-#                            System Extension capability)
-# The extension's own signing happens in build-camera-extension.sh
-# (APPLE_SIGNING_IDENTITY, PUPPET_CAMEXT_PROFILE). See docs/virtual-camera.md.
+#                            (App ID com.spartangamestudios.vpuppet)
+# The camera extension and its installer, VPuppet Camera.app, are signed in
+# build-camera-extension.sh (APPLE_SIGNING_IDENTITY, PUPPET_CAMEXT_PROFILE,
+# PUPPET_CAMHOST_PROFILE): the helper, not VPuppet, carries
+# system-extension.install. See docs/virtual-camera.md.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT="$HERE/build"
@@ -28,8 +29,6 @@ cat > "$OUT/Entitlements.app.plist" <<PLIST
   <key>com.apple.security.device.camera</key>
   <true/>
   <key>com.apple.security.device.audio-input</key>
-  <true/>
-  <key>com.apple.developer.system-extension.install</key>
   <true/>
   <key>com.apple.application-identifier</key>
   <string>$APPLE_TEAM_ID.com.spartangamestudios.vpuppet</string>
@@ -48,7 +47,7 @@ cat > "$OUT/tauri.signed.conf.json" <<JSON
       "entitlements": "macos/build/Entitlements.app.plist",
       "files": {
         "embedded.provisionprofile": "macos/build/embedded.provisionprofile",
-        "Library/SystemExtensions/com.spartangamestudios.vpuppet.camera.systemextension": "macos/build/com.spartangamestudios.vpuppet.camera.systemextension"
+        "Helpers/VPuppet Camera.app": "macos/build/VPuppet Camera.app"
       }
     }
   }

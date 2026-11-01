@@ -1,11 +1,13 @@
 //! macOS sink: a CoreMediaIO Camera Extension (system extension, macOS 12.3+).
 //!
-//! The extension (`src-tauri/macos/camera-extension/`, Swift) is embedded at
-//! `VPuppet.app/Contents/Library/SystemExtensions/` and publishes a device
+//! The extension (`src-tauri/macos/camera-extension/`, Swift) ships inside
+//! `VPuppet Camera.app` (`src-tauri/macos/camera-helper/`), a small helper
+//! embedded at `VPuppet.app/Contents/Helpers/`, and publishes a device
 //! "VPuppet Virtual Camera" with a source stream (what Zoom / Meet / Discord
 //! read) and a sink stream (what we write into). The app side lives in
-//! `src-tauri/macos/bridge/PuppetVCamBridge.m` (activation through
-//! OSSystemExtensionRequest, frames through the CMIO sink queue); this module
+//! `src-tauri/macos/bridge/PuppetVCamBridge.m` (activation by copying the
+//! helper to /Applications and running it, frames through the CMIO sink
+//! queue); this module
 //! wraps it and turns its state into the panel's plain-language status.
 //!
 //! The extension publishes its device only while this app sends a presence
@@ -14,10 +16,11 @@
 //! disappears when the output is turned off, VPuppet quits, or it crashes
 //! (beats stop; the extension times out after 3.5 s).
 //!
-//! Installing a system extension requires a Developer ID-signed app with the
-//! `com.apple.developer.system-extension.install` entitlement (from a
-//! provisioning profile) and the app in /Applications. See
-//! `docs/virtual-camera.md`.
+//! macOS installs a system extension only from a Developer ID-signed app in
+//! /Applications with the `com.apple.developer.system-extension.install`
+//! entitlement (from a provisioning profile). The helper is that app, so
+//! VPuppet itself can live anywhere (Steam installs it under
+//! ~/Library/Application Support/Steam). See `docs/virtual-camera.md`.
 
 use super::{BgraFrame, ExtState, ExtensionStatus, PixelFormat, SinkState, SinkStatus, StreamConfig, VirtualCamSink};
 use std::ffi::{c_char, CStr};
@@ -31,7 +34,7 @@ struct PvcStatus {
     request_state: i32,
     error_code: i64,
     device_present: i32,
-    in_applications: i32,
+    helper_installed: i32,
     is_bundle: i32,
     extension_embedded: i32,
     streaming: i32,
@@ -63,6 +66,8 @@ const REQ_ACTIVATED: i32 = 3;
 const REQ_NEEDS_REBOOT: i32 = 4;
 const REQ_FAILED: i32 = 5;
 const REQ_DEACTIVATED: i32 = 6;
+/// The bridge's own code: VPuppet Camera.app could not be copied to /Applications.
+const ERR_COPY: i64 = -100;
 
 /// Raw bridge state, decoupled from FFI so the mapping can be unit-tested.
 #[derive(Debug, Clone, Default)]
@@ -70,7 +75,8 @@ pub struct BridgeState {
     pub request_state: i32,
     pub error_code: i64,
     pub device_present: bool,
-    pub in_applications: bool,
+    /// /Applications/VPuppet Camera.app exists.
+    pub helper_installed: bool,
     pub is_bundle: bool,
     pub extension_embedded: bool,
     pub streaming: bool,
@@ -89,7 +95,7 @@ fn read_state(probe_device: bool) -> BridgeState {
         request_state: 0,
         error_code: 0,
         device_present: 0,
-        in_applications: 0,
+        helper_installed: 0,
         is_bundle: 0,
         extension_embedded: 0,
         streaming: 0,
@@ -107,7 +113,7 @@ fn read_state(probe_device: bool) -> BridgeState {
         request_state: s.request_state,
         error_code: s.error_code,
         device_present: s.device_present != 0,
-        in_applications: s.in_applications != 0,
+        helper_installed: s.helper_installed != 0,
         is_bundle: s.is_bundle != 0,
         extension_embedded: s.extension_embedded != 0,
         streaming: s.streaming != 0,
@@ -150,7 +156,7 @@ pub fn describe(b: &BridgeState) -> SinkStatus {
             .hint("While the output is ON, pick \"VPuppet Virtual Camera\" in Zoom, Meet, Discord or FaceTime. It is listed only while VPuppet sends.")
     } else if !b.is_bundle {
         s(SinkState::Unavailable, "DEV BUILD: CAMERA EXTENSION NEEDS THE INSTALLED APP")
-            .hint(format!("Run a signed VPuppet.app from /Applications to install the camera. {OBS_HINT}"))
+            .hint(format!("Run a signed VPuppet.app to install the camera. {OBS_HINT}"))
     } else if !b.extension_embedded {
         s(SinkState::Unavailable, "THIS BUILD HAS NO CAMERA EXTENSION").hint(OBS_HINT)
     } else {
@@ -159,10 +165,8 @@ pub fn describe(b: &BridgeState) -> SinkStatus {
             REQ_NEEDS_APPROVAL => s(SinkState::NeedsApproval, "APPROVE THE CAMERA IN SYSTEM SETTINGS").hint(APPROVE_HINT),
             REQ_NEEDS_REBOOT => s(SinkState::NeedsSetup, "RESTART YOUR MAC TO FINISH INSTALLING"),
             REQ_FAILED => failure(b),
-            _ if !b.in_applications => s(SinkState::NeedsSetup, "MOVE VPUPPET TO /APPLICATIONS")
-                .hint(format!("macOS installs camera extensions only from apps in the Applications folder. Drag VPuppet.app there, open it from there, then click INSTALL. {OBS_HINT}")),
             _ => s(SinkState::NeedsSetup, "CAMERA NOT INSTALLED")
-                .hint("Click INSTALL on the EXTENSION line. macOS will ask you to approve the VPuppet camera extension in System Settings (once)."),
+                .hint("Click INSTALL on the EXTENSION line. VPuppet puts its camera installer, VPuppet Camera, in your Applications folder, and macOS asks you to approve the camera in System Settings (once)."),
         }
     };
     if b.request_state == REQ_FAILED && !b.message.is_empty() && out.state != SinkState::Running && out.state != SinkState::Ready {
@@ -175,9 +179,10 @@ pub fn describe(b: &BridgeState) -> SinkStatus {
 fn failure(b: &BridgeState) -> SinkStatus {
     let s = |st, d: &str| SinkStatus::new("coremediaio", st, d);
     match b.error_code {
-        // OSSystemExtensionErrorUnsupportedParentBundleLocation
-        3 => s(SinkState::NeedsSetup, "MOVE VPUPPET TO /APPLICATIONS")
-            .hint("macOS installs camera extensions only from apps in the Applications folder. Move VPuppet.app there, reopen it, click INSTALL."),
+        // Copying the helper failed, or (OSSystemExtensionErrorUnsupportedParentBundleLocation)
+        // it isn't in /Applications after all.
+        ERR_COPY | 3 => s(SinkState::NeedsSetup, "COULD NOT PUT VPUPPET CAMERA IN /APPLICATIONS")
+            .hint(format!("VPuppet installs the camera through a small helper, VPuppet Camera, which macOS requires in the Applications folder. Allow the administrator prompt (or sign in as an administrator), then RETRY. {OBS_HINT}")),
         // MissingEntitlement, CodeSignatureInvalid, ValidationFailed, ForbiddenBySystemPolicy
         2 | 8 | 9 | 10 => s(SinkState::Unavailable, "THIS BUILD IS NOT SIGNED AND NOTARIZED FOR CAMERA EXTENSIONS")
             .hint(format!("Camera extensions need a Developer ID-signed, notarized build (see docs/virtual-camera.md). {OBS_HINT}")),
@@ -242,12 +247,11 @@ pub fn describe_extension(b: &BridgeState) -> ExtensionStatus {
         }
         REQ_FAILED => {
             set(&mut e, ExtState::Failed, &format!("FAILED: {}", b.message.to_uppercase()));
-            // Signing / location errors can't be fixed by retrying.
-            if !matches!(b.error_code, 2 | 3 | 8 | 9 | 10) {
+            // Signing errors can't be fixed by retrying.
+            if !matches!(b.error_code, 2 | 8 | 9 | 10) {
                 e.install = Some("RETRY".into());
             }
         }
-        _ if !b.in_applications => set(&mut e, ExtState::NotInstalled, "NOT INSTALLED: MOVE VPUPPET TO /APPLICATIONS FIRST"),
         REQ_DEACTIVATED => {
             set(&mut e, ExtState::NotInstalled, "REMOVED");
             e.install = Some("INSTALL".into());
@@ -444,7 +448,7 @@ mod tests {
     use super::*;
 
     fn base() -> BridgeState {
-        BridgeState { is_bundle: true, extension_embedded: true, in_applications: true, ..Default::default() }
+        BridgeState { is_bundle: true, extension_embedded: true, ..Default::default() }
     }
 
     #[test]
@@ -453,10 +457,6 @@ mod tests {
         // Installing is the EXTENSION line's job now.
         assert_eq!(describe(&base()).action, None);
         assert!(describe(&base()).hint.unwrap().contains("INSTALL"));
-
-        let mut b = base();
-        b.in_applications = false;
-        assert!(describe(&b).detail.contains("/APPLICATIONS"));
 
         let mut b = base();
         b.request_state = REQ_NEEDS_APPROVAL;
@@ -479,10 +479,14 @@ mod tests {
         assert!(s.detail.contains("NOT SIGNED") && s.detail.contains("MISSING ENTITLEMENT"));
         assert!(s.hint.unwrap().contains("OBS"));
 
+        // VPuppet Camera.app could not be copied to /Applications: retryable.
         let mut b = base();
         b.request_state = REQ_FAILED;
-        b.error_code = 3;
-        assert!(describe(&b).detail.contains("/APPLICATIONS"));
+        b.error_code = ERR_COPY;
+        let s = describe(&b);
+        assert_eq!(s.state, SinkState::NeedsSetup);
+        assert!(s.detail.contains("VPUPPET CAMERA") && s.detail.contains("/APPLICATIONS"));
+        assert_eq!(describe_extension(&b).install.as_deref(), Some("RETRY"));
 
         let mut b = base();
         b.device_present = true;
@@ -522,10 +526,11 @@ mod tests {
         assert!(!e.can_uninstall);
         assert_eq!(e.bundled_version.as_deref(), Some("2"));
 
+        // Steam installs VPuppet outside /Applications: INSTALL still applies
+        // (it copies the helper there first).
         let mut b = base();
-        b.in_applications = false;
-        let e = describe_extension(&b);
-        assert!(e.detail.contains("/APPLICATIONS") && e.install.is_none());
+        b.helper_installed = false;
+        assert_eq!(describe_extension(&b).install.as_deref(), Some("INSTALL"));
 
         let mut b = base();
         b.awaiting_approval = true;

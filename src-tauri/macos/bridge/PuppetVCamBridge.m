@@ -2,11 +2,11 @@
 //
 // Two jobs, exposed to Rust as plain C functions (src-tauri/src/vcam/macos.rs):
 //
-// 1. Install the CoreMediaIO Camera Extension embedded in the app bundle
-//    (Contents/Library/SystemExtensions/) with OSSystemExtensionRequest, and
-//    report where that stands: needs approval in System Settings, needs the
-//    app in /Applications, activated, failed (with the OSSystemExtension
-//    error code).
+// 1. Install the CoreMediaIO Camera Extension through VPuppet Camera.app, the
+//    helper embedded at Contents/Helpers/ (copied to /Applications and run;
+//    see "activation" below), and report where that stands: needs approval
+//    in System Settings, activated, failed (with the OSSystemExtension error
+//    code).
 // 2. Announce that VPuppet is alive (pvc_presence): a Darwin notification
 //    heartbeat the extension watches. It adds the camera device while beats
 //    arrive and removes it on "off" or when they stop (quit, crash).
@@ -16,10 +16,9 @@
 //    them to its source stream, which is what Zoom / Meet / Discord read.
 //
 // Built by build.rs with the `cc` crate (ARC on). Written from Apple's
-// CoreMediaIO and SystemExtensions headers; no third-party code.
+// CoreMediaIO headers; no third-party code.
 
 #import <Foundation/Foundation.h>
-#import <SystemExtensions/SystemExtensions.h>
 #import <CoreMediaIO/CMIOHardware.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
@@ -48,9 +47,9 @@ typedef struct {
     int32_t request_state;   // PVC_REQ_*
     int64_t error_code;      // OSSystemExtensionErrorCode (or NSError code) when FAILED
     int32_t device_present;  // the CMIO device exists (extension installed and running)
-    int32_t in_applications; // app bundle lives under /Applications
+    int32_t helper_installed; // /Applications/VPuppet Camera.app exists
     int32_t is_bundle;       // running from a .app (not `tauri dev`)
-    int32_t extension_embedded; // Contents/Library/SystemExtensions/<id>.systemextension exists
+    int32_t extension_embedded; // Contents/Helpers/VPuppet Camera.app carries the extension
     int32_t streaming;       // sink stream started
     int32_t enabled;         // from a properties request: extension enabled (-1 unknown)
     char message[512];
@@ -58,13 +57,25 @@ typedef struct {
     int32_t awaiting_approval; // from properties: installed, waiting for the user
     int32_t uninstalling;    // from properties: removal pending (reboot)
     char installed_version[64]; // CFBundleVersion of the enabled (else newest) installed copy
-    char bundled_version[64];   // CFBundleVersion of the copy inside this app
+    char bundled_version[64];   // CFBundleVersion of the copy inside this app's helper
 } pvc_status;
 
 // ---------------------------------------------------------------- activation
+//
+// macOS activates system extensions only from an app in /Applications, and
+// VPuppet may live anywhere (Steam: ~/Library/Application Support/Steam). So
+// VPuppet carries a helper, Contents/Helpers/VPuppet Camera.app, with the
+// extension inside it. Install, update and removal copy the helper to
+// /Applications when the copy there differs, then run it (activate /
+// deactivate / properties) and read its one-line answers
+// (camera-helper/main.swift has the protocol).
 
-@interface PVCRequestDelegate : NSObject <OSSystemExtensionRequestDelegate>
-@end
+#define PVC_HELPER_NAME @"VPuppet Camera.app"
+#define PVC_HELPER_INSTALLED @"/Applications/VPuppet Camera.app"
+#define PVC_HELPER_EXE @"Contents/MacOS/VPuppet Camera"
+// Our own error code (not an OSSystemExtensionErrorCode): the helper could not
+// be copied to /Applications.
+#define PVC_ERR_COPY -100
 
 static dispatch_queue_t pvc_queue(void) {
     static dispatch_queue_t q;
@@ -78,15 +89,13 @@ static int32_t g_req = PVC_REQ_IDLE;
 static int64_t g_err = 0;
 static int32_t g_enabled = -1;
 static NSString *g_msg = @"";
-static PVCRequestDelegate *g_delegate;
-static OSSystemExtensionRequest *g_props_request;
 static int32_t g_props_answered = 0;
 static int32_t g_awaiting = 0;
 static int32_t g_uninstalling = 0;
 static NSString *g_installed_version = @"";
 static double g_props_sent_at = 0;
 static int32_t g_props_pending = 0;
-static BOOL g_deactivating = NO;
+static int32_t g_busy = 0; // an activate / deactivate run is in flight
 
 static void set_state(int32_t s, int64_t code, NSString *msg) {
     @synchronized(g_lock) {
@@ -96,26 +105,126 @@ static void set_state(int32_t s, int64_t code, NSString *msg) {
     }
 }
 
-@implementation PVCRequestDelegate
-
-- (OSSystemExtensionReplacementAction)request:(OSSystemExtensionRequest *)request
-                  actionForReplacingExtension:(OSSystemExtensionProperties *)existing
-                                withExtension:(OSSystemExtensionProperties *)ext {
-    // Always take the copy shipped with this app (upgrades and downgrades).
-    return OSSystemExtensionReplacementActionReplace;
+static void ensure_init(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ g_lock = [NSObject new]; });
 }
 
-- (void)requestNeedsUserApproval:(OSSystemExtensionRequest *)request {
-    set_state(PVC_REQ_NEEDS_APPROVAL, 0, @"Waiting for approval in System Settings");
+static NSString *bundled_helper(void) {
+    return [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:[@"Contents/Helpers" stringByAppendingPathComponent:PVC_HELPER_NAME]];
 }
 
-- (void)request:(OSSystemExtensionRequest *)request didFinishWithResult:(OSSystemExtensionRequestResult)result {
-    if (request == g_props_request) return;
-    BOOL deact = g_deactivating;
+static NSString *extension_in(NSString *helper) {
+    return [helper stringByAppendingPathComponent:
+                       [NSString stringWithFormat:@"Contents/Library/SystemExtensions/%@.systemextension", PVC_EXTENSION_ID]];
+}
+
+static NSString *plist_version(NSString *bundle) {
+    // Read the file each time: NSBundle caches, and the copy can change under us.
+    NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:[bundle stringByAppendingPathComponent:@"Contents/Info.plist"]];
+    id v = d[@"CFBundleVersion"];
+    return [v isKindOfClass:NSString.class] ? v : @"";
+}
+
+/// The copy in /Applications is the one this VPuppet carries (same helper and
+/// extension executables and Info.plists).
+static BOOL helper_current(void) {
+    NSString *src = bundled_helper(), *dst = PVC_HELPER_INSTALLED;
+    NSString *ext = [NSString stringWithFormat:@"Contents/Library/SystemExtensions/%@.systemextension/Contents/", PVC_EXTENSION_ID];
+    NSArray *files = @[ PVC_HELPER_EXE, @"Contents/Info.plist", @"Contents/_CodeSignature/CodeResources",
+                        [ext stringByAppendingFormat:@"MacOS/%@", PVC_EXTENSION_ID], [ext stringByAppendingString:@"Info.plist"] ];
+    for (NSString *f in files) {
+        NSData *a = [NSData dataWithContentsOfFile:[src stringByAppendingPathComponent:f]];
+        NSData *b = [NSData dataWithContentsOfFile:[dst stringByAppendingPathComponent:f]];
+        if (!a || ![a isEqualToData:b]) return NO;
+    }
+    return YES;
+}
+
+static NSString *shell_quote(NSString *s) {
+    return [NSString stringWithFormat:@"'%@'", [s stringByReplacingOccurrencesOfString:@"'" withString:@"'\\''"]];
+}
+
+/// Run a shell command as an administrator: macOS shows its own password dialog.
+static BOOL run_as_admin(NSString *cmd, NSString **err) {
+    NSString *as = [[cmd stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"] stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
+    NSTask *t = [NSTask new];
+    t.launchPath = @"/usr/bin/osascript";
+    t.arguments = @[ @"-e", [NSString stringWithFormat:@"do shell script \"%@\" with prompt \"VPuppet needs to put its camera installer, VPuppet Camera, in the Applications folder.\" with administrator privileges", as] ];
+    NSPipe *errPipe = [NSPipe pipe];
+    t.standardError = errPipe;
+    t.standardOutput = [NSFileHandle fileHandleWithNullDevice];
+    @try {
+        [t launch];
+    } @catch (NSException *e) {
+        if (err) *err = e.reason;
+        return NO;
+    }
+    NSData *d = [errPipe.fileHandleForReading readDataToEndOfFile];
+    [t waitUntilExit];
+    if (t.terminationStatus == 0) return YES;
+    if (err) *err = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] ?: @"cancelled";
+    return NO;
+}
+
+/// Put this VPuppet's helper in /Applications (replacing a different copy).
+static BOOL install_helper(NSString **err) {
+    if (helper_current()) return YES;
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *src = bundled_helper(), *dst = PVC_HELPER_INSTALLED;
+    NSString *tmp = [NSString stringWithFormat:@"/Applications/.VPuppet Camera.%d.app", getpid()];
+    NSError *e = nil;
+    [fm removeItemAtPath:tmp error:nil];
+    if ([fm copyItemAtPath:src toPath:tmp error:&e]) {
+        [fm removeItemAtPath:dst error:nil];
+        if ([fm moveItemAtPath:tmp toPath:dst error:&e]) return YES;
+        [fm removeItemAtPath:tmp error:nil];
+    }
+    // /Applications not writable for this user (a standard account): ask for an administrator.
+    NSString *cmd = [NSString stringWithFormat:@"/bin/rm -rf %@ && /usr/bin/ditto %@ %@", shell_quote(dst), shell_quote(src), shell_quote(dst)];
+    NSString *adminErr = nil;
+    if (run_as_admin(cmd, &adminErr) && helper_current()) return YES;
+    if (err) *err = adminErr ?: e.localizedDescription ?: @"copy failed";
+    return NO;
+}
+
+/// Run the installed helper with one command; `line` gets each answer line.
+static int run_helper(NSString *command, void (^line)(NSString *)) {
+    NSTask *t = [NSTask new];
+    t.launchPath = [PVC_HELPER_INSTALLED stringByAppendingPathComponent:PVC_HELPER_EXE];
+    t.arguments = @[ command ];
+    NSPipe *out = [NSPipe pipe];
+    t.standardOutput = out;
+    t.standardError = [NSFileHandle fileHandleWithNullDevice];
+    @try {
+        [t launch];
+    } @catch (NSException *e) {
+        line([NSString stringWithFormat:@"failed %d could not run VPuppet Camera: %@", PVC_ERR_COPY, e.reason]);
+        return -1;
+    }
+    NSMutableData *buf = [NSMutableData data];
+    NSFileHandle *h = out.fileHandleForReading;
+    for (;;) {
+        NSData *d = [h availableData]; // blocks; empty at EOF
+        if (d.length == 0) break;
+        [buf appendData:d];
+        for (;;) {
+            NSRange nl = [buf rangeOfData:[NSData dataWithBytes:"\n" length:1] options:0 range:NSMakeRange(0, buf.length)];
+            if (nl.location == NSNotFound) break;
+            NSString *l = [[NSString alloc] initWithData:[buf subdataWithRange:NSMakeRange(0, nl.location)] encoding:NSUTF8StringEncoding];
+            [buf replaceBytesInRange:NSMakeRange(0, nl.location + 1) withBytes:NULL length:0];
+            if (l.length) line(l);
+        }
+    }
+    [t waitUntilExit];
+    return t.terminationStatus;
+}
+
+static void reset_props(BOOL nothing_installed) {
     @synchronized(g_lock) {
         g_props_sent_at = 0; // re-read versions on the next poll
         g_props_pending = 0;
-        if (deact) {
+        if (nothing_installed) {
             // macOS may never answer a properties request once nothing is installed.
             g_props_answered = 0;
             g_enabled = -1;
@@ -123,113 +232,121 @@ static void set_state(int32_t s, int64_t code, NSString *msg) {
             g_installed_version = @"";
         }
     }
-    if (result == OSSystemExtensionRequestWillCompleteAfterReboot)
-        set_state(PVC_REQ_NEEDS_REBOOT, 0, @"Restart the Mac to finish");
-    else
-        set_state(deact ? PVC_REQ_DEACTIVATED : PVC_REQ_ACTIVATED, 0, deact ? @"Removed" : @"Activated");
 }
 
-- (void)request:(OSSystemExtensionRequest *)request didFailWithError:(NSError *)error {
-    if (request == g_props_request) {
-        // A signing problem (missing entitlement, bad signature) shows up here
-        // already, so the panel can say "not signed" before the user tries to
-        // install. Other errors only go to the status line.
-        @synchronized(g_lock) {
-            g_props_pending = 0;
-            if (g_req == PVC_REQ_IDLE) {
-                long c = (long)error.code;
-                if (c == 2 || c == 8 || c == 9 || c == 10) {
-                    g_req = PVC_REQ_FAILED;
-                    g_err = c;
-                }
-                g_msg = [NSString stringWithFormat:@"%@ (%@ %ld)", error.localizedDescription, error.domain, c];
-            }
-        }
-        return;
+/// One answer line from an activate / deactivate run. Returns YES when final.
+static BOOL handle_result(NSString *l, BOOL removing) {
+    if ([l isEqualToString:@"approval"]) {
+        set_state(PVC_REQ_NEEDS_APPROVAL, 0, @"Waiting for approval in System Settings");
+        return NO;
     }
-    NSString *m = [NSString stringWithFormat:@"%@ (%@ %ld)", error.localizedDescription, error.domain, (long)error.code];
-    set_state(PVC_REQ_FAILED, error.code, m);
-    @synchronized(g_lock) { g_props_sent_at = 0; }
+    if ([l isEqualToString:@"activated"] || [l isEqualToString:@"deactivated"] || [l isEqualToString:@"reboot"]) {
+        reset_props(removing);
+        if ([l isEqualToString:@"reboot"])
+            set_state(PVC_REQ_NEEDS_REBOOT, 0, @"Restart the Mac to finish");
+        else
+            set_state(removing ? PVC_REQ_DEACTIVATED : PVC_REQ_ACTIVATED, 0, removing ? @"Removed" : @"Activated");
+        return YES;
+    }
+    if ([l hasPrefix:@"failed "]) {
+        NSArray *p = [l componentsSeparatedByString:@" "];
+        long code = p.count > 1 ? [p[1] integerValue] : 1;
+        NSString *msg = p.count > 2 ? [[p subarrayWithRange:NSMakeRange(2, p.count - 2)] componentsJoinedByString:@" "] : @"failed";
+        set_state(PVC_REQ_FAILED, code, msg);
+        @synchronized(g_lock) { g_props_sent_at = 0; }
+        return YES;
+    }
+    if ([l isEqualToString:@"timeout"]) {
+        set_state(PVC_REQ_FAILED, 1, removing ? @"Removal timed out" : @"Approval timed out");
+        return YES;
+    }
+    return NO;
 }
 
-- (void)request:(OSSystemExtensionRequest *)request foundProperties:(NSArray<OSSystemExtensionProperties *> *)properties API_AVAILABLE(macos(12.0)) {
-    int32_t en = 0;
-    BOOL awaiting = NO, uninstalling = NO;
-    NSString *ver = @"";
-    // Several copies can be listed during an update; the enabled one is what runs.
-    for (OSSystemExtensionProperties *p in properties) {
-        if (p.isUninstalling) {
-            uninstalling = YES;
-            continue;
-        }
-        if (p.isEnabled) {
-            en = 1;
-            ver = p.bundleVersion ?: @"";
-        } else if (!en) {
-            ver = p.bundleVersion ?: @"";
-        }
-        if (p.isAwaitingUserApproval) awaiting = YES;
-    }
+static void run_request(BOOL removing) {
+    ensure_init();
     @synchronized(g_lock) {
-        g_props_pending = 0;
-        g_enabled = en;
-        g_props_answered = 1;
-        g_awaiting = awaiting;
-        g_uninstalling = uninstalling && !en;
-        g_installed_version = ver;
-        if (awaiting && g_req == PVC_REQ_IDLE) {
-            g_req = PVC_REQ_NEEDS_APPROVAL;
-            g_msg = @"Waiting for approval in System Settings";
-        }
+        if (g_busy) return;
+        g_busy = 1;
     }
-}
-
-@end
-
-static void ensure_init(void) {
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        g_lock = [NSObject new];
-        g_delegate = [PVCRequestDelegate new];
+    set_state(PVC_REQ_PENDING, 0, @"Copying VPuppet Camera to Applications");
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *err = nil;
+        if (!install_helper(&err)) {
+            set_state(PVC_REQ_FAILED, PVC_ERR_COPY, [NSString stringWithFormat:@"Could not copy VPuppet Camera to Applications: %@", err]);
+        } else {
+            set_state(PVC_REQ_PENDING, 0, removing ? @"Requesting removal" : @"Requesting activation");
+            __block BOOL done = NO;
+            int status = run_helper(removing ? @"deactivate" : @"activate", ^(NSString *l) {
+                if (!done) done = handle_result(l, removing);
+            });
+            if (!done) set_state(PVC_REQ_FAILED, 1, [NSString stringWithFormat:@"VPuppet Camera exited (%d)", status]);
+            // Removed: the helper has no job left (dragging it to the Trash would
+            // also remove the extension, so it is the user's uninstaller too).
+            BOOL removed;
+            @synchronized(g_lock) { removed = removing && (g_req == PVC_REQ_DEACTIVATED || g_req == PVC_REQ_NEEDS_REBOOT); }
+            if (removed) [NSFileManager.defaultManager removeItemAtPath:PVC_HELPER_INSTALLED error:nil];
+        }
+        @synchronized(g_lock) { g_busy = 0; }
     });
 }
 
-void pvc_activate(void) {
-    ensure_init();
-    g_deactivating = NO;
-    set_state(PVC_REQ_PENDING, 0, @"Requesting activation");
-    OSSystemExtensionRequest *r = [OSSystemExtensionRequest activationRequestForExtension:PVC_EXTENSION_ID queue:pvc_queue()];
-    r.delegate = g_delegate;
-    [[OSSystemExtensionManager sharedManager] submitRequest:r];
-}
+void pvc_activate(void) { run_request(NO); }
 
-void pvc_deactivate(void) {
-    ensure_init();
-    g_deactivating = YES;
-    set_state(PVC_REQ_PENDING, 0, @"Requesting removal");
-    OSSystemExtensionRequest *r = [OSSystemExtensionRequest deactivationRequestForExtension:PVC_EXTENSION_ID queue:pvc_queue()];
-    r.delegate = g_delegate;
-    [[OSSystemExtensionManager sharedManager] submitRequest:r];
-}
+void pvc_deactivate(void) { run_request(YES); }
 
 /// Ask (without installing anything) whether the extension is enabled or awaiting approval.
 void pvc_query_properties(void) {
     ensure_init();
     @synchronized(g_lock) {
-        // At most one request every 4 s (the panel polls every 3 s), and while
-        // one is unanswered (macOS 26 never answers when nothing is installed)
-        // only every 30 s.
+        // At most one request every 4 s (the panel polls every 3 s), none while
+        // an install or removal runs.
         double now = CFAbsoluteTimeGetCurrent();
-        if (now - g_props_sent_at < (g_props_pending ? 30 : 4)) return;
+        if (g_busy || g_props_pending || now - g_props_sent_at < 4) return;
         g_props_sent_at = now;
         g_props_pending = 1;
     }
-    if (@available(macOS 12.0, *)) {
-        OSSystemExtensionRequest *r = [OSSystemExtensionRequest propertiesRequestForExtension:PVC_EXTENSION_ID queue:pvc_queue()];
-        r.delegate = g_delegate;
-        g_props_request = r;
-        [[OSSystemExtensionManager sharedManager] submitRequest:r];
-    }
+    dispatch_async(pvc_queue(), ^{
+        if (![NSFileManager.defaultManager isExecutableFileAtPath:[PVC_HELPER_INSTALLED stringByAppendingPathComponent:PVC_HELPER_EXE]]) {
+            // No helper in /Applications: nothing of ours is installed.
+            @synchronized(g_lock) {
+                g_props_pending = 0;
+                g_props_answered = 1;
+                g_enabled = 0;
+                g_awaiting = 0;
+                g_uninstalling = 0;
+                g_installed_version = @"";
+            }
+            return;
+        }
+        run_helper(@"properties", ^(NSString *l) {
+            NSArray *p = [l componentsSeparatedByString:@" "];
+            @synchronized(g_lock) {
+                if ([p[0] isEqualToString:@"props"] && p.count >= 5) {
+                    g_enabled = [p[1] intValue];
+                    g_awaiting = [p[2] intValue];
+                    g_uninstalling = [p[3] intValue];
+                    g_installed_version = [p[4] isEqualToString:@"-"] ? @"" : p[4];
+                    g_props_answered = 1;
+                    if (g_awaiting && g_req == PVC_REQ_IDLE) {
+                        g_req = PVC_REQ_NEEDS_APPROVAL;
+                        g_msg = @"Waiting for approval in System Settings";
+                    }
+                } else if ([p[0] isEqualToString:@"failed"] && p.count >= 2 && g_req == PVC_REQ_IDLE) {
+                    // A signing problem (missing entitlement, bad signature) shows up here
+                    // already, so the panel can say "not signed" before the user tries to
+                    // install. Other errors only go to the status line.
+                    long c = [p[1] integerValue];
+                    if (c == 2 || c == 8 || c == 9 || c == 10) {
+                        g_req = PVC_REQ_FAILED;
+                        g_err = c;
+                    }
+                    g_msg = p.count > 2 ? [[p subarrayWithRange:NSMakeRange(2, p.count - 2)] componentsJoinedByString:@" "] : @"";
+                }
+            }
+        });
+        @synchronized(g_lock) { g_props_pending = 0; }
+    });
 }
 
 // ---------------------------------------------------------------- presence
@@ -443,9 +560,8 @@ void pvc_get_status(pvc_status *out, int32_t probe_device) {
     memset(out, 0, sizeof(*out));
     NSString *bundlePath = NSBundle.mainBundle.bundlePath;
     out->is_bundle = [bundlePath hasSuffix:@".app"];
-    out->in_applications = [bundlePath hasPrefix:@"/Applications/"];
-    NSString *ext = [bundlePath stringByAppendingPathComponent:
-                                    [NSString stringWithFormat:@"Contents/Library/SystemExtensions/%@.systemextension", PVC_EXTENSION_ID]];
+    out->helper_installed = [[NSFileManager defaultManager] fileExistsAtPath:PVC_HELPER_INSTALLED];
+    NSString *ext = extension_in(bundled_helper());
     out->extension_embedded = [[NSFileManager defaultManager] fileExistsAtPath:ext];
     out->device_present = probe_device && find_device() != kCMIOObjectUnknown;
     @synchronized(g_lock) {
@@ -459,8 +575,5 @@ void pvc_get_status(pvc_status *out, int32_t probe_device) {
         out->uninstalling = g_uninstalling;
         strlcpy(out->installed_version, g_installed_version.UTF8String ?: "", sizeof(out->installed_version));
     }
-    if (out->extension_embedded) {
-        NSString *v = [NSBundle bundleWithPath:ext].infoDictionary[@"CFBundleVersion"];
-        strlcpy(out->bundled_version, v.UTF8String ?: "", sizeof(out->bundled_version));
-    }
+    if (out->extension_embedded) strlcpy(out->bundled_version, plist_version(ext).UTF8String ?: "", sizeof(out->bundled_version));
 }

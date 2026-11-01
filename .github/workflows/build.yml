@@ -121,6 +121,7 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           PUPPET_APP_PROFILE_B64: ${{ secrets.PUPPET_APP_PROFILE }}
           PUPPET_CAMEXT_PROFILE_B64: ${{ secrets.PUPPET_CAMEXT_PROFILE }}
+          PUPPET_CAMHOST_PROFILE_B64: ${{ secrets.PUPPET_CAMHOST_PROFILE }}
         run: |
           # The camera extension is signed in beforeBundleCommand, before Tauri
           # imports the certificate itself, so put it in a keychain now.
@@ -137,6 +138,10 @@ jobs:
           if [ -n "$PUPPET_CAMEXT_PROFILE_B64" ]; then
             echo "$PUPPET_CAMEXT_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/camext.provisionprofile"
             echo "PUPPET_CAMEXT_PROFILE=$RUNNER_TEMP/camext.provisionprofile" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$PUPPET_CAMHOST_PROFILE_B64" ]; then
+            echo "$PUPPET_CAMHOST_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/camhost.provisionprofile"
+            echo "PUPPET_CAMHOST_PROFILE=$RUNNER_TEMP/camhost.provisionprofile" >> "$GITHUB_ENV"
           fi
           PUPPET_APP_PROFILE="$RUNNER_TEMP/app.provisionprofile" bash src-tauri/macos/prepare-signing.sh
           echo "SIGNED_CONFIG=--config src-tauri/macos/build/tauri.signed.conf.json" >> "$GITHUB_ENV"
@@ -159,7 +164,11 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = macOS ]; then
             APP=$(ls -d src-tauri/target/*/release/bundle/macos/VPuppet.app)
-            EXT="$APP/Contents/Library/SystemExtensions/com.spartangamestudios.vpuppet.camera.systemextension"
+            HELPER="$APP/Contents/Helpers/VPuppet Camera.app"
+            test -x "$HELPER/Contents/MacOS/VPuppet Camera"
+            lipo -info "$HELPER/Contents/MacOS/VPuppet Camera"
+            codesign --verify --strict --verbose=1 "$HELPER"
+            EXT="$HELPER/Contents/Library/SystemExtensions/com.spartangamestudios.vpuppet.camera.systemextension"
             test -x "$EXT/Contents/MacOS/com.spartangamestudios.vpuppet.camera"
             lipo -info "$EXT/Contents/MacOS/com.spartangamestudios.vpuppet.camera"
             plutil -p "$EXT/Contents/Info.plist" | grep -E 'CMIOExtensionMachServiceName|CFBundlePackageType'

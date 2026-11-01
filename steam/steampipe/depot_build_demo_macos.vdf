@@ -15,7 +15,7 @@
 	"ContentRoot" "../../"
 
 	// The whole bundle, recursively (includes the camera extension under
-	// Contents/Library/SystemExtensions/ and, from tauri.demo.conf.json,
+	// Contents/Helpers/VPuppet Camera.app/ and, from tauri.demo.conf.json,
 	// Contents/MacOS/libsteam_api.dylib, which is inside the signature).
 	"FileMapping"
 	{
