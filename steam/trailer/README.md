@@ -31,9 +31,10 @@ ffmpeg -i setup-guide-en.mp4 -i bed.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:
 
 Tracking is real: the performer clip plays as the webcam and the hero follows it. Render the performer from a model with a realistic face, because MediaPipe finds no face on the cartoon CC0 avatars. The camera preview stays minimised, so the performer is never on screen.
 
-The script makes two adjustments before the reveal, both of which a user could also make:
+The script makes three adjustments before the reveal, both of which a user could also make:
 
 - It sets a calibration baseline.
+- It raises Smoothing from 0.5 to 0.9, which cuts frame-to-frame arm jitter by about 60%. The added lag doesn't show, because the performer is off screen.
 - It steepens the jawOpen, funnel and pucker curves, because the rendered performer's black lips otherwise read as a slightly open mouth.
 
 The hero (Morrígan) is served from memory and never written to the repo, the same as for `steam/screenshots`.

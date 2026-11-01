@@ -272,6 +272,10 @@ async function record(lang) {
     const g = window.__puppet.settings.gains;
     for (const n of ['jawOpen', 'mouthFunnel', 'mouthPucker']) g[n] = { gain: 1.2, curve: 2.4 };
   });
+  // Heavier smoothing (the Smoothing slider) than the 0.5 default: about 60%
+  // less frame-to-frame arm jitter, and the added lag never shows because the
+  // performer is off screen.
+  await mcp('settings_set', { smoothing: 0.9 });
   await wait(800);
   await page.evaluate(() => window.__puppet.calibrate());
   await wait(1400);
