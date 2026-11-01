@@ -2,7 +2,8 @@
 // in headless Chrome (nothing opens on screen), with captions and title cards
 // drawn into the page so every script renders the same.
 //   node scripts/steam-trailer.mjs <hero.vrm> <performer-clip-dir> [--lang en,ru,zh-CN,es] [--keep]
-// Writes steam/trailer/setup-guide-<lang>.mp4 (1920x1080, 60 fps, H.264, AAC).
+// Writes steam/trailer/setup-guide-<lang>.mp4 (1920x1080, 60 fps, H.264, AAC),
+// scored with the quiet bed from steam/trailer/music.py.
 //
 // Tracking is real: the performer clip (scripts/render-clip.mjs) is fed in as
 // the webcam (?source=file) and the hero follows it. Render it from a model
@@ -333,10 +334,12 @@ async function record(lang) {
   }
   writeFileSync(join(tmp, 'list.ffconcat'), lines.join('\n'));
   const out = join(OUT, `setup-guide-${lang}.mp4`);
+  const bed = join(tmp, 'bed.wav');
+  execFileSync('python3', [join(OUT, 'music.py'), (stamps.at(-1) - stamps[0] + 1 / FPS).toFixed(3), bed]);
   execFileSync('ffmpeg', [
     '-y', '-loglevel', 'error',
     '-f', 'concat', '-safe', '0', '-i', join(tmp, 'list.ffconcat'),
-    '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
+    '-i', bed,
     '-vf', `fps=${FPS},format=yuv420p`,
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-profile:v', 'high', '-movflags', '+faststart',
     '-c:a', 'aac', '-b:a', '192k', '-shortest',
