@@ -16,7 +16,7 @@ The trailer has six steps:
 5. Emotes from hotkeys or a gamepad.
 6. `W` and "VPuppet Virtual Camera" in Zoom, Meet, Discord or OBS.
 
-Title and end cards bracket the steps.
+Title and end cards bracket the steps. The end card says "Free demo: every feature for 100 hours" and "Wishlist on Steam".
 
 ## Music
 
@@ -25,7 +25,9 @@ The music bed is synthesised by `music.py` (numpy and scipy, no samples), so the
 ```bash
 python3 steam/trailer/music.py 61.17 bed.wav
 ffmpeg -i setup-guide-en.mp4 -i bed.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4
-``` The end card says "Free demo: every feature for 100 hours" and "Wishlist on Steam".
+```
+
+## How it is made
 
 Tracking is real: the performer clip plays as the webcam and the hero follows it. Render the performer from a model with a realistic face, because MediaPipe finds no face on the cartoon CC0 avatars. The camera preview stays minimised, so the performer is never on screen.
 
