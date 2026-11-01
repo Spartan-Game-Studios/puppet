@@ -3,7 +3,7 @@
     python3 steam/trailer/music.py <seconds> <out.wav> [track]
 
 With a track (any format ffmpeg reads), it is looped to the length, faded in
-and out and normalised to -26 LUFS. Licensed tracks stay outside the repo.
+and out and normalised to -32 LUFS. Licensed tracks stay outside the repo.
 Without one, a bed is synthesised from scratch (no samples, so nothing to
 license):
 
@@ -11,7 +11,7 @@ license):
 detuned pad over a sine sub, with an eighth-note pluck arpeggio and a faint
 shaker while the steps play. The pluck and shaker wait for the title card
 (about 4 s) and stop before the end card, where the pad resolves on D. The
-result is loudness-normalised by ffmpeg to -26 LUFS so it stays a bed.
+result is loudness-normalised by ffmpeg to -32 LUFS so it stays a bed.
 """
 import subprocess
 import sys
@@ -23,7 +23,7 @@ from scipy.signal import butter, fftconvolve, sosfilt
 
 DUR, OUT = float(sys.argv[1]), sys.argv[2]
 SR = 48000
-LOUDNORM = "loudnorm=I=-26:TP=-3:LRA=11"
+LOUDNORM = "loudnorm=I=-32:TP=-3:LRA=11"
 
 if len(sys.argv) > 3:
     subprocess.run(

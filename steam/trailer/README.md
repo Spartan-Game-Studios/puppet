@@ -20,7 +20,7 @@ Title and end cards bracket the steps. The end card says "Free demo: every featu
 
 ## Music
 
-The current trailers use "Ambience 3" from the *50 Cozy Fantasy RPG Tracks* pack (the loop version). It is a licensed track, so it stays out of the repo; pass it with `--music`. `music.py` loops the track to the recording's length, fades it in and out, and normalises it to -26 LUFS so it stays a quiet bed:
+The current trailers use "Ambience 3" from the *50 Cozy Fantasy RPG Tracks* pack (the loop version). It is a licensed track, so it stays out of the repo; pass it with `--music`. `music.py` loops the track to the recording's length, fades it in and out, and normalises it to -32 LUFS so it stays a quiet bed:
 
 ```bash
 node scripts/steam-trailer.mjs hero.vrm perf/ --music ".../Loops/mp3/Ambience 3.mp3"
