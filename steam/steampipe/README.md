@@ -29,12 +29,14 @@ CARGO_TARGET_DIR=src-tauri/target-demo VPUPPET_STEAM_APP_ID=<FULL_APP_ID> pnpm t
 
 The frontend asks the Rust side (`demo_status`), so the cargo feature is the only switch. The full build has no Steamworks dependency and ships no Steam library.
 
-macOS: sign, notarize and staple as in `docs/virtual-camera.md#macos-signing` (the signed build uses `--config src-tauri/macos/build/tauri.signed.conf.json`). Verify before uploading:
+macOS: `build-macos.sh` builds the universal app (Apple silicon + Intel), signs it with the camera extension's entitlements, notarizes and staples it, then checks both architectures, the signature and Gatekeeper. It needs the Developer ID profiles for `com.spartangamestudios.vpuppet` and `.vpuppet.camera` (`docs/virtual-camera.md#macos-signing`, steps 4 and 5) and a notarytool keychain profile:
 
 ```sh
-codesign --verify --deep --strict --verbose=2 src-tauri/target/release/bundle/macos/VPuppet.app
-spctl -a -vv src-tauri/target/release/bundle/macos/VPuppet.app
-xcrun stapler validate src-tauri/target/release/bundle/macos/VPuppet.app
+xcrun notarytool store-credentials vpuppet --apple-id <apple-id> --team-id <TEAMID>   # once; asks for an app-specific password
+APPLE_TEAM_ID=<TEAMID> \
+PUPPET_APP_PROFILE=<path>/VPuppet_Developer_ID.provisionprofile \
+PUPPET_CAMEXT_PROFILE=<path>/VPuppet_Camera_Developer_ID.provisionprofile \
+NOTARY_PROFILE=vpuppet bash steam/steampipe/build-macos.sh
 ```
 
 Linux: stage the AppImage under a fixed name (the commands are at the top of `depot_build_*_linux.vdf`).
@@ -75,6 +77,5 @@ steamcmd +login <steam_build_account> \
 
 - **Exact binary name** after the rename (`vpuppet.exe`? check `src-tauri/target/release/`).
 - **Linux: does the AppImage find `libsteam_api.so`** next to it? The binary links it by name; inside an AppImage the loader may not look beside the image. Test, or ship the extracted tree.
-- **Universal or Apple-silicon-only Mac build.** The current local build is `aarch64` only.
 - **WebView2 on Windows**: Steam does not run Tauri's installer, so the WebView2 bootstrapper isn't run. Add an install script or an in-app check.
 - **Linux packaging**: AppImage (self-contained, FUSE question) vs. the extracted `.deb` tree (needs the system's WebKitGTK 4.1). Test the AppImage under the Steam client's runtime first.
