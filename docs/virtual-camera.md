@@ -72,7 +72,7 @@ macOS activates a system extension only from the app that contains it, and only 
 
 The helper prints one line per event (`approval`, `activated`, `deactivated`, `reboot`, `props …`, `failed <code> <message>`, `timeout`; the protocol is at the top of `camera-helper/main.swift`). Frames and the presence heartbeat don't involve it: VPuppet writes into the extension's CMIO sink stream directly, from wherever it runs.
 
-Steam can't remove the extension when the game is uninstalled. Click **UNINSTALL** first, or drag **VPuppet Camera** from Applications to the Trash afterwards: macOS removes an extension with its app.
+Steam can't remove the extension when the game is uninstalled. Click **UNINSTALL** first, or remove **VPuppet Camera** from Applications afterwards: drag it to the Trash (macOS removes an extension with its app), or open it, which asks **Remove VPuppet Camera?**, deactivates the extension and moves the helper to the Trash. Opened from inside VPuppet.app (`Contents/Helpers`) it only points to the VIRTUAL CAM panel and removes nothing.
 
 ### The camera exists only while VPuppet sends
 
