@@ -1,0 +1,35 @@
+// Step 1 (Daz Studio, headless): build the starter avatar and save it as a .duf.
+// Genesis 9 Starter Essentials only (free with Daz Studio), so anyone can
+// reproduce it. Run: WORK=<folder> python3 daz_run.py 01_build_scene.dsa
+var cm = App.getContentMgr();
+// Wherever this machine's content library is.
+var LIB = String(cm.findFile("/People/Genesis 9/Genesis 9.duf")).replace("Genesis 9.duf", "");
+cm.openFile(LIB + "Genesis 9.duf", true);
+var fig = Scene.getPrimarySelection();
+out("figure: " + (fig ? fig.getLabel() : "none"));
+// Shape and skin, both in Starter Essentials: the bare figure is androgynous
+// and untextured grey. The Base Feminine dial and Feminine Skin 01 (D1).
+var obj = fig.getObject(), shaped = false;
+for (var m = 0; m < obj.getNumModifiers(); m++) {
+  var mod = obj.getModifier(m);
+  if (mod.name == "BaseFeminine_body_bs_Body") { mod.getValueChannel().setValue(1.0); shaped = true; }
+}
+out("Base Feminine dial: " + shaped);
+Scene.setPrimarySelection(fig);
+out("skin: " + cm.openFile(LIB + "Materials/Daz Originals/Base Materials/G9 Feminine Skin 01 MAT.duf", true));
+var items = [
+  "Hair/Daz Originals/Base Hair/G9 Base dForce Pixie Hair.duf",
+  "Clothing/Daz Originals/Base Clothing/G9 Base Shirt.duf",
+  "Clothing/Daz Originals/Base Clothing/G9 Base Shorts.duf",
+];
+for (var i = 0; i < items.length; i++) {
+  Scene.setPrimarySelection(fig);
+  out(items[i] + ": " + cm.openFile(LIB + items[i], true));
+}
+var labels = [];
+for (var j = 0; j < Scene.getNumNodes(); j++) {
+  var nd = Scene.getNode(j);
+  if (nd.inherits("DzSkeleton")) labels.push(nd.getLabel());
+}
+out("figures: " + labels.join(", "));
+out("saved (0 = ok): " + Scene.saveScene(WORK + "g9-starter.duf"));

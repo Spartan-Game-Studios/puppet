@@ -1,33 +1,145 @@
 ---
 title: Making an avatar with Daz 3D
-description: From Daz Studio through Blender to a VRM that VPuppet can load, and the licensing to check first.
+description: Genesis 9 from Daz Studio through Blender to a VRM with full perfect sync, with the scripts that do each step.
 ---
 
-Daz Studio characters can become VRM avatars through Blender. This is an advanced route: expect to spend time on the rig, the face shapes and performance.
-
 <Callout type="warn" title="Check the licence first">
-Daz content is covered by Daz's EULA, which restricts distributing and exporting its 3D assets, and some uses need an additional licence (Daz sells an Interactive License for using content in interactive software). A VRM contains the full mesh and textures, so uploading or sharing it is distributing them. Read the [Daz 3D EULA](https://www.daz3d.com/eula) and the terms of each product you use before you start. This page is not legal advice.
+Daz content is covered by Daz's EULA, which restricts distributing and exporting its 3D assets, and some uses need an additional licence (Daz sells an Interactive License for using content in interactive software). A VRM contains the full mesh and textures, so uploading or sharing it is distributing them. Read the [Daz 3D EULA](https://www.daz3d.com/eula) and the terms of each product you use before you start. This page is not legal advice. The VRM this guide makes is marked "personal use, no redistribution" in its own licence fields.
 </Callout>
 
-## 1. Daz Studio to Blender
+![The finished avatar in VPuppet: neutral, and driven by tracking (blink, tongue out)](/screenshots/guides/daz-g9-starter.webp)
 
-Build and dress your figure in Daz Studio, then bring it into Blender. Daz's own **Daz to Blender** bridge is one way; exporting FBX from Daz Studio is another. Each has its own documentation; follow the current version's.
+This guide turns a **Genesis 9** figure into a VRM that VPuppet drives with **perfect sync**: all 52 ARKit face shapes, plus the 13 VRM presets for other apps. It uses only **Genesis 9 Starter Essentials**, which comes free with Daz Studio, so you can follow it exactly and then swap in your own character.
 
-## 2. Make it a VRM in Blender
+Genesis 9's face rig already contains every ARKit expression, under its own names (`facs_bs_EyeBlinkLeft`, `facs_ctrl_MouthPucker`…). Some move bones (the jaw, the eyelids), and a VRM expression can only blend shape keys. So the heart of the route is a **bake**: pose each ARKit expression with Daz's own controls in Blender and save the result as a shape key named after it. Older figures (Genesis 8 and before) have no such set; this guide doesn't cover them.
 
-Install the [VRM Add-on for Blender](https://vrm-addon-for-blender.info/). It exports VRM 0.x and 1.0 and documents each step. In outline:
+## What you need
 
-- **Humanoid bones.** Assign the figure's bones to the VRM humanoid bones (hips, spine, chest, neck, head, arms, hands, fingers, legs, eyes). VPuppet needs these to track you.
-- **Rest pose.** A T-pose is the safest rest pose for VRM. VPuppet's MODEL INFO warns when the rest pose isn't one.
-- **Expressions.** Register face shape keys as VRM expressions. For **perfect sync**, create shape keys for the 52 ARKit blendshapes (`eyeBlinkLeft`, `jawOpen`, `mouthSmileLeft`...) by mapping or combining the figure's face morphs, and register each under its ARKit name. VPuppet matches names ignoring case and punctuation, so `eyeBlinkLeft`, `EyeBlinkLeft` and `eye_blink_left` all work, and it needs at least 40 of the 52 to treat the model as perfect sync. Without them, add at least the VRM presets (blink, `aa` `ih` `ou` `ee` `oh`, emotions).
-- **Spring bones.** Add spring-bone chains for hair and loose clothing, with colliders on the head and body. VPuppet's [cloth solver](../physics.mdx) builds on these chains.
+- **Daz Studio** with **Genesis 9 Starter Essentials** (both free).
+- **Blender** 5.2 or later, with two add-ons:
+  - the **Diffeomorphic DAZ Importer** (Edit > Preferences > Get Extensions, search "DAZ Importer"). After installing, make sure it's **enabled**;
+  - the [**VRM Add-on for Blender**](https://vrm-addon-for-blender.info/).
+- Diffeomorphic's **Daz Studio script**, which the Blender extension doesn't include: download `export_to_blender.dsa` (and its `.png` icon) from [`to_daz_studio/Scripts/Diffeomorphic/`](https://github.com/Diffeomorphic/import_daz/tree/main/to_daz_studio/Scripts/Diffeomorphic) and put both in your Daz library under `Scripts/Diffeomorphic/`. Daz then shows **Scripts > Diffeomorphic > Export To Blender**.
+- VPuppet's scripts for this route: [`tools/daz-vrm/`](https://github.com/Spartan-Game-Studios/puppet/tree/main/tools/daz-vrm) in VPuppet's repository.
 
-## 3. Keep it light
+Pick a **work folder** outside anything you share or sync publicly; everything made from Daz content goes there.
 
-Daz figures are made for rendering and are often far heavier than a real-time avatar needs. Decimate meshes you won't see up close, remove hidden geometry (body under clothing), merge materials where you can, and scale textures down. Tracking and rendering share your computer, so a lighter model leaves more for tracking. VPuppet's library card shows the triangle count.
+## The quick way
 
-## 4. Check it in VPuppet
+`run_all.sh` runs every step below in order, Daz included (Daz runs headless, without a window). On macOS:
 
-Import the `.vrm` into the [model library](../model-library.mdx) and open **MODEL INFO** (`I`). Its **MODEL CHECKS** list problems such as missing bones, a face that points away from the skeleton, or expressions that do nothing. Fix those in Blender and export again.
+```sh
+WORK=~/Documents/vpuppet-avatars/my-avatar bash tools/daz-vrm/run_all.sh
+```
 
-An AI agent connected to VPuppet can run this loop with you: inspect the model, re-import each new export, and test every perfect-sync shape. See [Connect an AI agent](../mcp.mdx#workflow).
+It writes `avatar.vrm` into the work folder in about two minutes. `bash run_all.sh 3` starts again from step 3 once the Daz files exist. Set `BLENDER=` to your Blender binary and `LIBRARY=` to your Daz library if they aren't in the usual macOS places. To use your own figure instead of the starter one, build it in Daz (step 1), save it as `g9-starter.duf` in the work folder, and run from step 2.
+
+The rest of this page explains each step and how to do it by hand.
+
+## 1. Build the figure in Daz Studio
+
+Load **Genesis 9** (People > Genesis 9), then with the figure selected:
+
+1. A **skin**: Materials > Daz Originals > Base Materials > **G9 Feminine Skin 01 MAT** (or any of the Feminine / Masculine skins). The bare Genesis 9 is untextured grey; without a skin preset you get a grey avatar.
+2. A **shape** (optional): the **Base Feminine** or **Base Masculine** body dial in Parameters, or a character preset.
+3. **Hair**: Hair > Daz Originals > Base Hair > **G9 Base dForce Pixie Hair**.
+4. **Clothes**: Clothing > Daz Originals > Base Clothing > **G9 Base Shirt** and **G9 Base Shorts**.
+
+Save the scene (`.duf`) in your work folder. Script: `01_build_scene.dsa`.
+
+<Callout title="Strand hair or card hair">
+Daz hair comes in two kinds. **Strand hair** ("dForce strand-based", like the starter Pixie Cut) is made of lines that only a renderer like Iray can draw; it needs step 5. **Card hair** is ordinary polygons and skips step 5, but is often heavy (400k+ vertices); decimate it.
+</Callout>
+
+## 2. Export the .dbz
+
+With the scene open: **Scripts > Diffeomorphic > Export To Blender**, default options. It writes `<scene>.dbz` next to the `.duf`. The importer fits every mesh from this file (your character's shape, the clothes fitted to it). Script: `02_export_dbz.dsa`.
+
+Without the `.dbz`, Blender's import stops with *"Mesh fitting set to DBZ"*. The importer's no-DBZ mode doesn't support the morphs that drive the jaw and eyelid bones, which the bake needs.
+
+## 3. Import into Blender
+
+Run the importer's **Easy Import** (it's in the DAZ tabs of the 3D view's sidebar, `N`), pick the `.duf`, and turn on:
+
+| Option | Why |
+|---|---|
+| Merge Rigs | A VRM has one skeleton. |
+| Eliminate Empties, Apply Transforms | A clean hierarchy. |
+| FACS (under morphs) | Genesis 9's face rig, the source of the 52 shapes. |
+| Joint correctives | Optional; they are removed in step 6. |
+| Transfer to face meshes | Lashes, brows, teeth and tongue follow the face. |
+
+Script: `03_import.py`. You get one armature with the FACS controls as custom properties, and the face shapes on the body, lashes, brows and mouth.
+
+## 4. Bake the 52 ARKit shapes
+
+This is the step without a button: run `04_bake_arkit.py`, either from the command line or in Blender's **Scripting** tab. **Allow scripts to run** (`blender -y`, or answer the prompt on opening the file); otherwise Daz's drivers don't run and nothing moves.
+
+For each ARKit name it sets the matching Daz control to 1, reads the deformed face meshes (body, lashes, brows, mouth, eyes), and stores the difference as a shape key with the ARKit name. Which control it uses matters:
+
+- **Most shapes**: the `facs_ctrl_` control where there is one (it combines shapes and bones the way Daz poses the face), else the `facs_bs_` shape. `jawOpen` moves the jaw bone 3 cm; the bake captures it.
+- **The eight `eyeLook…` shapes**: the `facs_bs_` versions, which move only the **lids**. VPuppet turns the eyeballs with the VRM look-at bones *and* drives these shapes from the same gaze; a shape that also turned the eyeballs would turn them twice.
+- **Sideways jaw and mouth** (`jawLeft`, `jawRight`, `jawForward`, `mouthLeft`, `mouthRight`): Genesis 9 makes these with two-way controls (`facs_ctrl_JawLeft-Right`, `JawForward-Recess`, `MouthLeft-Right`, −1 to 1). The figure faces −Y in Blender, so +1 moves toward the avatar's own left: `jawLeft` = +1, `jawRight` = −1.
+
+The script prints every shape with how far it moves; a line saying *NOTHING MOVES* means that control didn't do anything.
+
+## 5. Strand hair to cards
+
+Strand hair only. `05_hair_cards.py` turns strands into flat **ribbons** lying on the head (their face points away from the head, their width runs across the strand, narrowing to the tip), with a small generated texture that fades the edges and the tip. Arguments: keep every *n*-th strand (default 10) and the ribbon width in mm (default 3.5). For the Pixie Cut, `8 5` covers the scalp: about 5,400 ribbons, 87k vertices. Fewer strands or narrower ribbons and the scalp shows through.
+
+Short hair goes on the head bone. Long hair needs VRM spring bones on chains through it; this guide doesn't cover that.
+
+## 6. Clean up and T-pose
+
+`06_strip_tpose.py`:
+
+- **Removes what only Daz can drive**: every driver, every shape key except the 52, the FACS properties and the `(drv)` helper bones. A VRM can't run Daz's formulas. Elbows and knees lose Daz's joint correctives, and the arm twist bones now follow their parent.
+- **Makes a T-pose the rest pose.** Genesis 9 rests in an A-pose (arms 48° down); VRM expects arms straight out. The script aims upper arm, forearm and hand along the X axis, then bakes that pose into every mesh **including each shape key**. Blender's own *Apply* refuses meshes with shape keys, so doing this by hand means applying the pose before step 4, which then has to run on a posed rig.
+
+## 7. Materials
+
+Daz's Iray materials don't export. `07_materials.py` rebuilds each one as a plain Principled BSDF, which glTF and VRM carry:
+
+- base colour and normal map from the Daz textures, capped at 2048 px;
+- **cutout** alpha (glTF *Mask*) and both sides drawn for the hair cards, brows and lashes. Blended alpha sorts badly in real time, and these are single planes;
+- the brows tinted to the hair colour (Daz tints them in its own shader);
+- the tear and eye-moisture shells deleted (they only make sense in Iray).
+
+The eyes: Daz layers a grey iris over the sclera, which looks pale and staring in a real-time renderer. Pass one of Genesis 9's 15 combined eye textures as the second argument (`Runtime/Textures/DAZ/Characters/Genesis9/Base/Eyes/G9_Eyes05_D.jpg` is dark brown); `run_all.sh` uses 05 unless you set `EYES=`.
+
+## 8. Export the VRM
+
+`08_export_vrm.py` sets up and exports a **VRM 1.0** with the VRM Add-on:
+
+- **Humanoid bones**: the add-on's automatic assignment plus Genesis 9's names (`hip`, `spine1`–`spine4`, `l_upperarm`, `l_forearm`, the fingers…). No `jaw` bone: the baked shapes already open the mouth, and other apps would rotate a jaw bone on top of them.
+- **Expressions**: the 52 ARKit names, each bound on every mesh that has that shape, and the VRM presets (blink, `aa` `ih` `ou` `ee` `oh`, happy, angry, sad, relaxed, surprised) built as mixes of them.
+- **Look-at**: on the eye bones.
+- **Licence fields**: personal use only, no redistribution, no modification (the safe setting for Daz content; change them only if your licences allow).
+
+By hand: the same settings in the VRM tab of the armature, then File > Export > VRM.
+
+## 9. Check it in VPuppet
+
+Import the `.vrm` into the [model library](../model-library.mdx) and load it. The bottom bar should say **PERFECT SYNC 52/52**. Open **MODEL INFO** (`I`): its **MODEL CHECKS** list problems such as missing bones, a non-T rest pose or expressions that do nothing.
+
+An AI agent connected to VPuppet can check every shape for you: `expression_sweep` with the ARKit set drives each shape in turn and reports any that do nothing or are on the wrong side. See [Connect an AI agent](../mcp.mdx#workflow).
+
+## Keep it light
+
+The starter avatar comes out at about **180k triangles and 66 MB**: the body's 52 shapes 33 MB (they're stored for all 25k body vertices although only the face moves), the hair 87k vertices, the textures 15 MB. It loads in under a second and runs at full speed on a recent computer, but tracking and rendering share the machine. To cut it down:
+
+- fewer, wider hair ribbons (step 5), or decimate card hair;
+- textures at 1024 px for anything you don't see up close;
+- remove body geometry hidden under clothes (keep it in your `.blend`, delete it only in the copy you export).
+
+## When something goes wrong
+
+| Symptom | Cause and fix |
+|---|---|
+| Blender: `bpy.ops.daz… could not be found` | The DAZ Importer is installed but not enabled (Preferences > Add-ons). |
+| Import stops: "Mesh fitting set to DBZ" | No `.dbz` next to the `.duf`: step 2. |
+| The bake says *NOTHING MOVES* everywhere | Scripts aren't allowed to run, so Daz's drivers don't: `blender -y`. |
+| Avatar is grey | The scene had no skin preset: step 1. |
+| Hair missing in VPuppet, fine in Blender | One-sided hair cards, or alpha read from the colour: use `07_materials.py`, or set the material to both sides and alpha clip. |
+| Eyes look blank or staring | The layered Daz eye: use a combined eye texture (step 7). |
+| VPuppet shows PRESETS instead of PERFECT SYNC | Fewer than 40 of the 52 ARKit expressions exist under recognisable names; check step 4's output and the expression names in the VRM tab. |

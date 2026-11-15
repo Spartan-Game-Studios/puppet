@@ -1,0 +1,13 @@
+// Step 2 (Daz Studio, headless): write the .dbz that the Diffeomorphic importer
+// fits meshes from, next to the .duf. Uses Diffeomorphic's own export script
+// (Scripts/Diffeomorphic/export_to_blender.dsa, from github.com/Diffeomorphic/import_daz,
+// to_daz_studio/), minus its dialog: in the GUI it's Scripts > Diffeomorphic >
+// Export To Blender with the default options.
+var EXPORTER = String(App.getContentMgr().findFile("/Scripts/Diffeomorphic/export_to_blender.dsa"));
+out("open: " + App.getContentMgr().openFile(WORK + "g9-starter.duf", false));
+var f = new DzFile(EXPORTER); f.open(DzFile.ReadOnly); var src = f.read(); f.close();
+src = src.replace(/\ncreateDialog\(\)\s*$/, "\n");
+eval(src);
+exportToBlender(WORK + "g9-starter.dbz");
+var d = new DzFileInfo(WORK + "g9-starter.dbz");
+out("dbz: " + d.exists() + " " + d.size() + " bytes");
