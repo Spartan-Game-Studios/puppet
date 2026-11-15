@@ -174,8 +174,15 @@ Found and fixed:
 - **Install**: the GitHub release's source zip installs as is (top-level folder and
   all) and also carries the Daz script, so one download covers both.
 
-Not yet validated: the Daz steps done by hand in Daz's GUI, and the avatar in the
-running app with a live camera.
+**Daz GUI labels** (no clicking: `check_ui.dsa` runs inside a separate, hidden Daz GUI
+instance via `daz_run_gui.py`; headless Daz has no menus or panes): every content path
+in step 1 resolves; the dial is **Actor** > Full Body > People > Feminine > Base
+Feminine Body (the guide lacked "Actor"); *Content Directory Manager* is in the
+Content Library pane's options menu, not the Window menu (the guide was wrong). The
+export dialog's options come from the script's own code (Export HD, HD Convention,
+Export HD UVs, Default Location).
+
+Not yet validated: the avatar in the running app with a live camera.
 
 ## Open issues
 

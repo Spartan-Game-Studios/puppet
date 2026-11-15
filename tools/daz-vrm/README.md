@@ -17,5 +17,8 @@ Scripts for the route in the docs guide `apps/docs/content/docs/guides/daz3d.mdx
 
 `run_all.sh` runs them in order (`WORK=<folder> bash run_all.sh [from_step]`);
 `render_check.py` renders the head or body from three sides to judge a step.
+`check_ui.dsa` checks the Daz labels the guide names (menus, panes, content
+paths, the Base Feminine dial's Parameters path) from inside Daz's GUI; run it
+with `daz_run_gui.py`, which starts a separate, hidden Daz instance.
 
 Everything made from Daz content goes in `WORK`, never in this repository (Daz EULA).

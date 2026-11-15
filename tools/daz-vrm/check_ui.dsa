@@ -1,0 +1,30 @@
+// Check the Daz labels the guide names (steps 1-2), from inside Daz's GUI:
+// run with daz_run_gui.py. Loads Genesis 9 in its own instance only.
+var cm = App.getContentMgr();
+function walk(m, path, depth, re) {
+  if (!m || depth > 6 || typeof m.getNumItems != "function") return;
+  for (var i = 0; i < m.getNumItems(); i++) {
+    var it = m.getItem(i); if (!it) continue;
+    var lab = String(it.label || it.subMenuLabel || "").replace(/&/g, ""), act = String(it.action || "");
+    var p = path + " > " + (lab || act);
+    if (re.test(lab + act)) out("MENU: " + p);
+    walk(it.getSubMenu ? it.getSubMenu() : null, p, depth + 1, re);
+  }
+}
+walk(MainWindow.getActionMgr().getMenu(), "Menu", 0, /ContentLibraryPane|ParameterPane/);
+walk(MainWindow.getPaneMgr().findPane("DzContentLibraryPane").getOptionsMenu(), "Content Library options", 0, /DirectoryManager/);
+var dirs = []; for (var d = 0; d < cm.getNumContentDirectories(); d++) dirs.push(cm.getContentDirectoryPath(d));
+out("LIBRARIES: " + dirs.join(" ; "));
+var items = ["/People/Genesis 9/Genesis 9.duf",
+  "/People/Genesis 9/Materials/Daz Originals/Base Materials/G9 Feminine Skin 01 MAT.duf",
+  "/People/Genesis 9/Hair/Daz Originals/Base Hair/G9 Base dForce Pixie Hair.duf",
+  "/People/Genesis 9/Clothing/Daz Originals/Base Clothing/G9 Base Shirt.duf",
+  "/People/Genesis 9/Clothing/Daz Originals/Base Clothing/G9 Base Shorts.duf",
+  "/Scripts/Diffeomorphic/export_to_blender.dsa"];
+for (var k = 0; k < items.length; k++) out((cm.findFile(items[k]) ? "OK   " : "MISSING ") + items[k]);
+cm.openFile(String(cm.findFile(items[0])), false);
+var obj = Scene.getPrimarySelection().getObject();
+for (var m = 0; m < obj.getNumModifiers(); m++) {
+  var mod = obj.getModifier(m);
+  if (mod.name == "BaseFeminine_body_bs_Body") out("DIAL: Parameters " + mod.getValueChannel().getPath() + " > " + mod.getValueChannel().getLabel());
+}
