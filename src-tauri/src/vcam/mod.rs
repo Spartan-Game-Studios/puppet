@@ -121,6 +121,9 @@ pub struct SinkStatus {
     pub command: Option<String>,
     /// Label of the setup button, when `setup()` can do something.
     pub action: Option<String>,
+    /// `teardown()` can remove what `setup()` installed (the panel shows
+    /// UNINSTALL with a confirm step).
+    pub can_remove: bool,
     /// Selectable devices (Linux: /dev/videoN loopback nodes).
     pub devices: Vec<String>,
     pub device: Option<String>,
@@ -137,6 +140,7 @@ impl SinkStatus {
             hint: None,
             command: None,
             action: None,
+            can_remove: false,
             devices: Vec::new(),
             device: None,
             format: None,
@@ -154,6 +158,11 @@ impl SinkStatus {
     #[allow(dead_code)] // used by the macOS / Windows sinks
     pub fn action(mut self, a: impl Into<String>) -> Self {
         self.action = Some(a.into());
+        self
+    }
+    #[allow(dead_code)] // used by the Windows sink
+    pub fn removable(mut self) -> Self {
+        self.can_remove = true;
         self
     }
 }
@@ -202,6 +211,10 @@ pub trait VirtualCamSink: Send {
     /// user). Default: nothing to do.
     fn setup(&mut self) -> Result<(), String> {
         Err(format!("{}: nothing to set up", self.name()))
+    }
+    /// Undo `setup()` (Windows: unregister the camera DLL). May prompt the user.
+    fn teardown(&mut self) -> Result<(), String> {
+        Err(format!("{}: nothing to remove", self.name()))
     }
     /// Status of an installable camera driver (macOS camera extension). None:
     /// this sink has nothing to install or remove.
@@ -355,6 +368,10 @@ impl VcamHandle {
 
     pub fn setup(&self) -> Result<(), String> {
         self.shared.sink.lock().unwrap().setup()
+    }
+
+    pub fn teardown(&self) -> Result<(), String> {
+        self.shared.sink.lock().unwrap().teardown()
     }
 
     pub fn extension(&self) -> Option<ExtensionStatus> {

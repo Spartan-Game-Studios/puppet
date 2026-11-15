@@ -76,6 +76,22 @@ impl SoftcamSink {
     }
 }
 
+/// `regsvr32 /s [flags] "<dll>"` through a UAC prompt. Blocks until it exits.
+fn regsvr32_elevated(flags: &[&str], dll: &std::path::Path) -> Result<std::process::ExitStatus, String> {
+    let mut args = vec!["'/s'".to_string()];
+    args.extend(flags.iter().map(|f| format!("'{f}'")));
+    args.push(format!("'\"{}\"'", dll.display().to_string().replace('\'', "''")));
+    let ps = format!(
+        "$p = Start-Process -FilePath regsvr32.exe -ArgumentList {} -Verb RunAs -Wait -PassThru; exit $p.ExitCode",
+        args.join(",")
+    );
+    Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .map_err(|e| format!("could not start regsvr32: {e}"))
+}
+
 impl VirtualCamSink for SoftcamSink {
     fn name(&self) -> &'static str {
         "softcam"
@@ -92,7 +108,7 @@ impl VirtualCamSink for SoftcamSink {
             (Some(dll), Some(reg)) => {
                 let same = PathBuf::from(&reg) == *dll;
                 let state = if self.cam.is_some() { SinkState::Running } else { SinkState::Ready };
-                let mut s = SinkStatus::new("softcam", state, "VPUPPET VIRTUAL CAMERA (DIRECTSHOW)");
+                let mut s = SinkStatus::new("softcam", state, "VPUPPET VIRTUAL CAMERA (DIRECTSHOW)").removable();
                 if !same {
                     s = s
                         .hint(format!("Registered DLL is {reg}; this copy is {}. Click RE-REGISTER if the camera doesn't show up.", dll.display()))
@@ -113,19 +129,27 @@ impl VirtualCamSink for SoftcamSink {
     /// Register the DLL elevated (UAC prompt). Blocks until regsvr32 exits.
     fn setup(&mut self) -> Result<(), String> {
         let dll = self.dll.clone().ok_or("softcam.dll missing from this build")?;
-        let ps = format!(
-            "$p = Start-Process -FilePath regsvr32.exe -ArgumentList '/s','\"{}\"' -Verb RunAs -Wait -PassThru; exit $p.ExitCode",
-            dll.display().to_string().replace('\'', "''")
-        );
-        let status = Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
-            .creation_flags(CREATE_NO_WINDOW)
-            .status()
-            .map_err(|e| format!("could not start regsvr32: {e}"))?;
+        let status = regsvr32_elevated(&[], &dll)?;
         if status.success() && Self::registered_path().is_some() {
             Ok(())
         } else {
             Err(format!("regsvr32 failed or was cancelled ({status})"))
+        }
+    }
+
+    /// Unregister elevated (UAC prompt), so nothing is left once Steam deletes
+    /// the folder. regsvr32 /u loads the DLL it is given; any softcam.dll built
+    /// with VPuppet's CLSID removes the same keys, so use this copy when the
+    /// registered one is gone (Steam library moved or deleted).
+    fn teardown(&mut self) -> Result<(), String> {
+        self.close();
+        let reg = Self::registered_path().map(PathBuf::from).filter(|p| p.is_file());
+        let dll = reg.or_else(|| self.dll.clone()).ok_or("softcam.dll missing from this build")?;
+        let status = regsvr32_elevated(&["/u"], &dll)?;
+        if status.success() && Self::registered_path().is_none() {
+            Ok(())
+        } else {
+            Err(format!("regsvr32 /u failed or was cancelled ({status})"))
         }
     }
 

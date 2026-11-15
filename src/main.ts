@@ -47,6 +47,7 @@ import {
   vmcStats,
   vcamSelectDevice,
   vcamSetup,
+  vcamTeardown,
   vcamStats,
   vcamStatus,
   type VcamStatus,
@@ -659,6 +660,9 @@ async function applyVcam(): Promise<void> {
   refreshVcamStatus();
 }
 
+/** Pending UNINSTALL confirm timer (see btn-vcam-remove below). */
+let vcamRemoveArmed: number | null = null;
+
 function setVcam(on: boolean): void {
   settings.vcam.enabled = on;
   persist();
@@ -681,6 +685,8 @@ async function refreshVcamStatus(): Promise<void> {
   const btn = $('btn-vcam-setup');
   btn.textContent = st.action ?? '';
   btn.classList.toggle('hidden', !st.action);
+  $('btn-vcam-remove').classList.toggle('hidden', !st.can_remove);
+  if (!st.can_remove) disarmVcamRemove();
   // The OBS route is the answer whenever the native camera can't be used.
   $('vcam-obs').classList.toggle('mute', st.state === 'ready' || st.state === 'running');
   const row = $('vcam-device-row');
@@ -725,6 +731,42 @@ $('btn-vcam-setup').addEventListener('click', async () => {
   for (let i = 0; i < 15; i++) setTimeout(refreshVcamStatus, 1000 * (i + 1));
   refreshVcamStatus();
 });
+// UNINSTALL (Windows: unregister the camera) takes a second press within 5 s,
+// like the macOS extension's UNINSTALL; Escape or leaving the button cancels.
+function disarmVcamRemove(): void {
+  if (vcamRemoveArmed !== null) clearTimeout(vcamRemoveArmed);
+  vcamRemoveArmed = null;
+  const btn = $('btn-vcam-remove');
+  btn.textContent = t('stage.uninstall');
+  btn.classList.remove('on');
+}
+$('btn-vcam-remove').addEventListener('click', async () => {
+  const btn = $<HTMLButtonElement>('btn-vcam-remove');
+  if (vcamRemoveArmed === null) {
+    btn.textContent = t('stage.confirmUninstall');
+    btn.classList.add('on');
+    vcamRemoveArmed = window.setTimeout(disarmVcamRemove, 5000);
+    return;
+  }
+  disarmVcamRemove();
+  if (settings.vcam.enabled) setVcam(false);
+  btn.disabled = true;
+  try {
+    await vcamTeardown();
+  } catch (e) {
+    setStatus(t('stage.vcamError', { error: String(e) }), true);
+  } finally {
+    btn.disabled = false;
+  }
+  refreshVcamStatus();
+});
+$('btn-vcam-remove').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && vcamRemoveArmed !== null) {
+    e.stopPropagation();
+    disarmVcamRemove();
+  }
+});
+$('btn-vcam-remove').addEventListener('blur', disarmVcamRemove);
 $('btn-vcam-refresh').addEventListener('click', () => refreshVcamStatus());
 $('vcam-cmd').addEventListener('click', async () => {
   const cmd = $('vcam-cmd');

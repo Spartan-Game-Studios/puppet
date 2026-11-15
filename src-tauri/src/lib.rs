@@ -176,6 +176,13 @@ fn vcam_setup(state: State<'_, VcamState>) -> Result<(), String> {
     state.handle.setup()
 }
 
+/// Undo `vcam_setup` (Windows: unregister the camera; the panel confirms first).
+#[tauri::command(async)]
+fn vcam_teardown(state: State<'_, VcamState>) -> Result<(), String> {
+    state.cam.lock().map_err(|e| e.to_string())?.stop();
+    state.handle.teardown()
+}
+
 /// The camera driver's install state (macOS camera extension); null elsewhere.
 #[tauri::command(async)]
 fn vcam_ext_status(state: State<'_, VcamState>) -> Option<vcam::ExtensionStatus> {
@@ -342,6 +349,7 @@ pub fn run() {
             vcam_status,
             vcam_stats,
             vcam_setup,
+            vcam_teardown,
             vcam_select_device,
             vcam_ext_status,
             vcam_ext_install,

@@ -159,7 +159,7 @@ Then open `src-tauri/target/release/bundle/macos/VPuppet.app` from anywhere and 
 1. In the camera card's **VIRTUAL CAM** section, click **REGISTER CAMERA** and accept the Windows admin prompt. This runs `regsvr32` on the `softcam.dll` that ships next to `vpuppet.exe` (once per install location).
 2. Tick **SEND TO VIRTUAL CAMERA** (`W`) and pick **VPuppet Virtual Camera** in your video app.
 
-To remove it before uninstalling VPuppet, run in an admin terminal: `regsvr32 /u "<VPuppet install folder>\softcam.dll"`.
+To remove it before uninstalling VPuppet, click **UNINSTALL** in the VIRTUAL CAM panel (shown once the camera is registered; it asks for a second press) and accept the admin prompt. It runs `regsvr32 /u` on the registered DLL, or on this copy if the registered one is gone (same CLSID). By hand, in an admin terminal: `regsvr32 /u "<VPuppet install folder>\softcam.dll"`.
 
 softcam is a DirectShow camera, which Zoom, Discord, OBS, Chrome / Edge (Meet) and most desktop apps read. Apps that only use Media Foundation's frame server (the Windows 11 Camera app, some UWP apps) don't list DirectShow cameras. Only the 64-bit DLL is built, so 32-bit camera apps won't see it.
 

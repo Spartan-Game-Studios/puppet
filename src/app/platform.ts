@@ -204,6 +204,8 @@ export interface VcamStatus {
   hint: string | null;
   command: string | null;
   action: string | null;
+  /** `vcamTeardown()` can undo the setup (Windows: unregister the camera). */
+  can_remove: boolean;
   devices: string[];
   device: string | null;
   format: 'bgra' | 'yuyv' | 'bgr24' | null;
@@ -236,6 +238,7 @@ const BROWSER_VCAM: VcamStatus = {
   hint: t('stage.vcamBrowserHint'),
   command: null,
   action: null,
+  can_remove: false,
   devices: [],
   device: null,
   format: null,
@@ -251,6 +254,10 @@ export async function vcamStats(): Promise<VcamRustStats | null> {
 
 export async function vcamSetup(): Promise<void> {
   if (isTauri) await invoke('vcam_setup');
+}
+
+export async function vcamTeardown(): Promise<void> {
+  if (isTauri) await invoke('vcam_teardown');
 }
 
 /** Mirrors `vcam::ExtState` in src-tauri/src/vcam/mod.rs. */
