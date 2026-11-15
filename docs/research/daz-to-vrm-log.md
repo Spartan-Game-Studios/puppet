@@ -146,6 +146,37 @@ The VRM: 9 meshes, 179,537 triangles, 16 materials, 24 images (14.7 MB). Size
 breakdown: body morph targets 33 MB (52 shapes × all 25k body vertices, though only
 the face moves), hair cards 8 MB, textures 15 MB.
 
+## Validation pass 1 (15 Nov 2026)
+
+Checked every UI claim in the guide against the add-ons' code, ran steps 4–8 the way
+the Scripting tab does (no arguments), and ran the whole Blender route on a **fresh
+install**: a throwaway Blender profile with the importer's GitHub release 5.2.0 zip
+installed through Install from Disk, the VRM add-on, and no importer settings.
+Found and fixed:
+
+- **"Allow scripts" was wrong.** The importer's drivers are simple expressions; the
+  bake works with auto-run blocked (`-Y`). The first "nothing moves" was our probe not
+  tagging the rig for re-evaluation.
+- **Labels**: DAZ Setup tab > Easy Import DAZ; only FACS needs ticking (Merge Rigs,
+  Eliminate Empties, Transfer To Face Meshes / Clothes are on by default). JCMs and
+  Apply Transforms aren't needed (same result without them). The Daz script runs from
+  Content Library > Scripts > Diffeomorphic (dialog "Export DBZ"); the Base Feminine
+  dial is Parameters > Full Body > People > Feminine.
+- **Scripts couldn't run from the Scripting tab** (they read `--` arguments only). Now
+  each works on the open file and saves the next one beside it.
+- **By-hand defaults were worse** than `run_all.sh` (hair 1 in 10 at 3.5 mm, pale Daz
+  eye). The good settings are the defaults now; the eye map is found in the library.
+- **A fresh importer can't find the Daz library** ("Some assets were not found"): its
+  default folders don't include macOS's `/Users/Shared/My DAZ 3D Library`. Its Load
+  Root Paths can't read the `.dbz` (it wants the paths at the top level, the `.dbz`
+  nests them under `rootpaths`, and loading it *clears* the list). Guide: set it once in
+  Global Settings > Add Content Directory. `03_import.py` reads the `.dbz`'s paths.
+- **Install**: the GitHub release's source zip installs as is (top-level folder and
+  all) and also carries the Daz script, so one download covers both.
+
+Not yet validated: the Daz steps done by hand in Daz's GUI, and the avatar in the
+running app with a live camera.
+
 ## Open issues
 
 - **File size / weight**: 66 MB, 180k triangles. Biggest wins: store morphs sparsely or

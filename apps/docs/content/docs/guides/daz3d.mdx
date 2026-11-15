@@ -18,8 +18,8 @@ Genesis 9's face rig already contains every ARKit expression, under its own name
 - **Daz Studio** with **Genesis 9 Starter Essentials** (both free).
 - **Blender** 5.2 or later, with two extensions (Edit > Preferences > Get Extensions):
   - the **VRM** add-on ("VRM format"): search for it in Get Extensions and install;
-  - the **Diffeomorphic DAZ Importer**: download the latest release from [github.com/Diffeomorphic/import_daz](https://github.com/Diffeomorphic/import_daz/releases), then in Get Extensions open the **⌄** menu, **Install from Disk…**, and pick the zip. Check that it's **enabled**.
-- Diffeomorphic's **Daz Studio script**, which the Blender extension doesn't include. It's in the same download, in `to_daz_studio/Scripts/Diffeomorphic/`: copy `export_to_blender.dsa` and `export_to_blender.png` into your Daz library's `Scripts/Diffeomorphic/` folder (create it).
+  - the **Diffeomorphic DAZ Importer**: from [its releases](https://github.com/Diffeomorphic/import_daz/releases) download the latest source code (zip). In Get Extensions open the **⌄** menu, **Install from Disk…**, and pick that zip as it is. Check that it's **enabled**.
+- Diffeomorphic's **Daz Studio script**, which is in the same zip but not installed by Blender: from its `to_daz_studio/Scripts/Diffeomorphic/` folder, copy `export_to_blender.dsa` and `export_to_blender.png` into your Daz library's `Scripts/Diffeomorphic/` folder (create it).
 - VPuppet's scripts for this route: [`tools/daz-vrm/`](https://github.com/Spartan-Game-Studios/puppet/tree/main/tools/daz-vrm) in VPuppet's repository.
 
 Pick a **work folder** outside anything you share or sync publicly; everything made from Daz content goes there.
@@ -60,7 +60,9 @@ The importer fits every mesh from this file (your character's shape, the clothes
 
 ## 3. Import into Blender
 
-In a new Blender file, open the 3D view's sidebar (`N`), go to the **DAZ Setup** tab and click **Easy Import DAZ**. Pick your `.duf`. In the options:
+The first time only, tell the importer where your Daz library is: in the 3D view's sidebar (`N`), **DAZ Setup** tab, **Global Settings**. Under *DAZ Studio Root Directories*, click **Add Content Directory**, type your library folder, and click OK. On macOS it's usually `/Users/Shared/My DAZ 3D Library`, on Windows `C:\Users\Public\Documents\My DAZ 3D Library`; Daz Studio shows yours in Window > Panes > Content Directory Manager. Without it the import stops with *"Some assets were not found"*.
+
+Then, in a new Blender file, click **Easy Import DAZ** in the same tab. Pick your `.duf`. In the options:
 
 - tick **FACS** (in the morphs list). That's Genesis 9's face rig, the source of the 52 shapes;
 - leave the rest as they are. **Merge Rigs** (a VRM has one skeleton), **Eliminate Empties**, **Transfer To Face Meshes** (lashes, brows, teeth and tongue follow the face) and **Transfer To Clothes** are on already, and **Mesh Fitting** is *DBZ File*.
@@ -140,6 +142,7 @@ The starter avatar comes out at about **180k triangles and 66 MB**: the body's 5
 |---|---|
 | No **DAZ Setup** tab in the sidebar | The DAZ Importer is installed but not enabled (Preferences > Add-ons). |
 | Import stops: "Mesh fitting set to DBZ" | No `.dbz` next to the `.duf`: step 2. |
+| Import: "Some assets were not found" | The importer doesn't know your Daz library: Global Settings, step 3. |
 | Step 4 prints *NOTHING MOVES* | That control does nothing on your figure; check you ticked **FACS** in step 3. |
 | Avatar is grey | The scene had no skin: step 1. |
 | Hair missing in VPuppet, fine in Blender | One-sided hair cards, or alpha read from the colour: use `07_materials.py`, or set the material to both sides and alpha clip. |

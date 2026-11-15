@@ -13,6 +13,23 @@ from bl_ext.user_default.import_daz import api
 api.set_silent_mode(True)
 for ob in list(bpy.data.objects):
     bpy.data.objects.remove(ob)
+# Tell the importer where this machine's Daz library is, from the .dbz (Daz
+# wrote its own root paths into it). A fresh install only knows the default
+# folders and stops with "Some assets were not found" (the guide's by-hand
+# route sets this in DAZ Setup > Global Settings). This run only; not saved.
+import json, gzip
+from bl_ext.user_default.import_daz.settings import GS
+dbz = os.path.splitext(duf)[0] + ".dbz"
+try:
+    with gzip.open(dbz, "rt", encoding="utf-8-sig") as f: roots = json.load(f)["rootpaths"]
+except OSError:
+    with open(dbz, encoding="utf-8-sig") as f: roots = json.load(f)["rootpaths"]
+for d in GS.readAutoDirs("content", roots) + GS.readAutoDirs("builtin_content", roots):
+    if d not in GS.contentDirs: GS.contentDirs.append(d)
+for d in GS.readAutoDirs("builtin_mdl", roots) + GS.readAutoDirs("mdl_dirs", roots):
+    if d not in GS.mdlDirs: GS.mdlDirs.append(d)
+print("content dirs:", GS.contentDirs)
+
 # Exactly what the guide asks for in the Easy Import dialog: the defaults
 # (Merge Rigs, Eliminate Empties, Transfer To Face Meshes / Clothes on,
 # mesh fitting from the .dbz) plus FACS.
