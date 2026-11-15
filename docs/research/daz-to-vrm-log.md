@@ -133,6 +133,17 @@ inside); VPuppet's real-time lighting doesn't shade the mouth the way Iray or EE
 do, so the tongue was lit like the face. `07_materials.py` darkens the tongue / gums
 texture to 60 % and the mouth cavity to 40 %; `jawOpen` now reads as an open mouth.
 
+### D18. Eye range: fixed in VPuppet, standard ranges in the export
+Found live: the eyes didn't follow. The VRM add-on's default look-at ranges (90° of
+target angle → 10° of eye) are the VRM convention, but VPuppet fed in the user's own
+eye angle (≤ 30° / 25°), so every model used about a third of its range (this avatar
+2.4°, the Morrígan 3.4° for a 20° glance). Fixed in VPuppet, not per avatar:
+`src/scene/eyeRange.ts` maps the tracked gaze range onto each model's declared range,
+and the TRACKING panel's **EYE TURN ↔ / ↕** set the limit per model (degrees, eye-bone
+models). The export keeps the convention (input 90) with realistic limits: 25°
+sideways, 20° up / down. Measured: this avatar 17.8°, the Morrígan 10.5° for a 20°
+glance.
+
 ## Run log (15 Nov 2026)
 
 | Step | Script | Time | Result |

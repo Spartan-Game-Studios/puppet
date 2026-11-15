@@ -28,6 +28,7 @@ import { probeRig, type RigProbe } from '../core/rigProbe';
 import { StableSprings, springNamesFromGltf, type PhysicsSettings } from '../physics/stableSprings';
 import { gatherModelFacts, type GatheredFacts } from './modelFacts';
 import { applyLookAtFallback } from './lookAtFallback';
+import { prepareEyeRange, setEyeRange, type EyeLimits, type EyeRange } from './eyeRange';
 import { t } from '../i18n';
 import type { FaceState } from '../tracking/faceProcessor';
 import type { BodyMode } from '../tracking/protocol';
@@ -197,6 +198,8 @@ export class Avatar {
 
   /** Latest values sent to the model (for VMC output and the readout). */
   readonly expressionValues = new Map<string, number>();
+  /** The model's own eye limits; `setEyeRange` overrides them (see eyeRange.ts). */
+  readonly eyeLimits: EyeLimits;
   private targets = new Map<string, Quaternion>();
   private face: FaceState | null = null;
   private faceSeenAt = -1;
@@ -206,6 +209,7 @@ export class Avatar {
 
   constructor(vrm: VRM, physicsSettings: PhysicsSettings, springNames?: Map<Object3D, string>) {
     this.vrm = vrm;
+    this.eyeLimits = prepareEyeRange(vrm);
     const em = vrm.expressionManager;
     this.expressionNames = em ? em.expressions.map((e) => e.expressionName) : [];
     this.perfectSync = buildPerfectSyncMap(this.expressionNames);
@@ -235,6 +239,11 @@ export class Avatar {
     vrm.update(0);
     this.physics.reset();
     this.measureBounds();
+  }
+
+  /** How far the eyes may turn (eye-bone models; null = the model's own limit). */
+  setEyeRange(range: EyeRange): void {
+    setEyeRange(this.vrm, range);
   }
 
   get name(): string {

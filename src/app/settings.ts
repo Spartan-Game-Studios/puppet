@@ -38,6 +38,8 @@ export interface Settings {
   /** Virtual camera output (06 VIRTUAL CAM). `device`: Linux /dev/videoN, null = first found. */
   vcam: { enabled: boolean; resolution: VcamResolution; device: string | null };
   physics: PhysicsSettings;
+  /** Per-model eye limits in degrees (null = the model's own), keyed like physicsOverrides. */
+  eyeRange: Record<string, { h: number | null; v: number | null }>;
   /** Per-model physics overrides, keyed by the model file's SHA-256. */
   physicsOverrides: Record<string, PhysicsOverrides>;
   /** 3D environment (background kind 'environment'): scene, quality, per-scene look. */
@@ -76,6 +78,7 @@ export function defaultSettings(): Settings {
     vmcIn: { enabled: false, port: 39539, lan: false, regions: { ...DEFAULT_SOURCES } },
     vcam: { enabled: false, resolution: '1280x720', device: null },
     physics: { ...DEFAULT_PHYSICS },
+    eyeRange: {},
     physicsOverrides: {},
     environment: defaultEnvironmentSettings(),
     ui: { tab: 'face', debug: true, cam: { source: true, vcam: false } },

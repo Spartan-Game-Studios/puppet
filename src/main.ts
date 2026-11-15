@@ -256,6 +256,7 @@ async function loadModel(buf: ArrayBuffer, label: string, path: string | null): 
     applyDrive(a);
     const ov = settings.physicsOverrides[hash];
     if (ov) a.physics.setOverrides(ov);
+    a.setEyeRange(settings.eyeRange[hash] ?? { h: null, v: null });
     viewer.setAvatar(a);
     viewer.frame(currentFraming);
     avatar = a;
@@ -276,6 +277,7 @@ async function loadModel(buf: ArrayBuffer, label: string, path: string | null): 
     $('empty').classList.add('hidden');
     buildBlendshapeList();
     buildPhysicsUI();
+    refreshEyeTurn();
     setStatus(t('stage.modelOk', { chains: a.physics.chains.length, joints: a.physics.jointCount }));
     home.modelLoaded(hash, buf, label, path, facts.warnings); // library: header name, licence, import if new; model checks
     return true;
@@ -499,6 +501,45 @@ rangeBind('gaze-gain', () => settings.gazeGain, (v) => {
   if (avatar) avatar.drive.gazeGain = v;
   persist();
 });
+// EYE TURN: how far the eyes may turn, per model (src/scene/eyeRange.ts). Eye-bone
+// models only, in degrees; models that look around with expressions keep their own.
+function refreshEyeTurn(): void {
+  const lim = avatar?.eyeLimits;
+  const own = (modelHash && settings.eyeRange[modelHash]) || { h: null, v: null };
+  for (const axis of ['h', 'v'] as const) {
+    const el = $<HTMLInputElement>(`eye-turn-${axis}`);
+    const out = $(`eye-turn-${axis}-out`);
+    const usable = lim?.kind === 'bone';
+    el.disabled = !usable;
+    if (!usable) {
+      out.textContent = lim?.kind === 'expression' ? t('track.eyeTurnExpr') : '-';
+      continue;
+    }
+    const deg = own[axis] ?? lim![axis];
+    el.value = String(Math.round(deg));
+    out.textContent = own[axis] == null ? `${Math.round(deg)}° ${t('track.eyeTurnOwn')}` : `${Math.round(deg)}°`;
+  }
+  $<HTMLButtonElement>('btn-eye-turn-model').disabled = !(modelHash && settings.eyeRange[modelHash]);
+}
+for (const axis of ['h', 'v'] as const) {
+  $<HTMLInputElement>(`eye-turn-${axis}`).addEventListener('input', (e) => {
+    if (!avatar || !modelHash) return;
+    const r = { ...(settings.eyeRange[modelHash] ?? { h: null, v: null }) };
+    r[axis] = Number((e.target as HTMLInputElement).value);
+    settings.eyeRange[modelHash] = r;
+    avatar.setEyeRange(r);
+    persist();
+    refreshEyeTurn();
+  });
+}
+$('btn-eye-turn-model').addEventListener('click', () => {
+  if (!avatar || !modelHash) return;
+  delete settings.eyeRange[modelHash];
+  avatar.setEyeRange({ h: null, v: null });
+  persist();
+  refreshEyeTurn();
+});
+refreshEyeTurn();
 checkBind('emotions', () => settings.emotions, (v) => {
   settings.emotions = v;
   if (avatar) avatar.drive.presetOptions.emotions = v;

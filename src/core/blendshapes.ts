@@ -197,7 +197,11 @@ export function derivePresets(bs: Blendshapes, opts: PresetOptions = DEFAULT_PRE
  * Gaze from the eyeLook blendshapes, in degrees. Positive yaw = the subject
  * looks to their own left; positive pitch = up.
  */
-export function gazeFromBlendshapes(bs: Blendshapes, maxYawDeg = 30, maxPitchDeg = 25): { yaw: number; pitch: number } {
+/** The tracked gaze range: a full eyeLook shape is this many degrees (see scene/eyeRange.ts). */
+export const GAZE_MAX_YAW = 30;
+export const GAZE_MAX_PITCH = 25;
+
+export function gazeFromBlendshapes(bs: Blendshapes, maxYawDeg = GAZE_MAX_YAW, maxPitchDeg = GAZE_MAX_PITCH): { yaw: number; pitch: number } {
   const toLeft = avg(get(bs, 'eyeLookOutLeft'), get(bs, 'eyeLookInRight'));
   const toRight = avg(get(bs, 'eyeLookInLeft'), get(bs, 'eyeLookOutRight'));
   const up = avg(get(bs, 'eyeLookUpLeft'), get(bs, 'eyeLookUpRight'));

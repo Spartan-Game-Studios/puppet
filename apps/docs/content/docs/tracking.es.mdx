@@ -29,6 +29,8 @@ Los demás modelos muestran `PRESETS n/13`. VPuppet deriva las expresiones está
 
 La rotación de la cabeza viene directamente de la transformación facial de MediaPipe. La mirada controla el look-at del modelo, tanto si usa huesos de los ojos como expresiones de mirada. **GAZE GAIN** (ganancia de la mirada) ajusta cuánto se mueven los ojos.
 
+Una mirada completa gira los ojos del modelo hasta donde el modelo permite. **EYE TURN ↔** y **EYE TURN ↕** (giro de ojos) cambian ese límite, en grados, en los modelos con huesos de los ojos; el ajuste se guarda para cada modelo. Los ojos realistas quedan naturales hacia 20–30°, los de anime hacia 10–15°. **MODEL'S EYE RANGE** (rango del modelo) vuelve a los límites con los que se hizo el modelo. Los modelos que miran con expresiones en lugar de huesos de los ojos conservan su propio rango (los controles muestran EXPRESSIONS).
+
 ## Cuerpo (+BODY)
 
 La columna, el pecho, los hombros y los brazos siguen los puntos de referencia de pose de MediaPipe.

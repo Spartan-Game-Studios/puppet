@@ -82,6 +82,13 @@ la = ext.vrm1.look_at
 la.type = "bone"
 eyes = (rig.data.bones["l_eye"].head_local + rig.data.bones["r_eye"].head_local) / 2
 la.offset_from_head_bone = tuple(eyes - rig.data.bones["head"].head_local)
+# Range maps (D18): the VRM convention (target angle up to 90 degrees) with
+# realistic eye limits: 25 sideways, 20 up / down. The add-on's default output of
+# 10 is sized for anime eyes. VPuppet maps the user's own gaze onto this range
+# (src/scene/eyeRange.ts), and its EYE TURN sliders change the limit per model.
+for rm, outp in ((la.range_map_horizontal_inner, 25), (la.range_map_horizontal_outer, 25),
+                 (la.range_map_vertical_up, 20), (la.range_map_vertical_down, 20)):
+    rm.input_max_value = 90; rm.output_scale = outp
 
 # Meta (D15): Daz content may not be redistributed, so lock it down.
 m = ext.vrm1.meta

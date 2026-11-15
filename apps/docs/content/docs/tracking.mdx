@@ -29,6 +29,8 @@ Other models show `PRESETS n/13`. VPuppet derives the standard VRM expressions f
 
 Head rotation comes straight from MediaPipe's face transform. Gaze drives the model's look-at, whether the model uses eye bones or look expressions. **GAZE GAIN** scales how far the eyes move.
 
+A full glance turns the model's eyes as far as the model allows. **EYE TURN ↔** and **EYE TURN ↕** change that limit, in degrees, for models with eye bones; the setting is saved for each model. Realistic eyes look natural around 20–30°, anime eyes around 10–15°. **MODEL'S EYE RANGE** goes back to the limits the model was made with. Models that look around with expressions instead of eye bones keep their own range (the sliders show EXPRESSIONS).
+
 ## Body (+BODY)
 
 The spine, chest, shoulders and arms follow MediaPipe's pose landmarks.
