@@ -4,12 +4,37 @@
 # saved next to the .blend in textures/. Transparent shells that only make
 # sense in a path tracer (tear, eye moisture) are removed.
 #   Blender -b 06_tpose.blend -P 07_materials.py -- <out.blend> [eye texture]
+# In the Scripting tab: open 06_tpose.blend and Run Script (writes the next file
+# next to it, with the default settings below).
 # The optional eye texture is one of Genesis 9's combined eye maps
 # (Runtime/Textures/DAZ/Characters/Genesis9/Base/Eyes/G9_EyesNN_D.jpg, D16).
 import os, re, sys, bpy, numpy as np
-args = sys.argv[sys.argv.index("--") + 1:]
+def _args(default_out):
+    """Command line: the arguments after "--". Scripting tab (no "--"): save
+    next to the open .blend as default_out, with the defaults."""
+    import os
+    if "--" in sys.argv:
+        return sys.argv[sys.argv.index("--") + 1:]
+    folder = os.path.dirname(bpy.data.filepath) or os.path.expanduser("~")
+    return [os.path.join(folder, default_out)]
+args = _args("07_materials.blend")
 out = args[0]
-EYES = args[1] if len(args) > 1 else None
+def _default_eyes():
+    """G9_Eyes05_D.jpg (dark brown) from the Daz library the DAZ Importer knows about."""
+    import json
+    rel = "Runtime/Textures/DAZ/Characters/Genesis9/Base/Eyes/G9_Eyes05_D.jpg"
+    dirs = ["/Users/Shared/My DAZ 3D Library", "C:/Users/Public/Documents/My DAZ 3D Library"]
+    for f in ("~/DAZ Importer/import_daz_settings.json", "~/Documents/DAZ Importer/import_daz_settings.json"):
+        try:
+            d = json.load(open(os.path.expanduser(f), encoding="utf-8-sig"))
+            dirs = d.get("daz-settings", d).get("contentDirs", []) + dirs
+        except (OSError, ValueError):
+            pass
+    return next((os.path.join(d, rel) for d in dirs if os.path.exists(os.path.join(d, rel))), None)
+# "daz" keeps Daz's own layered eye (pale grey iris for the starter figure).
+EYES = args[1] if len(args) > 1 else _default_eyes()
+if EYES == "daz": EYES = None
+print("eyes:", EYES or "Daz's layered eye")
 TEX = os.path.join(os.path.dirname(out), "textures"); os.makedirs(TEX, exist_ok=True)
 MAX = 2048
 

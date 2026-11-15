@@ -2,11 +2,23 @@
 # For each ARKit name, set its Daz control to 1 (the importer's drivers move the
 # morphs and, for the jaw and lids, bones), read the deformed face meshes, and
 # store the difference from rest as a shape key named after the ARKit shape.
-#   Blender -b -y 03_imported.blend -P 04_bake_arkit.py -- <out.blend>
-# -y lets the importer's drivers run.
+#   Blender -b 03_imported.blend -P 04_bake_arkit.py -- <out.blend>
+# In the Scripting tab: open 03_imported.blend and Run Script.
 import sys, re, bpy, addon_utils
+def _args(default_out):
+    """Command line: the arguments after "--". Scripting tab (no "--"): save
+    next to the open .blend as default_out, with the defaults."""
+    import os
+    if "--" in sys.argv:
+        return sys.argv[sys.argv.index("--") + 1:]
+    folder = os.path.dirname(bpy.data.filepath) or os.path.expanduser("~")
+    return [os.path.join(folder, default_out)]
 import numpy as np
-out = sys.argv[sys.argv.index("--") + 1]
+out = _args("04_baked.blend")[0]
+if bpy.app.autoexec_fail:
+    # The importer's drivers are simple expressions, which run anyway; a blocked
+    # file matters only if something printed NOTHING MOVES below.
+    print("note: Blender blocked scripts in this file; if shapes don't move, allow execution")
 addon_utils.enable("bl_ext.user_default.import_daz", default_set=True)
 
 ARKIT = """browDownLeft browDownRight browInnerUp browOuterUpLeft browOuterUpRight cheekPuff

@@ -3,12 +3,23 @@
 # lines, so each kept strand becomes a flat ribbon lying on the head (its width
 # runs across the strand, its face points away from the head centre), with a
 # small generated texture that fades the edges and the tip.
-#   Blender -b 04_baked.blend -P 05_hair_cards.py -- <out.blend> [keep_every=10] [width_mm=3.5]
+#   Blender -b 04_baked.blend -P 05_hair_cards.py -- <out.blend> [keep_every=8] [width_mm=5]
+# In the Scripting tab: open 04_baked.blend and Run Script (writes the next file
+# next to it, with the default settings below).
 import sys, bpy, numpy as np
-args = sys.argv[sys.argv.index("--") + 1:]
+def _args(default_out):
+    """Command line: the arguments after "--". Scripting tab (no "--"): save
+    next to the open .blend as default_out, with the defaults."""
+    import os
+    if "--" in sys.argv:
+        return sys.argv[sys.argv.index("--") + 1:]
+    folder = os.path.dirname(bpy.data.filepath) or os.path.expanduser("~")
+    return [os.path.join(folder, default_out)]
+args = _args("05_hair.blend")
 out = args[0]
-KEEP = int(args[1]) if len(args) > 1 else 10
-WIDTH = (float(args[2]) if len(args) > 2 else 3.5) / 1000.0
+# 1 in 8 at 5 mm covers the scalp for the starter Pixie Cut; 1 in 10 at 3.5 mm showed it.
+KEEP = int(args[1]) if len(args) > 1 else 8
+WIDTH = (float(args[2]) if len(args) > 2 else 5.0) / 1000.0
 
 rig = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
 head = rig.data.bones["head"]

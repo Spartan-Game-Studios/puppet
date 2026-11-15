@@ -13,11 +13,12 @@ from bl_ext.user_default.import_daz import api
 api.set_silent_mode(True)
 for ob in list(bpy.data.objects):
     bpy.data.objects.remove(ob)
+# Exactly what the guide asks for in the Easy Import dialog: the defaults
+# (Merge Rigs, Eliminate Empties, Transfer To Face Meshes / Clothes on,
+# mesh fitting from the .dbz) plus FACS.
 r = bpy.ops.daz.easy_import_daz(
     directory=os.path.dirname(duf) + "/", files=[{"name": os.path.basename(duf)}],
-    useMergeRigs=True, useEliminateEmpties=True, useMergeGeografts=True,
-    useFacs=True, useJcms=True, useTransferFace=True, useTransferClothes=True,
-    useApplyTransforms=True,
+    useFacs=True,
 )
 print("import:", r, api.get_error_message() or "no error")
 for ob in bpy.data.objects:

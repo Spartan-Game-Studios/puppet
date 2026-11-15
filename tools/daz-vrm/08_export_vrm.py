@@ -3,8 +3,18 @@
 # presets built from them (for apps without perfect sync), look-at on the eye
 # bones, and meta that matches what Daz's licence allows.
 #   Blender -b 07_materials.blend -P 08_export_vrm.py -- <out.vrm> [name]
+# In the Scripting tab: open 07_materials.blend and Run Script (writes the next file
+# next to it, with the default settings below).
 import sys, bpy, addon_utils
-args = sys.argv[sys.argv.index("--") + 1:]
+def _args(default_out):
+    """Command line: the arguments after "--". Scripting tab (no "--"): save
+    next to the open .blend as default_out, with the defaults."""
+    import os
+    if "--" in sys.argv:
+        return sys.argv[sys.argv.index("--") + 1:]
+    folder = os.path.dirname(bpy.data.filepath) or os.path.expanduser("~")
+    return [os.path.join(folder, default_out)]
+args = _args("avatar.vrm")
 out = args[0]; name = args[1] if len(args) > 1 else "Genesis 9 Starter"
 addon_utils.enable("bl_ext.user_default.vrm", default_set=True)
 rig = next(o for o in bpy.data.objects if o.type == 'ARMATURE')

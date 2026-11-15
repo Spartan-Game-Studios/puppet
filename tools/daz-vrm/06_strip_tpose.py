@@ -1,8 +1,18 @@
 # Step 6 (Blender, headless): strip what only Daz can drive, then make a T-pose
 # the rest pose without losing the baked ARKit shape keys.
 #   Blender -b 05_hair.blend -P 06_strip_tpose.py -- <out.blend>
+# In the Scripting tab: open 05_hair.blend and Run Script (writes the next file
+# next to it, with the default settings below).
 import sys, re, bpy, numpy as np, mathutils
-out = sys.argv[sys.argv.index("--") + 1]
+def _args(default_out):
+    """Command line: the arguments after "--". Scripting tab (no "--"): save
+    next to the open .blend as default_out, with the defaults."""
+    import os
+    if "--" in sys.argv:
+        return sys.argv[sys.argv.index("--") + 1:]
+    folder = os.path.dirname(bpy.data.filepath) or os.path.expanduser("~")
+    return [os.path.join(folder, default_out)]
+out = _args("06_tpose.blend")[0]
 ARKIT = set("""browDownLeft browDownRight browInnerUp browOuterUpLeft browOuterUpRight cheekPuff
 cheekSquintLeft cheekSquintRight eyeBlinkLeft eyeBlinkRight eyeLookDownLeft eyeLookDownRight
 eyeLookInLeft eyeLookInRight eyeLookOutLeft eyeLookOutRight eyeLookUpLeft eyeLookUpRight
