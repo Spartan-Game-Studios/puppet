@@ -143,6 +143,17 @@ for o in bpy.data.objects:
             build(m, color=capped(im, "eyes_color"), rough=0.15)
         elif "Head-3" in n or "Cap" in o.name:  # hair cap: scalp tint in the hair colour
             build(m, color_value=hair_col, alpha=capped(find(imgs, "Opacity"), "hair_cap_alpha", 'PNG'), rough=0.7, cutout=False)
+        elif n in ("Mouth", "Mouth Cavity"):
+            # Real-time renderers don't shade the inside of the mouth the way a
+            # path tracer does: a fully lit tongue reads as "tongue out" in
+            # VPuppet. Darken the tongue / gums and the cavity in the texture (D17).
+            src = find(imgs, r"_D_\d+$"); w, h = src.size
+            px = np.array(src.pixels[:], np.float32).reshape(h, w, 4)
+            px[..., :3] *= 0.6 if n == "Mouth" else 0.4
+            im = bpy.data.images.new(re.sub(r"\W+", "_", n) + "_dark_src", w, h); im.pixels.foreach_set(px.ravel())
+            nrm = find(imgs, r"_NM_\d+$")
+            build(m, color=capped(im, re.sub(r"\W+", "_", n) + "_color"),
+                  normal=capped(nrm, re.sub(r"\W+", "_", n) + "_normal") if nrm else None, rough=0.4)
         else:
             col = find(imgs, r"_D_\d+$", r"BaseColor", r"_D$")
             nrm = find(imgs, r"_NM_\d+$", r"_Normal$", r"_NM$")

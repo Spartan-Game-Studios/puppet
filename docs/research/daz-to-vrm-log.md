@@ -126,6 +126,13 @@ iris that reads as staring in VPuppet. Starter Essentials has 15 combined maps
 (`Runtime/Textures/DAZ/Characters/Genesis9/Base/Eyes/G9_EyesNN_D.jpg`, same UVs);
 we use 05 (dark brown).
 
+### D17. Darken the inside of the mouth
+Found in the running app: `expression_sweep`'s `jawOpen` tile looked like the tongue
+was out. The geometry was right (the VRM re-imported into Blender shows the tongue
+inside); VPuppet's real-time lighting doesn't shade the mouth the way Iray or EEVEE
+do, so the tongue was lit like the face. `07_materials.py` darkens the tongue / gums
+texture to 60 % and the mouth cavity to 40 %; `jawOpen` now reads as an open mouth.
+
 ## Run log (15 Nov 2026)
 
 | Step | Script | Time | Result |
@@ -182,7 +189,13 @@ Content Library pane's options menu, not the Window menu (the guide was wrong). 
 export dialog's options come from the script's own code (Export HD, HD Convention,
 Export HD UVs, Default Location).
 
-Not yet validated: the avatar in the running app with a live camera.
+**Running app** (a dev build, then a debug `VPuppet.app`; the dev binary can't get the
+camera, because macOS attributes it to the app that launched it): through VPuppet's
+MCP server, `library_import` loads it as perfect sync 52/52, presets 13/13, no model
+warnings; `expression_sweep` over the 52 ARKit shapes flags none (each changes the
+face, on the correct side), and its contact sheet found D17. **Live camera**: 40 s of
+face tracking at 50–59 fps, ~14 ms latency, never lost; head turns and tilts, winks
+on each side, smile and open mouth all come through, hair follows the head.
 
 ## Open issues
 

@@ -107,6 +107,7 @@ Short hair goes on the head bone. Long hair needs VRM spring bones on chains thr
 - base colour and normal map from the Daz textures, capped at 2048 px (saved in `textures/` in the work folder);
 - **cutout** alpha (glTF *Mask*) and both sides drawn for the hair cards, brows and lashes. Blended alpha sorts badly in real time, and these are single planes;
 - the brows tinted to the hair colour (Daz tints them in its own shader);
+- the inside of the mouth darkened in its texture (tongue and gums to 60 %, the cavity to 40 %). Real-time renderers don't shade it the way Iray does, and a fully lit tongue looks stuck out;
 - the tear and eye-moisture shells deleted (they only make sense in Iray).
 
 The eyes: Daz layers a grey iris over the sclera, which looks pale and staring in a real-time renderer. The script uses one of Genesis 9's 15 combined eye textures instead, `G9_Eyes05_D.jpg` (dark brown), found in your Daz library. From a terminal, pass another one (`Runtime/Textures/DAZ/Characters/Genesis9/Base/Eyes/G9_EyesNN_D.jpg`) after the output file, or `daz` for Daz's own eye.
