@@ -177,7 +177,7 @@ Platform extras for the virtual camera: on macOS, `pnpm tauri build` also builds
 
 ### Avatars
 
-VPuppet ships no avatar. Use your own `.vrm` (VRM 0.x or 1.0), for example one exported from [VRoid Studio](https://vroid.com/en/studio), or any model whose licence allows your use. Check the model's own VRM licence metadata. `*.vrm` is git-ignored throughout this repo; please don't commit models.
+VPuppet comes with four CC0 starter avatars, added to an empty library on first launch (`public/starters/LICENSES.md`); delete them like any other model. For your own look, use your own `.vrm` (VRM 0.x or 1.0), for example one exported from [VRoid Studio](https://vroid.com/en/studio), or any model whose licence allows your use. Check the model's own VRM licence metadata. `*.vrm` is git-ignored throughout this repo; please don't commit models.
 
 ## Virtual camera
 

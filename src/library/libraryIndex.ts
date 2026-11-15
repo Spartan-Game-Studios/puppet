@@ -62,9 +62,11 @@ export interface LibraryIndex {
   entries: Record<string, IndexEntry>;
   /** Offer to import the pre-library "last model" setting once. */
   migration: 'pending' | 'done';
+  /** Add the bundled CC0 starter avatars once, to a library that starts empty. */
+  starters: 'pending' | 'done';
 }
 
-export const emptyIndex = (): LibraryIndex => ({ version: 1, entries: {}, migration: 'pending' });
+export const emptyIndex = (): LibraryIndex => ({ version: 1, entries: {}, migration: 'pending', starters: 'pending' });
 
 const num = (v: unknown, d: number | null): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
@@ -80,6 +82,7 @@ export function parseIndex(text: string | null | undefined): LibraryIndex {
   }
   if (!raw || typeof raw !== 'object') return idx;
   if (raw.migration === 'done') idx.migration = 'done';
+  if (raw.starters === 'done') idx.starters = 'done';
   const entries = raw.entries && typeof raw.entries === 'object' ? raw.entries : {};
   for (const [id, e] of Object.entries<any>(entries)) {
     if (!isValidId(id) || !e || typeof e !== 'object') continue;

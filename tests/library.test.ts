@@ -270,11 +270,13 @@ describe('library index', () => {
     rename(idx, id(1), '  My Model  ');
     markUsed(idx, id(1), 9);
     idx.migration = 'done';
+    idx.starters = 'done';
     const back = parseIndex(serializeIndex(idx));
     expect(back).toEqual(idx);
     expect(back.entries[id(1)].customName).toBe('My Model');
     expect(parseIndex('{broken').entries).toEqual({});
     expect(parseIndex(null).migration).toBe('pending');
+    expect(parseIndex(null).starters).toBe('pending');
     const junk = parseIndex(JSON.stringify({ entries: { '../../etc': { favourite: true }, [id(2)]: { favourite: 'yes', addedAt: 'x' } } }));
     expect(Object.keys(junk.entries)).toEqual([id(2)]);
     expect(junk.entries[id(2)]).toEqual({ favourite: false, addedAt: 0, lastUsedAt: null, customName: null, noticeSeen: false });

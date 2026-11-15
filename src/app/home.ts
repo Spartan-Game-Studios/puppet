@@ -12,6 +12,7 @@ import { baseName, isTauri, readPath } from './platform';
 import { t } from '../i18n';
 import { pickVrmFiles, pickVrmPaths } from '../library/backend';
 import { Library, type Card, type ImportResult, type ImportSource, type ImportStep } from '../library/library';
+import { addStarters } from '../library/starters';
 import { displayAuthor, displayName, formatBytes, formatCount, tn, type LibraryQuery } from '../library/libraryIndex';
 import { badgeLabel, LICENCE_LETTER, licenceLetterTitle, readVrmMeta, summarizeLicence, type LicenceSummary, type VrmMeta } from '../library/vrmMeta';
 import { buildCard, CARD_WARNINGS, renderLicence, renderWarnings, syncLabel } from './homeView';
@@ -437,6 +438,13 @@ export async function mountHome(deps: HomeDeps): Promise<Home> {
       $('home-migrate-name').title = lastPath;
       $('home-migrate').classList.remove('hidden');
     } else library.setMigrationDone();
+  }
+  // ---------------------------------------------------------------- starter avatars (first launch)
+  // Only for a library that starts empty: someone upgrading with models of
+  // their own (or a pre-library last model) doesn't get extra entries.
+  if (library.index.starters === 'pending') {
+    library.setStartersDone();
+    if (library.size === 0 && !lastPath) void addStarters(library);
   }
   $('btn-migrate-yes').addEventListener('click', async () => {
     $('home-migrate').classList.add('hidden');

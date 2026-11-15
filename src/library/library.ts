@@ -232,4 +232,9 @@ export class Library {
     this.index.migration = 'done';
     this.save();
   }
+
+  setStartersDone(): void {
+    this.index.starters = 'done';
+    this.save();
+  }
 }

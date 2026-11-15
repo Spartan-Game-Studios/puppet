@@ -70,6 +70,15 @@ MPL-2.0 is file-level copyleft. Using these crates unmodified (their source is o
 
 Retargeting (`src/anim/retarget.ts`) is VPuppet's own code. The idea of mapping a clip onto a VRM's normalized bones through world-space rest rotations is the one three-vrm's `loadMixamoAnimation` example shows (MIT); no code was copied from it. Users' imported clips (Mixamo or other) stay on their machine and are never bundled.
 
+## Starter avatars
+
+| Asset | Licence | Notes |
+|---|---|---|
+| `public/starters/two-tails.vrm`, `strawberry-princess.vrm`, `witch.vrm`: Two-Tails, Strawberry Princess and Witch by [Polygonal Mind](https://polygonalmind.com) (100Avatars) | CC0 1.0 | unmodified; from the [Open Source Avatars](https://opensourceavatars.com) registry |
+| `public/starters/chubby-tubby-cat.vrm`: Chubby Tubby Cat by ToxSam | CC0 1.0 | unmodified; from the Open Source Avatars registry |
+
+Added to an empty library on first launch. Sources, hashes and how the licences were checked: `public/starters/LICENSES.md`. Users' own models stay on their machine and are never bundled.
+
 ## Environment assets
 
 The built-in 3D environments ship **no asset files**. Every scene, texture and sky is generated at runtime from code in `src/scene/environment/` (geometry, GLSL shaders, value noise painted into canvas textures). Custom `.glb`/`.gltf`/`.hdr`/`.exr` files are the user's own and are never bundled.
