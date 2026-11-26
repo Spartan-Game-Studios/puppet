@@ -20,6 +20,11 @@
 #
 # Output: src-tauri/target/universal-apple-darwin/release/bundle/macos/VPuppet.app
 # (the path depot_build_full_macos.vdf uploads).
+#
+# DEMO=1 builds the free demo instead (cargo features demo + steam, with
+# libsteam_api.dylib in Contents/MacOS) into its own target folder,
+# src-tauri/target-demo/, so it can never be uploaded as the full app.
+# Its BUY button opens the full app's store page (VPUPPET_STEAM_APP_ID).
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
@@ -27,7 +32,16 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 : "${PUPPET_APP_PROFILE:?set PUPPET_APP_PROFILE to the app provisioning profile}"
 : "${PUPPET_CAMHOST_PROFILE:?set PUPPET_CAMHOST_PROFILE to the camera installer provisioning profile}"
 APP_ID="com.spartangamestudios.vpuppet"
-APP="src-tauri/target/universal-apple-darwin/release/bundle/macos/VPuppet.app"
+TARGET_DIR="src-tauri/target"
+BUILD_ARGS=()
+if [[ "${DEMO:-0}" == 1 ]]; then
+  TARGET_DIR="src-tauri/target-demo"
+  export CARGO_TARGET_DIR="$PWD/$TARGET_DIR"
+  export VPUPPET_STEAM_APP_ID="${VPUPPET_STEAM_APP_ID:-5540350}"
+  node scripts/stage-steam-redist.mjs
+  BUILD_ARGS=(--features demo,steam --config src-tauri/tauri.demo.conf.json)
+fi
+APP="$TARGET_DIR/universal-apple-darwin/release/bundle/macos/VPuppet.app"
 HELPER="$APP/Contents/Helpers/VPuppet Camera.app"
 EXT="$HELPER/Contents/Library/SystemExtensions/$APP_ID.camera.systemextension"
 
@@ -53,7 +67,12 @@ unset APPLE_ID APPLE_PASSWORD APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_PATH
 
 rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
 bash src-tauri/macos/prepare-signing.sh
-pnpm tauri build --target universal-apple-darwin --bundles app --config src-tauri/macos/build/tauri.signed.conf.json
+pnpm tauri build --target universal-apple-darwin --bundles app "${BUILD_ARGS[@]}" --config src-tauri/macos/build/tauri.signed.conf.json
+if [[ "${DEMO:-0}" == 1 ]]; then
+  test -f "$APP/Contents/MacOS/libsteam_api.dylib" || { echo "build-macos: the demo bundle lacks libsteam_api.dylib" >&2; exit 1; }
+  otool -L "$APP/Contents/MacOS/vpuppet" | grep -q '@loader_path/libsteam_api.dylib' \
+    || { echo "build-macos: vpuppet does not load libsteam_api.dylib from beside itself" >&2; otool -L "$APP/Contents/MacOS/vpuppet" >&2; exit 1; }
+fi
 
 echo "build-macos: checking $APP"
 for bin in "$APP/Contents/MacOS/"* "$HELPER/Contents/MacOS/"* "$EXT/Contents/MacOS/"*; do

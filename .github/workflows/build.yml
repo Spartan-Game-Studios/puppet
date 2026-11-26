@@ -189,3 +189,82 @@ jobs:
             src-tauri/target/release/bundle/rpm/*.rpm
             src-tauri/target/release/bundle/appimage/*.AppImage
           if-no-files-found: error
+
+  # The free Steam demo (cargo features demo + steam) for Windows and Linux,
+  # on manual runs only. macOS is built, signed and notarized locally with
+  # `DEMO=1 bash steam/steampipe/build-macos.sh`. The artifacts are the files
+  # the SteamPipe demo depots ship (steam/steampipe/depot_build_demo_*.vdf).
+  demo:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            name: linux-x64
+            bundles: appimage
+          - platform: windows-latest
+            name: windows-x64
+            bundles: nsis
+    runs-on: ${{ matrix.platform }}
+    env:
+      # The demo's BUY button opens the full app's store page.
+      VPUPPET_STEAM_APP_ID: '5540350'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: demo-${{ matrix.name }}
+      - run: pnpm install --frozen-lockfile
+      - name: Stage the Steamworks runtime library
+        run: node scripts/stage-steam-redist.mjs
+      - name: Let the AppImage bundler find libsteam_api.so (Linux)
+        if: runner.os == 'Linux'
+        # linuxdeploy copies every library the binary links into the AppImage
+        # (usr/lib, with an rpath to it), but only libraries it can resolve.
+        run: echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/src-tauri/vendor/steam" >> "$GITHUB_ENV"
+      - name: Build the demo (no release)
+        uses: tauri-apps/tauri-action@v0
+        with:
+          args: --features demo,steam --config src-tauri/tauri.demo.conf.json --bundles ${{ matrix.bundles }}
+      - name: Collect the depot files
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT=demo-depot
+          mkdir -p "$OUT"
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp src-tauri/target/release/vpuppet.exe "$OUT/"
+            cp src-tauri/target/release/softcam.dll src-tauri/target/release/LICENSE-softcam.txt "$OUT/"
+            cp src-tauri/vendor/steam/steam_api64.dll "$OUT/"
+          else
+            cp src-tauri/target/release/bundle/appimage/*.AppImage "$OUT/VPuppet.AppImage"
+            chmod +x "$OUT/VPuppet.AppImage"
+            cp src-tauri/vendor/steam/libsteam_api.so "$OUT/"
+            # The AppImage must carry libsteam_api.so and the binary must find it.
+            cd "$RUNNER_TEMP"
+            "$GITHUB_WORKSPACE/$OUT/VPuppet.AppImage" --appimage-extract >/dev/null
+            find squashfs-root -name 'libsteam_api.so' | grep -q . || { echo "AppImage lacks libsteam_api.so" >&2; exit 1; }
+            BIN=$(find squashfs-root/usr/bin -maxdepth 1 -type f -name 'vpuppet*' | head -1)
+            env -u LD_LIBRARY_PATH ldd "$BIN" | tee ldd.txt | grep steam_api
+            if grep -q 'steam_api.*not found' ldd.txt; then echo "vpuppet cannot find libsteam_api.so inside the AppImage" >&2; exit 1; fi
+          fi
+          ls -l "$GITHUB_WORKSPACE/$OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vpuppet-demo-${{ matrix.name }}
+          path: demo-depot/
+          if-no-files-found: error

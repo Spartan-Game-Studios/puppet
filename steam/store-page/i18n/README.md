@@ -49,7 +49,9 @@ Tick these, for both the full app and the demo, **once the app's UI translation 
 | Russian | yes | n/a | n/a |
 | Simplified Chinese | yes | n/a | n/a |
 | Spanish - Spain | yes | n/a | n/a |
-| Spanish - Latin America | yes | n/a | n/a |
+| Spanish - Latin America | **no** | n/a | n/a |
+
+Tick **only one** Spanish. The app has a single Spanish (`es`), and Valve's review fails a build whose store page lists both Spanish - Spain and Spanish - Latin America for one localization (build 26691140, Nov 2026). The app's wording leans Spain (*ordenador*), so Spanish - Spain is the one ticked. The Latin America description slot can keep the same text; it only fills the page for Latin American visitors.
 
 VPuppet has no voice-over and no subtitles, so leave Full audio and Subtitles unticked for every language.
 
